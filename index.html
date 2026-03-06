@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>MCAT Quest</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="MCAT Quest">
+<meta name="theme-color" content="#0f0f14">
+<meta name="description" content="MCAT Study Game">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%230f0f14' width='100' height='100' rx='20'/><text y='68' x='50' text-anchor='middle' font-size='55'>🧬</text></svg>">
+<link rel="manifest" href="data:application/json,%7B%22name%22%3A%22MCAT%20Quest%22%2C%22short_name%22%3A%22MCAT%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%230f0f14%22%2C%22theme_color%22%3A%22%230f0f14%22%7D">
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body,#root{height:100%;width:100%;background:#0f0f14;color:#e8e6e3;overflow-x:hidden}
+body{font-family:'SF Mono','Menlo','Fira Code',monospace;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+button{font-family:inherit;-webkit-tap-highlight-color:transparent;cursor:pointer;outline:none;border:none;background:none;color:inherit}
+button:active{opacity:0.85}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:2px}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+@keyframes fG{0%,100%{background:#0f0f14}50%{background:#0a2e0a}}
+@keyframes sS{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+@keyframes pu{0%,100%{opacity:1}50%{opacity:.5}}
+@keyframes sU{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pI{from{transform:scale(.8);opacity:0}to{transform:scale(1);opacity:1}}
+@keyframes fI{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes gI{from{transform:scale(0);opacity:0}to{transform:scale(1);opacity:1}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+// ═══════════════════════════════════════════
+// FIREBASE CONFIG — your personal project
+// ═══════════════════════════════════════════
+firebase.initializeApp({
+  apiKey: "AIzaSyCkm0XHE_cubG1AdZd2QXXz9g4oOxqT0Mo",
+  authDomain: "mcat-804a5.firebaseapp.com",
+  projectId: "mcat-804a5",
+  storageBucket: "mcat-804a5.firebasestorage.app",
+  messagingSenderId: "146740482880",
+  appId: "1:146740482880:web:80faf1a84fe5a9a86220a5"
+});
+const db = firebase.firestore();
+</script>
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ═══════════════════════════════════════════
+// FIREBASE STORAGE LAYER
+// ═══════════════════════════════════════════
+const COLLECTION = "mcatquest";
+
+async function loadFromCloud(pin) {
+  try {
+    const doc = await db.collection(COLLECTION).doc(pin).get();
+    if (doc.exists) return doc.data();
+  } catch (e) { console.error("Load failed:", e); }
+  return null;
+}
+
+async function saveToCloud(pin, data) {
+  try {
+    await db.collection(COLLECTION).doc(pin).set(data);
+    return true;
+  } catch (e) { console.error("Save failed:", e); return false; }
+}
+
+function getSavedPin() {
+  try { return localStorage.getItem("mcat_pin") || ""; } catch(e) { return ""; }
+}
+function rememberPin(pin) {
+  try { localStorage.setItem("mcat_pin", pin); } catch(e) {}
+}
+
+// ═══════════════════════════════════════════
+// CATEGORIES
+// ═══════════════════════════════════════════
+const CATEGORIES = {
+  ENZYME_KINETICS:{name:"Enzyme Kinetics",icon:"🧬",color:"#e63946",section:"Bio/Biochem"},
+  METABOLISM:{name:"Metabolism",icon:"🔥",color:"#f4a261",section:"Bio/Biochem"},
+  AMINO_ACIDS:{name:"Amino Acids",icon:"🧪",color:"#2a9d8f",section:"Bio/Biochem"},
+  GEN_CHEM:{name:"Gen Chem",icon:"⚗️",color:"#457b9d",section:"Chem/Phys"},
+  ORGO:{name:"Organic Chem",icon:"⬡",color:"#6a4c93",section:"Chem/Phys"},
+  PHYSICS:{name:"Physics",icon:"⚡",color:"#1d3557",section:"Chem/Phys"},
+  PSYCH_SOC:{name:"Psych/Soc",icon:"🧠",color:"#e76f51",section:"Psych/Soc"},
+  BIO_SYSTEMS:{name:"Bio Systems",icon:"🫀",color:"#d62828",section:"Bio/Biochem"},
+  MOLECULAR_BIO:{name:"Molecular Bio",icon:"🔬",color:"#588157",section:"Bio/Biochem"},
+};
+
+// ═══════════════════════════════════════════
+// QUESTION BANK (100+)
+// ═══════════════════════════════════════════
+const ALL_QUESTIONS = [
+  // ENZYME KINETICS (Priority)
+  {id:"ek1",cat:"ENZYME_KINETICS",priority:true,diff:2,q:"In uncompetitive inhibition, what happens to Km and Vmax?",options:["Both decrease","Km increases, Vmax decreases","Both increase","Km decreases, Vmax stays same"],answer:0,explain:"UNcompetitive = everything goes UN-der. Both Km and Vmax decrease.",mnemonic:"🔑 UN-competitive → everything goes DOWN"},
+  {id:"ek2",cat:"ENZYME_KINETICS",priority:true,diff:2,q:"Noncompetitive inhibition changes which parameter(s)?",options:["Only Vmax decreases","Only Km increases","Both decrease","Only Km decreases"],answer:0,explain:"Binds allosteric site. Fewer functional enzymes → Vmax↓. Km unchanged.",mnemonic:"🔑 NON-competitive = NO change to Km, Vmax down"},
+  {id:"ek3",cat:"ENZYME_KINETICS",priority:true,diff:2,q:"LB plot for uncompetitive inhibition shows:",options:["Parallel lines","Lines crossing on y-axis","Lines crossing on x-axis","Same line"],answer:0,explain:"Both slope and intercepts shift proportionally → parallel.",mnemonic:"🔑 UN-competitive lines UN-able to meet"},
+  {id:"ek4",cat:"ENZYME_KINETICS",priority:true,diff:2,q:"Competitive inhibitor LB lines intersect on the:",options:["Y-axis","X-axis","Origin","Don't intersect"],answer:0,explain:"Same Vmax → same y-intercept. Different Km.",mnemonic:"🔑 Competitive = same y-intercept (same Vmax)"},
+  {id:"ek5",cat:"ENZYME_KINETICS",priority:true,diff:3,q:"Why does Km decrease in uncompetitive inhibition?",options:["Inhibitor traps ES, shifting equilibrium toward ES","Inhibitor increases enzyme affinity directly","Substrate concentration increases","Enzyme conformation changes"],answer:0,explain:"Le Chatelier: removing ES → more ES forms → apparent higher affinity → lower Km.",mnemonic:"🔑 Le Chatelier: removing ES → more ES forms"},
+  {id:"ek6",cat:"ENZYME_KINETICS",priority:true,diff:1,q:"An uncompetitive inhibitor binds to:",options:["Only the ES complex","Only free enzyme","Both E and ES","Substrate directly"],answer:0,explain:"UNcompetitive = UNable to bind alone.",mnemonic:"🔑 UN-able to bind alone, needs substrate first"},
+  {id:"ek7",cat:"ENZYME_KINETICS",diff:1,q:"Km represents:",options:["[S] at half Vmax","Maximum rate","Binding energy","Turnover number"],answer:0,explain:"Low Km = high affinity.",mnemonic:"🔑 Low Km = hungry enzyme"},
+  {id:"ek8",cat:"ENZYME_KINETICS",diff:2,q:"Catalytic efficiency is measured by:",options:["kcat/Km","Vmax/Km","Km/Vmax","kcat × Km"],answer:0,explain:"Specificity constant.",mnemonic:"🔑 Efficiency = speed ÷ appetite"},
+  {id:"ek9",cat:"ENZYME_KINETICS",priority:true,diff:2,q:"Noncompetitive inhibitor LB lines intersect on the:",options:["X-axis","Y-axis","Parallel","Origin"],answer:0,explain:"Same Km → same x-intercept. Different Vmax → different y-intercept.",mnemonic:"🔑 NON-competitive = cross on X-axis"},
+  {id:"ek10",cat:"ENZYME_KINETICS",priority:true,diff:3,q:"Mixed inhibition differs from noncompetitive because:",options:["It changes both Km and Vmax","Only changes Km","Only affects Vmax","Binds active site"],answer:0,explain:"Different affinities for E vs ES → changes both.",mnemonic:"🔑 Mixed = mixed effects on BOTH"},
+  {id:"ek11",cat:"ENZYME_KINETICS",diff:2,q:"Allosteric enzymes do NOT follow:",options:["Michaelis-Menten kinetics","Le Chatelier's principle","Thermodynamics","Conservation of mass"],answer:0,explain:"Sigmoidal, not hyperbolic.",mnemonic:"🔑 Allosteric = S-curve"},
+  {id:"ek12",cat:"ENZYME_KINETICS",diff:3,q:"Competitive inhibition can be overcome by:",options:["Increasing [substrate]","Increasing [enzyme]","Decreasing temperature","Adding more inhibitor"],answer:0,explain:"High [S] outcompetes inhibitor.",mnemonic:"🔑 Flood with substrate to win"},
+  {id:"ek13",cat:"ENZYME_KINETICS",diff:2,q:"kcat (turnover number) represents:",options:["Reactions per enzyme per second at saturation","Total reactions in a cell","Km/Vmax ratio","Molecular weight"],answer:0,explain:"kcat = Vmax/[Et].",mnemonic:"🔑 kcat = speed limit at full blast"},
+  {id:"ek14",cat:"ENZYME_KINETICS",diff:3,q:"Positive cooperativity means:",options:["First binding increases affinity for more","Enzyme activated by product","Km increases with [S]","Single subunit"],answer:0,explain:"Sigmoidal. Hill coefficient n > 1.",mnemonic:"🔑 'More the merrier'"},
+  {id:"ek15",cat:"ENZYME_KINETICS",priority:true,diff:2,q:"Which inhibition has NO effect on Vmax?",options:["Competitive","Noncompetitive","Uncompetitive","Mixed"],answer:0,explain:"Can always outcompete with enough substrate.",mnemonic:"🔑 Competitive = Vmax unchanged"},
+  {id:"ek16",cat:"ENZYME_KINETICS",priority:true,diff:3,q:"Km drops from 2mM to 0.5mM, Vmax also decreases. Inhibitor type?",options:["Uncompetitive","Competitive","Noncompetitive","Irreversible"],answer:0,explain:"Both down → uncompetitive.",mnemonic:"🔑 Both down = UNcompetitive"},
+  // METABOLISM
+  {id:"met1",cat:"METABOLISM",diff:1,q:"Net ATP from one glucose (aerobic):",options:["30-32","36-38","2","4"],answer:0,explain:"Modern: 30-32. Old 36-38 is a trap.",mnemonic:"🔑 30-32 ATP"},
+  {id:"met2",cat:"METABOLISM",diff:2,q:"Rate-limiting enzyme of glycolysis:",options:["PFK-1","Hexokinase","Pyruvate kinase","Aldolase"],answer:0,explain:"PFK-1: committed step.",mnemonic:"🔑 PFK-1 = gatekeeper"},
+  {id:"met3",cat:"METABOLISM",diff:1,q:"β-oxidation occurs in the:",options:["Mitochondrial matrix","Cytoplasm","Smooth ER","Peroxisomes only"],answer:0,explain:"Chops 2C units in matrix.",mnemonic:"🔑 Carnitine shuttle → matrix"},
+  {id:"met4",cat:"METABOLISM",diff:2,q:"Pyruvate → lactate primarily to:",options:["Regenerate NAD+","Produce ATP","Feed Krebs","Store energy"],answer:0,explain:"LDH regenerates NAD+ for glycolysis.",mnemonic:"🔑 No O2 → lactate recycles NAD+"},
+  {id:"met5",cat:"METABOLISM",diff:1,q:"Krebs cycle occurs in:",options:["Mitochondrial matrix","Inner membrane","Cytoplasm","Outer membrane"],answer:0,explain:"Matrix = Krebs. Inner membrane = ETC.",mnemonic:"🔑 Matrix = Krebs"},
+  {id:"met6",cat:"METABOLISM",diff:2,q:"NADH per Krebs turn:",options:["3","2","4","1"],answer:0,explain:"3 NADH + 1 FADH2 + 1 GTP per turn.",mnemonic:"🔑 3 NADH, 1 FADH2, 1 GTP"},
+  {id:"met7",cat:"METABOLISM",diff:3,q:"Gluconeogenesis bypasses PFK-1 using:",options:["Fructose-1,6-bisphosphatase","Glucose-6-phosphatase","Pyruvate carboxylase","PEP carboxykinase"],answer:0,explain:"3 bypass enzymes total.",mnemonic:"🔑 3 bypasses for 3 irreversible steps"},
+  {id:"met8",cat:"METABOLISM",diff:2,q:"Insulin promotes:",options:["Glycolysis + glycogen synthesis","Gluconeogenesis","Beta-oxidation","Ketogenesis"],answer:0,explain:"Fed state: store everything.",mnemonic:"🔑 Insulin = store it all!"},
+  {id:"met9",cat:"METABOLISM",diff:2,q:"Glucagon targets:",options:["Liver","Skeletal muscle","Brain","Adipose"],answer:0,explain:"Muscle lacks glucagon receptors.",mnemonic:"🔑 Glucagon = liver only"},
+  {id:"met10",cat:"METABOLISM",diff:3,q:"FADH2 enters ETC at:",options:["Complex II","Complex I","Complex III","Complex IV"],answer:0,explain:"Skips I → less ATP (1.5 vs 2.5).",mnemonic:"🔑 FADH2 = Complex II"},
+  {id:"met11",cat:"METABOLISM",diff:3,q:"Ketone bodies from:",options:["Acetyl-CoA in liver","Pyruvate in muscle","Glucose in brain","FAs in adipose"],answer:0,explain:"Fasting → excess acetyl-CoA → ketones.",mnemonic:"🔑 Liver + fasting + acetyl-CoA"},
+  {id:"met12",cat:"METABOLISM",diff:2,q:"Cori cycle shuttles:",options:["Muscle lactate → liver glucose","Liver lactate → muscle glucose","Brain glucose → liver pyruvate","Kidney NH3 → liver"],answer:0,explain:"Costs 6 ATP net.",mnemonic:"🔑 Muscle LACTATE → liver GLUCOSE"},
+  // AMINO ACIDS
+  {id:"aa1",cat:"AMINO_ACIDS",diff:1,q:"Positively charged AAs at pH 7.4:",options:["Lys, Arg, His","Asp, Glu","Ser, Thr, Tyr","Phe, Trp, Tyr"],answer:0,explain:"Basic AAs.",mnemonic:"🔑 Kings Rule History"},
+  {id:"aa2",cat:"AMINO_ACIDS",diff:2,q:"Best biological buffer AA:",options:["Histidine","Tryptophan","Proline","Phenylalanine"],answer:0,explain:"His pKa ~6 ≈ physiological pH.",mnemonic:"🔑 His = buffer king"},
+  {id:"aa3",cat:"AMINO_ACIDS",diff:1,q:"Disulfide bonds between:",options:["Cysteine","Methionine","Serine","Threonine"],answer:0,explain:"Two Cys -SH → -S-S-.",mnemonic:"🔑 Cys-Cys = S-S bridge"},
+  {id:"aa4",cat:"AMINO_ACIDS",diff:2,q:"Negatively charged AAs:",options:["Asp and Glu","Lys and Arg","Ser and Thr","Trp and Phe"],answer:0,explain:"Deprotonated at 7.4.",mnemonic:"🔑 D and E = Dangerously nEgative"},
+  {id:"aa5",cat:"AMINO_ACIDS",diff:2,q:"Helix breaker:",options:["Proline","Glycine","Alanine","Leucine"],answer:0,explain:"Rigid ring creates kink.",mnemonic:"🔑 Proline = helix breaker"},
+  {id:"aa6",cat:"AMINO_ACIDS",diff:1,q:"Essential AAs:",options:["Obtained from diet","Made in liver","From glucose","By bacteria"],answer:0,explain:"PVT TIM HALL.",mnemonic:"🔑 PVT TIM HALL"},
+  {id:"aa7",cat:"AMINO_ACIDS",diff:2,q:"At pI:",options:["Net charge = zero","Max positive","Max negative","No charge anywhere"],answer:0,explain:"Zwitterion. Won't migrate.",mnemonic:"🔑 pI = zero charge"},
+  {id:"aa8",cat:"AMINO_ACIDS",diff:3,q:"UV 280nm absorbers:",options:["Trp, Tyr, Phe","Lys, Arg, His","Asp, Glu","Ser, Thr"],answer:0,explain:"Aromatic rings absorb ~280nm.",mnemonic:"🔑 Trp >> Tyr > Phe"},
+  // GEN CHEM
+  {id:"gc1",cat:"GEN_CHEM",diff:1,q:"Buffer best at pH ±1 of:",options:["pKa","7.0","pKb","14"],answer:0,explain:"Henderson-Hasselbalch.",mnemonic:"🔑 Buffer = pKa ± 1"},
+  {id:"gc2",cat:"GEN_CHEM",diff:2,q:"Spontaneous at ALL temps:",options:["ΔH<0 and ΔS>0","ΔH>0 and ΔS>0","ΔH<0 and ΔS<0","ΔH>0 and ΔS<0"],answer:0,explain:"ΔG = ΔH - TΔS always negative.",mnemonic:"🔑 Exothermic + more entropy"},
+  {id:"gc3",cat:"GEN_CHEM",diff:1,q:"Add product at equilibrium:",options:["Shifts toward reactants","Shifts toward products","No effect","Increases Keq"],answer:0,explain:"Le Chatelier.",mnemonic:"🔑 System runs away from added stuff"},
+  {id:"gc4",cat:"GEN_CHEM",diff:2,q:"↑T for exothermic:",options:["Decreases Keq","Increases Keq","No effect","Depends"],answer:0,explain:"Heat = product in exothermic.",mnemonic:"🔑 ↑T shifts left → smaller Keq"},
+  {id:"gc5",cat:"GEN_CHEM",diff:1,q:"Highest boiling point:",options:["H₂O","CH₄","Ne","C₂H₆"],answer:0,explain:"H-bonding >> London.",mnemonic:"🔑 H-bonds win"},
+  {id:"gc6",cat:"GEN_CHEM",diff:1,q:"Strong acid:",options:["Completely dissociates","Partially","Doesn't","Forms buffer"],answer:0,explain:"100% dissociation.",mnemonic:"🔑 Strong = full dissociation"},
+  {id:"gc7",cat:"GEN_CHEM",diff:2,q:"pH of 1×10⁻³ M HCl:",options:["3","11","-3","0.001"],answer:0,explain:"pH = -log(10⁻³) = 3.",mnemonic:"🔑 pH = -log[H+]"},
+  {id:"gc8",cat:"GEN_CHEM",diff:3,q:"Positive E°cell:",options:["Spontaneous (ΔG<0)","Non-spontaneous","Needs voltage","ΔG>0"],answer:0,explain:"+E° → -ΔG → spontaneous.",mnemonic:"🔑 +E° = -ΔG = go"},
+  {id:"gc9",cat:"GEN_CHEM",diff:1,q:"Oxidation is:",options:["Loss of electrons","Gain of electrons","Loss of protons","Gain of protons"],answer:0,explain:"OIL RIG.",mnemonic:"🔑 OIL RIG"},
+  {id:"gc10",cat:"GEN_CHEM",diff:2,q:"Rate law order by:",options:["Experiment only","Balanced equation","MW","Temperature"],answer:0,explain:"Experimental (unless elementary step).",mnemonic:"🔑 Rate law = experiments"},
+  {id:"gc11",cat:"GEN_CHEM",diff:3,q:"First-order half-life:",options:["Constant","Doubles with [A]","Depends on [A]","Zero"],answer:0,explain:"t½ = 0.693/k.",mnemonic:"🔑 t½ = 0.693/k"},
+  // ORGO
+  {id:"org1",cat:"ORGO",diff:2,q:"SN1 favored by:",options:["3° + weak nuc + polar protic","1° + strong nuc","2° + polar aprotic","Methyl + strong base"],answer:0,explain:"Stable carbocation needed.",mnemonic:"🔑 SN1: 3°, weak nuc, protic"},
+  {id:"org2",cat:"ORGO",diff:1,q:"SN2 stereochemistry:",options:["Inversion","Retention","Racemic","No change"],answer:0,explain:"Backside attack → Walden inversion.",mnemonic:"🔑 SN2 = umbrella flip"},
+  {id:"org3",cat:"ORGO",diff:2,q:"Bulky base + 2° →",options:["E2","SN2","SN1","E1"],answer:0,explain:"Too bulky for backside attack.",mnemonic:"🔑 Too bulky → elimination"},
+  {id:"org4",cat:"ORGO",diff:2,q:"Markovnikov: H to carbon with:",options:["More H's","Fewer H's","More substituents","LG"],answer:0,explain:"Rich get richer.",mnemonic:"🔑 Rich get richer"},
+  {id:"org5",cat:"ORGO",diff:2,q:"Anti-Markovnikov with:",options:["HBr + peroxides","HBr alone","H2O + acid","HCl + heat"],answer:0,explain:"Radical mechanism.",mnemonic:"🔑 Peroxides flip the rule"},
+  {id:"org6",cat:"ORGO",diff:1,q:"Enantiomers differ at:",options:["ALL stereocenters","One","Connectivity","Formula"],answer:0,explain:"Mirror images.",mnemonic:"🔑 Left & right hands"},
+  {id:"org7",cat:"ORGO",diff:2,q:"Diastereomers differ at:",options:["Some but not all stereocenters","All","None","Different formulas"],answer:0,explain:"Not mirror images. Different physical properties.",mnemonic:"🔑 ≠ mirror images"},
+  {id:"org8",cat:"ORGO",diff:3,q:"Aldol nucleophile:",options:["Enolate","Grignard","Alcohol","Halide"],answer:0,explain:"Attacks another carbonyl.",mnemonic:"🔑 Enolate attacks aldehyde"},
+  {id:"org9",cat:"ORGO",diff:2,q:"Zaitsev's rule:",options:["More substituted alkene","Less substituted","Terminal","Cyclic"],answer:0,explain:"More stable alkene.",mnemonic:"🔑 More substituted wins"},
+  {id:"org10",cat:"ORGO",diff:3,q:"Reduces COOH to 1° alcohol:",options:["LiAlH4","NaBH4","H2/Pd","PCC"],answer:0,explain:"LiAlH4 = strong. NaBH4 = gentle.",mnemonic:"🔑 LiAlH4 = strong reducer"},
+  // PHYSICS
+  {id:"ph1",cat:"PHYSICS",diff:2,q:"Bernoulli: ↑velocity →",options:["↓pressure","↑pressure","Same","↑density"],answer:0,explain:"P + ½ρv² + ρgh = const.",mnemonic:"🔑 Fast = low pressure"},
+  {id:"ph2",cat:"PHYSICS",diff:1,q:"E-field units:",options:["N/C = V/m","C/m","J/C","N·m"],answer:0,explain:"E = F/q = V/d.",mnemonic:"🔑 N/C = V/m"},
+  {id:"ph3",cat:"PHYSICS",diff:1,q:"2× distance → force:",options:["1/4","1/2","Same","2×"],answer:0,explain:"F ∝ 1/r².",mnemonic:"🔑 Inverse SQUARE"},
+  {id:"ph4",cat:"PHYSICS",diff:2,q:"Concave mirror past C:",options:["Real, inverted, smaller","Virtual, upright","Real, upright","No image"],answer:0,explain:"Image between F and C.",mnemonic:"🔑 Past C = small inverted real"},
+  {id:"ph5",cat:"PHYSICS",diff:2,q:"A₁v₁=A₂v₂ for:",options:["Incompressible fluids","Compressible gases","Turbulent flow","Rest"],answer:0,explain:"Narrow → faster.",mnemonic:"🔑 Narrow = faster"},
+  {id:"ph6",cat:"PHYSICS",diff:2,q:"Open-open tube harmonics:",options:["All integers","Odd only","Even only","None"],answer:0,explain:"Closed-open: odd only.",mnemonic:"🔑 Open=ALL, Closed-open=ODD"},
+  {id:"ph7",cat:"PHYSICS",diff:1,q:"W=0 when force is:",options:["⊥ to displacement","Parallel","Antiparallel","45°"],answer:0,explain:"cos90° = 0.",mnemonic:"🔑 Perpendicular = zero work"},
+  {id:"ph8",cat:"PHYSICS",diff:2,q:"Thin lens equation:",options:["1/f = 1/do + 1/di","f = do+di","f = do×di","1/f = 1/do−1/di"],answer:0,explain:"Sign conventions matter.",mnemonic:"🔑 1/f = 1/do + 1/di"},
+  {id:"ph9",cat:"PHYSICS",diff:1,q:"Sound fastest through:",options:["Solids","Liquids","Gases","Vacuum"],answer:0,explain:"Can't travel through vacuum.",mnemonic:"🔑 Solid > liquid > gas"},
+  {id:"ph10",cat:"PHYSICS",diff:2,q:"Total internal reflection from:",options:["High n → low n","Low n → high n","Same","Any"],answer:0,explain:"Must exceed critical angle.",mnemonic:"🔑 High→Low + critical angle"},
+  {id:"ph11",cat:"PHYSICS",diff:3,q:"Parallel plate C =",options:["ε₀A/d","ε₀d/A","Q/V²","V/Q"],answer:0,explain:"Big plates, small gap.",mnemonic:"🔑 C = ε₀A/d"},
+  // PSYCH/SOC
+  {id:"ps1",cat:"PSYCH_SOC",diff:1,q:"Object permanence stage:",options:["Sensorimotor (0-2)","Preoperational","Concrete operational","Formal operational"],answer:0,explain:"~8 months.",mnemonic:"🔑 Peek-a-boo isn't magic"},
+  {id:"ps2",cat:"PSYCH_SOC",diff:1,q:"Bystander effect:",options:["Diffusion of responsibility","Social facilitation","Groupthink","Deindividuation"],answer:0,explain:"More people → less help.",mnemonic:"🔑 More watchers = less help"},
+  {id:"ps3",cat:"PSYCH_SOC",diff:1,q:"Erikson adolescent crisis:",options:["Identity vs Role Confusion","Intimacy vs Isolation","Initiative vs Guilt","Trust vs Mistrust"],answer:0,explain:"'Who am I?'",mnemonic:"🔑 Teens = identity crisis"},
+  {id:"ps4",cat:"PSYCH_SOC",diff:2,q:"Schachter-Singer:",options:["Arousal + cognitive label","Only arousal","Cognition first","Facial feedback"],answer:0,explain:"Two factors.",mnemonic:"🔑 Body buzz + brain label"},
+  {id:"ps5",cat:"PSYCH_SOC",diff:1,q:"Classical conditioning:",options:["Pavlov","Skinner","Bandura","Watson"],answer:0,explain:"Bell + food → bell → salivation.",mnemonic:"🔑 Pavlov = bell → drool"},
+  {id:"ps6",cat:"PSYCH_SOC",diff:2,q:"Negative reinforcement:",options:["Remove aversive → ↑behavior","Add punishment","Remove pleasant","Ignore"],answer:0,explain:"Remove bad → increase behavior.",mnemonic:"🔑 ≠ punishment!"},
+  {id:"ps7",cat:"PSYCH_SOC",diff:2,q:"Conventional morality:",options:["Following rules for order","Self-interest","Universal principles","Rewards"],answer:0,explain:"Stages 3-4.",mnemonic:"🔑 Conformist"},
+  {id:"ps8",cat:"PSYCH_SOC",diff:2,q:"Broca's damage →",options:["Can't produce speech","Can't understand","Visual loss","Memory loss"],answer:0,explain:"Expressive aphasia.",mnemonic:"🔑 Broca's = Broken speech"},
+  {id:"ps9",cat:"PSYCH_SOC",diff:2,q:"James-Lange:",options:["Body THEN emotion","Simultaneous","Cognition first","Facial expressions"],answer:0,explain:"'I run therefore I'm scared.'",mnemonic:"🔑 Body first"},
+  {id:"ps10",cat:"PSYCH_SOC",diff:3,q:"Symbolic interactionism:",options:["Meaning through interaction","Large structures","Biology","Unconscious"],answer:0,explain:"Micro-level.",mnemonic:"🔑 Interaction + symbols = meaning"},
+  {id:"ps11",cat:"PSYCH_SOC",diff:2,q:"Fundamental attribution error:",options:["Others' behavior → disposition","Own → situation","Blaming victim","Just world"],answer:0,explain:"Others fail = character. I fail = circumstances.",mnemonic:"🔑 Others: lazy. Me: bad luck."},
+  {id:"ps12",cat:"PSYCH_SOC",diff:2,q:"Maslow base:",options:["Physiological","Safety","Love","Self-actualization"],answer:0,explain:"Food, water, sleep.",mnemonic:"🔑 Bottom = survival"},
+  // BIO SYSTEMS
+  {id:"bs1",cat:"BIO_SYSTEMS",diff:1,q:"SA node:",options:["Right atrium","Left atrium","Right ventricle","Left ventricle"],answer:0,explain:"Pacemaker.",mnemonic:"🔑 SA = Start Atrium"},
+  {id:"bs2",cat:"BIO_SYSTEMS",diff:2,q:"ADH acts on:",options:["Collecting duct","PCT","Ascending loop","Glomerulus"],answer:0,explain:"Inserts aquaporins.",mnemonic:"🔑 ADH + collecting duct"},
+  {id:"bs3",cat:"BIO_SYSTEMS",diff:2,q:"Sympathetic releases:",options:["Norepinephrine","ACh","Dopamine","Serotonin"],answer:0,explain:"Exception: sweat glands = ACh.",mnemonic:"🔑 Sympathetic = NorEpi"},
+  {id:"bs4",cat:"BIO_SYSTEMS",diff:2,q:"GFR regulated by:",options:["Afferent/efferent arterioles","BP only","ADH only","Urine volume"],answer:0,explain:"Constrict efferent → ↑GFR.",mnemonic:"🔑 Afferent=Arriving, Efferent=Exiting"},
+  {id:"bs5",cat:"BIO_SYSTEMS",diff:1,q:"T cells mature in:",options:["Thymus","Bone marrow","Spleen","Lymph nodes"],answer:0,explain:"T = Thymus. B = Bone marrow.",mnemonic:"🔑 T=Thymus, B=Bone"},
+  {id:"bs6",cat:"BIO_SYSTEMS",diff:1,q:"Universal RBC donor:",options:["O negative","AB positive","O positive","A negative"],answer:0,explain:"No antigens.",mnemonic:"🔑 O neg=donor, AB+=recipient"},
+  {id:"bs7",cat:"BIO_SYSTEMS",diff:3,q:"Aldosterone:",options:["↑Na+ reabsorption, ↑K+ secretion","↑Water directly","↓Na+","↑Glucose"],answer:0,explain:"Na+ in, K+ out.",mnemonic:"🔑 Holds onto salt"},
+  {id:"bs8",cat:"BIO_SYSTEMS",diff:2,q:"Hb O₂ curve:",options:["Sigmoidal","Hyperbolic","Linear","Exponential"],answer:0,explain:"Cooperative. Mb = hyperbolic.",mnemonic:"🔑 Hb=S, Mb=hyperbola"},
+  {id:"bs9",cat:"BIO_SYSTEMS",diff:3,q:"Right shift Hb curve:",options:["↑CO₂, ↑H+, ↑temp, ↑BPG","↓CO₂","↑pH","↑CO"],answer:0,explain:"Release O₂ to active tissues.",mnemonic:"🔑 CADET face Right"},
+  // MOLECULAR BIO
+  {id:"mb1",cat:"MOLECULAR_BIO",diff:1,q:"Helicase:",options:["Unwinds DNA","Relieves tension","Makes primers","Synthesizes"],answer:0,explain:"Breaks H-bonds.",mnemonic:"🔑 Helix-ase"},
+  {id:"mb2",cat:"MOLECULAR_BIO",diff:2,q:"Wobble position:",options:["3rd codon","1st","2nd","All"],answer:0,explain:"Code degeneracy.",mnemonic:"🔑 Position 3 wobbles"},
+  {id:"mb3",cat:"MOLECULAR_BIO",diff:2,q:"5' cap:",options:["7-methylguanosine","Poly-A","Intron","Methyl-C"],answer:0,explain:"Protects, aids ribosome recognition.",mnemonic:"🔑 Cap=helmet, Poly-A=cushion"},
+  {id:"mb4",cat:"MOLECULAR_BIO",diff:2,q:"Okazaki fragments on:",options:["Lagging strand","Leading","Both","mRNA"],answer:0,explain:"Joined by ligase.",mnemonic:"🔑 Lagging = pieces"},
+  {id:"mb5",cat:"MOLECULAR_BIO",diff:1,q:"DNA pol direction:",options:["5'→3'","3'→5'","Both","Random"],answer:0,explain:"Build 5'→3', read 3'→5'.",mnemonic:"🔑 Build 5'→3' always"},
+  {id:"mb6",cat:"MOLECULAR_BIO",diff:3,q:"Nonsense mutation →",options:["Premature stop","Different AA","Frameshift","No change"],answer:0,explain:"Nonsense=STOP. Missense=wrong AA.",mnemonic:"🔑 Nonsense = STOP!"},
+  {id:"mb7",cat:"MOLECULAR_BIO",diff:2,q:"Lac operon induced by:",options:["Allolactose","Glucose","ATP","Tryptophan"],answer:0,explain:"Lactose ON + glucose OFF.",mnemonic:"🔑 Lactose ON, glucose OFF"},
+  {id:"mb8",cat:"MOLECULAR_BIO",diff:3,q:"Telomerase prevents:",options:["Chromosome shortening","Mismatch","Unwinding","Methylation"],answer:0,explain:"Active in stem/cancer cells.",mnemonic:"🔑 Anti-aging cream"},
+  {id:"mb9",cat:"MOLECULAR_BIO",diff:2,q:"Pro vs eu ribosomes:",options:["70S vs 80S","80S vs 70S","Both 80S","Both 70S"],answer:0,explain:"Antibiotics target 70S.",mnemonic:"🔑 Pro=70S, Eu=80S"},
+  {id:"mb10",cat:"MOLECULAR_BIO",diff:3,q:"p53 does:",options:["Arrests cycle / apoptosis on damage","Promotes division","Activates telomerase","↑Mutations"],answer:0,explain:"Mutated in >50% cancers.",mnemonic:"🔑 Guardian: STOP or self-destruct"},
+];
+
+// ═══════════════════════════════════════════
+// GAME CONFIG
+// ═══════════════════════════════════════════
+const GAME_MODES = {
+  BLITZ:{name:"Blitz",icon:"⚡",desc:"30s per question.",time:30},
+  MARATHON:{name:"Marathon",icon:"🏃",desc:"No timer. Deep learning.",time:null},
+  BOSS_BATTLE:{name:"Boss Battle",icon:"👹",desc:"5 hard Qs. 3 lives.",time:45},
+  WEAK_SPOTS:{name:"Weak Spots",icon:"🎯",desc:"Your weakest areas.",time:null},
+  REVIEW:{name:"Review Missed",icon:"📝",desc:"Replay wrong answers.",time:null},
+};
+const RANKS=[
+  {name:"Pre-Med Newbie",minXP:0,badge:"🥚"},{name:"Anatomy Apprentice",minXP:100,badge:"🐣"},
+  {name:"Lab Rat",minXP:300,badge:"🐁"},{name:"Study Machine",minXP:600,badge:"⚙️"},
+  {name:"Knowledge Knight",minXP:1000,badge:"🛡️"},{name:"Science Sorcerer",minXP:1800,badge:"🧙"},
+  {name:"MCAT Warrior",minXP:3000,badge:"⚔️"},{name:"528 Legend",minXP:5000,badge:"👑"},
+];
+function getRank(xp){let r=RANKS[0];for(const x of RANKS)if(xp>=x.minXP)r=x;return r;}
+function getNextRank(xp){for(const r of RANKS)if(xp<r.minXP)return r;return null;}
+function shuffle(a){const b=[...a];for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]];}return b;}
+
+const DEFAULT_DATA={xp:0,totalCorrect:0,totalAnswered:0,bestStreak:0,questionStats:{},sessionHistory:[]};
+
+// ═══════════════════════════════════════════
+// PIN SCREEN
+// ═══════════════════════════════════════════
+function PinScreen({onLogin}) {
+  const [pin, setPin] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const saved = getSavedPin();
+
+  useEffect(() => {
+    if (saved) { setPin(saved); doLogin(saved); }
+  }, []);
+
+  async function doLogin(p) {
+    if (p.length < 3) { setError("PIN must be at least 3 characters"); return; }
+    setLoading(true); setError("");
+    const data = await loadFromCloud(p);
+    rememberPin(p);
+    onLogin(p, data || {...DEFAULT_DATA});
+  }
+
+  if (saved && loading) return (
+    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#0f0f14"}}>
+      <div style={{textAlign:"center"}}><div style={{fontSize:48,animation:"pulse 1.5s infinite"}}>🧬</div>
+      <div style={{fontSize:12,color:"#555",marginTop:10}}>Loading progress...</div></div>
+    </div>
+  );
+
+  return (
+    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#0f0f14",padding:20}}>
+      <div style={{maxWidth:340,width:"100%",textAlign:"center"}}>
+        <div style={{fontSize:52,marginBottom:8}}>🧬</div>
+        <h1 style={{fontSize:28,fontWeight:900,color:"#fff",letterSpacing:3,margin:"0 0 4px"}}>MCAT<span style={{background:"linear-gradient(135deg,#667eea,#764ba2)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>QUEST</span></h1>
+        <p style={{fontSize:11,color:"#555",marginBottom:30,letterSpacing:2}}>ENTER YOUR PIN TO SYNC PROGRESS</p>
+        <input
+          type="text"
+          value={pin}
+          onChange={e => setPin(e.target.value.toLowerCase().replace(/[^a-z0-9]/g,""))}
+          onKeyDown={e => e.key==="Enter" && doLogin(pin)}
+          placeholder="your-pin"
+          style={{width:"100%",padding:"14px 16px",background:"rgba(255,255,255,0.06)",border:"1.5px solid rgba(255,255,255,0.12)",borderRadius:10,color:"#fff",fontSize:18,fontFamily:"inherit",textAlign:"center",letterSpacing:4,outline:"none"}}
+          autoFocus
+        />
+        <p style={{fontSize:10,color:"#666",marginTop:8,lineHeight:1.5}}>Use the same PIN on every device to sync. First time? Just pick any PIN — it creates your save automatically.</p>
+        {error && <p style={{fontSize:11,color:"#f87171",marginTop:8}}>{error}</p>}
+        <button
+          onClick={() => doLogin(pin)}
+          disabled={loading || pin.length < 3}
+          style={{width:"100%",padding:14,marginTop:16,background:pin.length>=3?"linear-gradient(135deg,#667eea,#764ba2)":"rgba(255,255,255,0.06)",color:"#fff",borderRadius:10,fontSize:15,fontWeight:700,letterSpacing:1,opacity:pin.length>=3?1:0.4}}
+        >{loading ? "Loading..." : "Enter"}</button>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════
+// MAIN GAME (same logic, Firebase storage)
+// ═══════════════════════════════════════════
+function Game({pin, initialData}) {
+  const [screen,setScreen]=useState("home");
+  const [data,setData]=useState(initialData);
+  const [saveStatus,setSaveStatus]=useState("");
+  const [streak,setStreak]=useState(0);
+  const [gameMode,setGameMode]=useState(null);
+  const [selectedCats,setSelectedCats]=useState([]);
+  const [questions,setQuestions]=useState([]);
+  const [qIndex,setQIndex]=useState(0);
+  const [selected,setSelected]=useState(null);
+  const [showResult,setShowResult]=useState(false);
+  const [timeLeft,setTimeLeft]=useState(null);
+  const [sessionScore,setSessionScore]=useState(0);
+  const [sessionCorrect,setSessionCorrect]=useState(0);
+  const [sessionTotal,setSessionTotal]=useState(0);
+  const [wrongAnswers,setWrongAnswers]=useState([]);
+  const [shakeWrong,setShakeWrong]=useState(false);
+  const [flashCorrect,setFlashCorrect]=useState(false);
+  const [bossLives,setBossLives]=useState(3);
+  const [showMnemonic,setShowMnemonic]=useState(false);
+  const [statsTab,setStatsTab]=useState("overview");
+  const timerRef=useRef(null);
+
+  // Save to Firebase whenever data changes
+  useEffect(() => {
+    const t = setTimeout(async () => {
+      setSaveStatus("saving");
+      const ok = await saveToCloud(pin, data);
+      setSaveStatus(ok ? "saved" : "error");
+      if (ok) setTimeout(() => setSaveStatus(""), 1500);
+    }, 600);
+    return () => clearTimeout(t);
+  }, [data]);
+
+  // Timer
+  useEffect(()=>{if(timeLeft===null||timeLeft<=0||showResult)return;timerRef.current=setTimeout(()=>setTimeLeft(t=>t-1),1000);return()=>clearTimeout(timerRef.current);},[timeLeft,showResult]);
+  useEffect(()=>{if(timeLeft===0&&!showResult)handleAnswer(-1);},[timeLeft]);
+
+  const getCatAccuracy=(k)=>{const qs=ALL_QUESTIONS.filter(q=>q.cat===k);let s=0,c=0;qs.forEach(q=>{const st=data.questionStats[q.id];if(st){s+=st.seen;c+=st.correct;}});return{seen:s,correct:c,pct:s>0?Math.round(c/s*100):null};};
+  const getWeakestCats=()=>{const a=Object.keys(CATEGORIES).map(k=>({key:k,...getCatAccuracy(k)})).filter(c=>c.seen>=2);a.sort((x,y)=>x.pct-y.pct);return a.slice(0,3).map(c=>c.key);};
+  const getMissedIds=()=>Object.entries(data.questionStats).filter(([_,s])=>s.seen>0&&(s.correct/s.seen)<0.6).map(([id])=>id);
+
+  const startGame=(mode,cats)=>{
+    let pool;
+    if(mode==="WEAK_SPOTS"){const wc=getWeakestCats();if(!wc.length){alert("Play some games first!");return;}pool=ALL_QUESTIONS.filter(q=>wc.includes(q.cat));setSelectedCats(wc);}
+    else if(mode==="REVIEW"){const mi=getMissedIds();if(!mi.length){alert("No missed questions yet!");return;}pool=ALL_QUESTIONS.filter(q=>mi.includes(q.id));}
+    else{const ck=cats.length?cats:Object.keys(CATEGORIES);pool=ALL_QUESTIONS.filter(q=>ck.includes(q.cat));}
+    const count=mode==="BOSS_BATTLE"?5:Math.min(15,pool.length);
+    const byCat={};pool.forEach(q=>{if(!byCat[q.cat])byCat[q.cat]=[];byCat[q.cat].push(q);});
+    Object.keys(byCat).forEach(k=>{byCat[k]=shuffle(byCat[k]);});
+    const catKeys=shuffle(Object.keys(byCat));const picked=[];let round=0;
+    while(picked.length<count){let any=false;for(const ck of catKeys){if(picked.length>=count)break;if(round<byCat[ck].length){picked.push(byCat[ck][round]);any=true;}}if(!any)break;round++;}
+    let sel=shuffle(picked).map(q=>{const ct=q.options[q.answer];const so=shuffle([...q.options]);return{...q,options:so,answer:so.indexOf(ct)};});
+    setQuestions(sel);setQIndex(0);setSelected(null);setShowResult(false);setSessionScore(0);setSessionCorrect(0);setSessionTotal(0);setWrongAnswers([]);setGameMode(mode);setBossLives(3);setShowMnemonic(false);setStreak(0);setTimeLeft(GAME_MODES[mode].time||null);setScreen("play");
+  };
+
+  const handleAnswer=(idx)=>{
+    if(showResult)return;const q=questions[qIndex];const correct=idx===q.answer;
+    setSelected(idx);setShowResult(true);setSessionTotal(t=>t+1);clearTimeout(timerRef.current);
+    let earned=0;
+    if(correct){const tb=timeLeft?Math.floor(timeLeft*2):0;const sb=streak>=5?25:streak>=3?15:0;earned=(gameMode==="BOSS_BATTLE"?30:15)+tb+sb+(q.diff||1)*3;setSessionScore(s=>s+earned);setSessionCorrect(c=>c+1);setStreak(s=>s+1);setFlashCorrect(true);setTimeout(()=>setFlashCorrect(false),600);
+    }else{setStreak(0);setWrongAnswers(w=>[...w,q]);setShakeWrong(true);setTimeout(()=>setShakeWrong(false),500);if(gameMode==="BOSS_BATTLE")setBossLives(l=>l-1);}
+    setData(d=>{const qs={...d.questionStats};const p=qs[q.id]||{seen:0,correct:0,lastSeen:null,streak:0};qs[q.id]={seen:p.seen+1,correct:p.correct+(correct?1:0),lastSeen:Date.now(),streak:correct?p.streak+1:0};return{...d,xp:d.xp+earned,totalCorrect:d.totalCorrect+(correct?1:0),totalAnswered:d.totalAnswered+1,bestStreak:correct?Math.max(d.bestStreak,streak+1):d.bestStreak,questionStats:qs};});
+  };
+
+  const nextQuestion=()=>{if(gameMode==="BOSS_BATTLE"&&bossLives<=0){finishSession();return;}if(qIndex+1>=questions.length){finishSession();return;}setQIndex(i=>i+1);setSelected(null);setShowResult(false);setShowMnemonic(false);if(GAME_MODES[gameMode].time)setTimeLeft(GAME_MODES[gameMode].time);};
+  const finishSession=()=>{setData(d=>({...d,sessionHistory:[...d.sessionHistory,{date:Date.now(),mode:gameMode,correct:sessionCorrect,total:sessionTotal,score:sessionScore,cats:[...new Set(questions.map(q=>q.cat))]}].slice(-50)}));setScreen("results");};
+  const resetProgress=()=>{if(confirm("Reset ALL progress?")){setData({...DEFAULT_DATA});setScreen("home");}};
+
+  const rank=getRank(data.xp);const nextRankData=getNextRank(data.xp);
+
+  const SaveBadge=()=>saveStatus?<div style={{position:"fixed",bottom:12,right:12,fontSize:9,padding:"4px 10px",borderRadius:10,background:saveStatus==="saved"?"rgba(74,222,128,0.15)":saveStatus==="error"?"rgba(248,113,113,0.15)":"rgba(102,126,234,0.15)",color:saveStatus==="saved"?"#4ade80":saveStatus==="error"?"#f87171":"#667eea",zIndex:999}}>{saveStatus==="saving"?"💾 Syncing...":saveStatus==="saved"?"✅ Synced to cloud":"⚠️ Sync error"}</div>:null;
+
+  // ═══ HOME ═══
+  if(screen==="home"){
+    const accuracy=data.totalAnswered>0?Math.round(data.totalCorrect/data.totalAnswered*100):0;
+    return(<div style={st.ctr}><SaveBadge/><div style={st.inn}>
+      <div style={{textAlign:"center",marginBottom:20}}><div style={{fontSize:42}}>🧬</div><h1 style={st.ttl}>MCAT<span style={st.acc}>QUEST</span></h1><p style={{fontSize:11,color:"#555",letterSpacing:2,textTransform:"uppercase"}}>Master the MCAT through play</p></div>
+      <div style={st.sBar}><div style={st.si}><span style={st.sv}>{rank.badge} {rank.name}</span><span style={st.sl}>Rank</span></div><div style={st.dv}/><div style={st.si}><span style={st.sv}>{data.xp} XP</span><span style={st.sl}>Experience</span></div><div style={st.dv}/><div style={st.si}><span style={st.sv}>{accuracy}%</span><span style={st.sl}>Accuracy</span></div><div style={st.dv}/><div style={st.si}><span style={st.sv}>{data.totalAnswered}</span><span style={st.sl}>Answered</span></div></div>
+      {nextRankData&&<div style={{marginBottom:20,textAlign:"center"}}><div style={{height:6,background:"rgba(255,255,255,.08)",borderRadius:3,overflow:"hidden",marginBottom:4}}><div style={{height:"100%",background:"linear-gradient(90deg,#667eea,#764ba2)",borderRadius:3,transition:"width .5s",width:`${Math.min(((data.xp-rank.minXP)/(nextRankData.minXP-rank.minXP))*100,100)}%`}}/></div><span style={{fontSize:10,color:"#555"}}>{nextRankData.minXP-data.xp} XP to {nextRankData.badge} {nextRankData.name}</span></div>}
+      <div style={{marginBottom:20}}><div style={st.sh}><span style={st.sln}/><span style={st.stt}>TOPIC MASTERY</span><span style={st.sln}/></div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:5}}>{Object.entries(CATEGORIES).map(([k,cat])=>{const ac=getCatAccuracy(k);const p=ac.pct??0;const c=p>=80?"#4ade80":p>=60?"#fbbf24":p>0?"#f87171":"#333";return<div key={k} style={{padding:"7px 4px",background:"rgba(255,255,255,.03)",borderRadius:7,textAlign:"center",borderBottom:`2px solid ${c}`}}><div style={{fontSize:15}}>{cat.icon}</div><div style={{fontSize:8,color:"#777",marginTop:1}}>{cat.name}</div><div style={{fontSize:12,fontWeight:700,color:c,marginTop:1}}>{ac.seen>0?`${p}%`:"—"}</div></div>;})}</div></div>
+      <div style={st.sh}><span style={st.sln}/><span style={st.stt}>CHOOSE YOUR BATTLE</span><span style={st.sln}/></div>
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>{Object.entries(GAME_MODES).map(([key,mode])=>{const dis=(key==="WEAK_SPOTS"&&!getWeakestCats().length)||(key==="REVIEW"&&!getMissedIds().length);return<button key={key} style={{...st.mc,opacity:dis?0.4:1}} onClick={()=>{if(dis)return;if(key==="WEAK_SPOTS"||key==="REVIEW")startGame(key,[]);else{setGameMode(key);setScreen("select_cats");}}}><span style={{fontSize:24,width:36,textAlign:"center"}}>{mode.icon}</span><div><span style={{fontSize:14,fontWeight:700,color:"#fff",display:"block"}}>{mode.name}</span><span style={{fontSize:10,color:"#666"}}>{mode.desc}{key==="REVIEW"&&getMissedIds().length>0?` (${getMissedIds().length})`:""}</span></div></button>;})}</div>
+      <div style={{display:"flex",gap:8,marginTop:14}}>{data.bestStreak>0&&<div style={{flex:1,textAlign:"center",padding:8,background:"rgba(255,150,50,.08)",borderRadius:8,fontSize:12,color:"#ffa033",fontWeight:600}}>🔥 Best: {data.bestStreak}</div>}<button onClick={()=>setScreen("stats")} style={{flex:1,padding:8,background:"rgba(102,126,234,.1)",borderRadius:8,fontSize:12,color:"#667eea",fontWeight:600}}>📊 Stats</button></div>
+      <div style={{textAlign:"center",marginTop:14}}><span style={{fontSize:9,color:"#444"}}>{ALL_QUESTIONS.length} Qs · ☁️ Synced as "{pin}"</span></div>
+    </div></div>);
+  }
+
+  // ═══ STATS ═══
+  if(screen==="stats"){
+    const accuracy=data.totalAnswered>0?Math.round(data.totalCorrect/data.totalAnswered*100):0;const catStats=Object.entries(CATEGORIES).map(([k,c])=>({key:k,...c,...getCatAccuracy(k)})).sort((a,b)=>(a.pct??999)-(b.pct??999));const recent=[...data.sessionHistory].reverse().slice(0,10);const qDetails=ALL_QUESTIONS.map(q=>({...q,stats:data.questionStats[q.id]||null})).filter(q=>q.stats).sort((a,b)=>(a.stats.correct/a.stats.seen)-(b.stats.correct/b.stats.seen));const trend=data.sessionHistory.slice(-20).map((s,i)=>({i,pct:s.total>0?Math.round(s.correct/s.total*100):0}));
+    return(<div style={st.ctr}><SaveBadge/><div style={st.inn}>
+      <button style={st.bk} onClick={()=>setScreen("home")}>← Back</button>
+      <h2 style={{fontSize:20,fontWeight:800,color:"#fff",margin:"0 0 16px"}}>📊 Statistics</h2>
+      <div style={{display:"flex",gap:3,marginBottom:16,background:"rgba(255,255,255,.04)",padding:3,borderRadius:10}}>{[["overview","Overview"],["topics","Topics"],["questions","Questions"],["history","History"]].map(([k,l])=><button key={k} onClick={()=>setStatsTab(k)} style={{flex:1,padding:"7px 3px",borderRadius:7,fontSize:11,fontWeight:600,background:statsTab===k?"rgba(102,126,234,.25)":"transparent",color:statsTab===k?"#667eea":"#555"}}>{l}</button>)}</div>
+      {statsTab==="overview"&&<div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:16}}>{[{l:"Total XP",v:data.xp,i:"⭐"},{l:"Accuracy",v:`${accuracy}%`,i:"🎯"},{l:"Questions",v:data.totalAnswered,i:"📝"},{l:"Best Streak",v:data.bestStreak,i:"🔥"},{l:"Sessions",v:data.sessionHistory.length,i:"🎮"},{l:"Rank",v:rank.name,i:rank.badge}].map((x,i)=><div key={i} style={{padding:12,background:"rgba(255,255,255,.03)",borderRadius:10,border:"1px solid rgba(255,255,255,.06)"}}><div style={{fontSize:9,color:"#666",textTransform:"uppercase",letterSpacing:1,marginBottom:3}}>{x.i} {x.l}</div><div style={{fontSize:18,fontWeight:800,color:"#fff"}}>{x.v}</div></div>)}</div>
+        {trend.length>1&&<div><h3 style={{fontSize:12,color:"#777",marginBottom:8,fontWeight:600}}>Accuracy Trend</h3><div style={{display:"flex",alignItems:"flex-end",gap:2,height:70,marginBottom:16}}>{trend.map((t,i)=><div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end",height:"100%"}}><div style={{width:"100%",maxWidth:20,background:t.pct>=80?"#4ade80":t.pct>=60?"#fbbf24":"#f87171",borderRadius:"2px 2px 0 0",height:`${Math.max(t.pct*0.7,3)}%`,minHeight:2}}/><div style={{fontSize:7,color:"#555",marginTop:1}}>{t.pct}</div></div>)}</div></div>}
+        {getWeakestCats().length>0&&<div style={{padding:12,background:"rgba(248,113,113,.08)",border:"1px solid rgba(248,113,113,.2)",borderRadius:10}}><div style={{fontSize:12,fontWeight:700,color:"#f87171",marginBottom:4}}>🎯 Focus Areas</div>{getWeakestCats().map(k=>{const ac=getCatAccuracy(k);return<div key={k} style={{fontSize:11,color:"#ccc",lineHeight:1.6}}>{CATEGORIES[k].icon} {CATEGORIES[k].name}: {ac.pct}%</div>;})}</div>}</div>}
+      {statsTab==="topics"&&<div style={{display:"flex",flexDirection:"column",gap:7}}>{catStats.map(c=><div key={c.key} style={{padding:10,background:"rgba(255,255,255,.03)",borderRadius:10,borderLeft:`3px solid ${c.color}`}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}><span style={{fontSize:13,fontWeight:700,color:"#fff"}}>{c.icon} {c.name}</span><span style={{fontSize:13,fontWeight:800,color:c.pct!=null?(c.pct>=80?"#4ade80":c.pct>=60?"#fbbf24":"#f87171"):"#555"}}>{c.pct!=null?`${c.pct}%`:"—"}</span></div><div style={{height:3,background:"rgba(255,255,255,.08)",borderRadius:2,overflow:"hidden"}}><div style={{height:"100%",width:`${c.pct??0}%`,background:c.color,borderRadius:2}}/></div><div style={{fontSize:9,color:"#555",marginTop:3}}>{c.correct}/{c.seen} · {ALL_QUESTIONS.filter(q=>q.cat===c.key).length} total</div></div>)}</div>}
+      {statsTab==="questions"&&<div>{!qDetails.length?<div style={{color:"#555",fontSize:12,textAlign:"center",padding:30}}>Play first!</div>:<div style={{display:"flex",flexDirection:"column",gap:5}}>{qDetails.slice(0,25).map(q=>{const p=Math.round(q.stats.correct/q.stats.seen*100);return<div key={q.id} style={{padding:8,background:"rgba(255,255,255,.03)",borderRadius:7,borderLeft:`3px solid ${p>=80?"#4ade80":p>=60?"#fbbf24":"#f87171"}`}}><div style={{fontSize:11,color:"#bbb",lineHeight:1.4,marginBottom:3}}>{q.q}</div><div style={{display:"flex",gap:10,fontSize:9,color:"#555"}}><span style={{color:p>=80?"#4ade80":p>=60?"#fbbf24":"#f87171",fontWeight:700}}>{p}%</span><span>×{q.stats.seen}</span><span>{CATEGORIES[q.cat].icon}</span></div></div>;})}</div>}</div>}
+      {statsTab==="history"&&<div>{!recent.length?<div style={{color:"#555",fontSize:12,textAlign:"center",padding:30}}>No sessions</div>:<div style={{display:"flex",flexDirection:"column",gap:6}}>{recent.map((s,i)=>{const p=s.total>0?Math.round(s.correct/s.total*100):0;return<div key={i} style={{padding:10,background:"rgba(255,255,255,.03)",borderRadius:10,border:"1px solid rgba(255,255,255,.06)"}}><div style={{display:"flex",justifyContent:"space-between"}}><span style={{fontSize:13,fontWeight:700,color:"#fff"}}>{GAME_MODES[s.mode]?.icon} {GAME_MODES[s.mode]?.name||s.mode}</span><span style={{fontSize:12,fontWeight:800,color:p>=80?"#4ade80":p>=60?"#fbbf24":"#f87171"}}>{p}%</span></div><div style={{fontSize:10,color:"#555",marginTop:3}}>{new Date(s.date).toLocaleDateString()} · {s.correct}/{s.total} · +{s.score} XP</div></div>;})}</div>}</div>}
+      <button onClick={resetProgress} style={{marginTop:24,border:"1px solid rgba(248,113,113,.3)",color:"#f87171",padding:"8px 16px",borderRadius:8,fontSize:11,display:"block",margin:"24px auto 0"}}>Reset Progress</button>
+    </div></div>);
+  }
+
+  // ═══ CATEGORY SELECT ═══
+  if(screen==="select_cats"){
+    const toggle=k=>setSelectedCats(p=>p.includes(k)?p.filter(x=>x!==k):[...p,k]);const secs={};Object.entries(CATEGORIES).forEach(([k,c])=>{if(!secs[c.section])secs[c.section]=[];secs[c.section].push({key:k,...c});});
+    return(<div style={st.ctr}><SaveBadge/><div style={st.inn}>
+      <button style={st.bk} onClick={()=>{setSelectedCats([]);setScreen("home");}}>← Back</button>
+      <h2 style={{fontSize:20,fontWeight:800,color:"#fff",margin:"0 0 3px",display:"flex",alignItems:"center",gap:8}}>{GAME_MODES[gameMode].icon} {GAME_MODES[gameMode].name}</h2>
+      <p style={{fontSize:11,color:"#666",marginBottom:16,marginTop:3}}>Select topics or start with all</p>
+      {Object.entries(secs).map(([sec,cats])=><div key={sec} style={{marginBottom:14}}><h3 style={{fontSize:10,color:"#555",letterSpacing:2,textTransform:"uppercase",marginBottom:6,fontWeight:600}}>{sec}</h3><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:6}}>{cats.map(c=>{const is=selectedCats.includes(c.key);const ac=getCatAccuracy(c.key);return<button key={c.key} onClick={()=>toggle(c.key)} style={{position:"relative",display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"10px 6px",borderRadius:9,border:`1.5px solid ${is?c.color:"rgba(255,255,255,.08)"}`,background:is?`${c.color}22`:"rgba(255,255,255,.03)"}}><span style={{fontSize:18}}>{c.icon}</span><span style={{fontSize:10,fontWeight:600}}>{c.name}</span><span style={{fontSize:8,color:ac.pct!=null?(ac.pct>=80?"#4ade80":ac.pct>=60?"#fbbf24":"#f87171"):"#555"}}>{ac.pct!=null?`${ac.pct}%`:`${ALL_QUESTIONS.filter(q=>q.cat===c.key).length} Qs`}</span>{is&&<span style={{position:"absolute",top:3,right:3,width:14,height:14,borderRadius:7,background:c.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,color:"#fff",fontWeight:700}}>✓</span>}</button>;})}</div></div>)}
+      <button style={st.startBtn} onClick={()=>startGame(gameMode,selectedCats)}>{selectedCats.length===0?"Start All Topics":`Start ${selectedCats.length} Topic${selectedCats.length>1?"s":""}`}</button>
+    </div></div>);
+  }
+
+  // ═══ PLAY ═══
+  if(screen==="play"){
+    const q=questions[qIndex];if(!q){setScreen("results");return null;}
+    const cat=CATEGORIES[q.cat];const prog=((qIndex+1)/questions.length)*100;const low=timeLeft!=null&&timeLeft<=10;const qStat=data.questionStats[q.id];
+    return(<div style={{...st.ctr,...(flashCorrect?{animation:"fG .5s"}:{}),...(shakeWrong?{animation:"sS .4s"}:{})}}>
+      <SaveBadge/>
+      <div style={{display:"flex",alignItems:"center",gap:8,padding:"12px 14px 4px",maxWidth:640,margin:"0 auto"}}>
+        <button style={{background:"rgba(255,255,255,.06)",width:28,height:28,borderRadius:7,fontSize:13,color:"#888"}} onClick={finishSession}>✕</button>
+        <div style={{flex:1,display:"flex",alignItems:"center",gap:6}}><div style={{flex:1,height:4,background:"rgba(255,255,255,.08)",borderRadius:2,overflow:"hidden"}}><div style={{height:"100%",background:"linear-gradient(90deg,#667eea,#764ba2)",borderRadius:2,transition:"width .4s",width:`${prog}%`}}/></div><span style={{fontSize:10,color:"#555",fontWeight:600}}>{qIndex+1}/{questions.length}</span></div>
+        <div style={{display:"flex",gap:5}}>{streak>=2&&<span style={{fontSize:11,fontWeight:700,color:"#ff9933",padding:"2px 7px",background:"rgba(255,153,51,.12)",borderRadius:14}}>🔥{streak}</span>}<span style={{fontSize:11,fontWeight:700,color:"#667eea",padding:"2px 7px",background:"rgba(102,126,234,.12)",borderRadius:14}}>⭐{sessionScore}</span></div>
+      </div>
+      {timeLeft!=null&&<div style={{textAlign:"center",fontSize:16,fontWeight:800,padding:"1px 0",maxWidth:640,margin:"0 auto",color:low?"#ff4444":"#88ff88",animation:low?"pu .8s infinite":"none"}}>⏱ {timeLeft}s</div>}
+      {gameMode==="BOSS_BATTLE"&&<div style={{textAlign:"center",padding:"1px 0",display:"flex",justifyContent:"center",gap:3}}>{[0,1,2].map(i=><span key={i} style={{fontSize:18,opacity:i<bossLives?1:.2}}>❤️</span>)}</div>}
+      <div style={{maxWidth:640,margin:"0 auto",padding:"3px 14px 8px",display:"flex",alignItems:"center",gap:6}}><span style={{display:"inline-flex",alignItems:"center",gap:3,padding:"3px 10px",borderRadius:14,fontSize:10,fontWeight:600,color:"#fff",background:cat.color}}>{cat.icon} {cat.name}{q.priority&&<span style={{marginLeft:3,fontSize:8,background:"rgba(255,255,255,.25)",padding:"1px 5px",borderRadius:7,fontWeight:700}}>★</span>}</span><span style={{fontSize:9,color:"#555"}}>{["","Easy","Med","Hard"][q.diff||1]}</span>{qStat&&<span style={{fontSize:9,color:"#444",marginLeft:"auto"}}>×{qStat.seen}</span>}</div>
+      <div style={{maxWidth:640,margin:"0 auto",padding:"0 14px 12px"}}><h2 style={{fontSize:17,fontWeight:700,color:"#fff",lineHeight:1.5,margin:0}}>{q.q}</h2></div>
+      <div style={{maxWidth:640,margin:"0 auto",padding:"0 14px",display:"flex",flexDirection:"column",gap:7}}>{q.options.map((opt,i)=>{let bg="rgba(255,255,255,.04)",bc="rgba(255,255,255,.1)",op=1;if(showResult){if(i===q.answer){bg="rgba(74,222,128,.12)";bc="#4ade80";}else if(i===selected&&i!==q.answer){bg="rgba(248,113,113,.12)";bc="#f87171";}else op=0.4;}return<button key={`${qIndex}-${i}`} style={{display:"flex",alignItems:"flex-start",gap:9,padding:"11px 12px",background:bg,border:`1.5px solid ${bc}`,borderRadius:9,textAlign:"left",opacity:op}} onClick={()=>!showResult&&handleAnswer(i)} disabled={showResult}><span style={{width:22,height:22,borderRadius:5,background:"rgba(255,255,255,.06)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:"#888",flexShrink:0}}>{String.fromCharCode(65+i)}</span><span style={{fontSize:12,lineHeight:1.5}}>{opt}</span></button>;})}</div>
+      {showResult&&<div style={{maxWidth:640,margin:"12px auto 0",padding:"0 14px 24px",animation:"sU .3s"}}>
+        <div style={{marginBottom:6}}>{selected===q.answer?<span style={{fontSize:14,fontWeight:700,color:"#4ade80"}}>✅ Correct!</span>:<span style={{fontSize:14,fontWeight:700,color:"#f87171"}}>❌ {timeLeft===0&&selected===-1?"Time's up!":"Incorrect"}</span>}</div>
+        <p style={{fontSize:11,color:"#aaa",lineHeight:1.7,margin:"0 0 8px"}}>{q.explain}</p>
+        {q.mnemonic&&<><button onClick={()=>setShowMnemonic(!showMnemonic)} style={{background:"rgba(255,200,50,.1)",border:"1px solid rgba(255,200,50,.25)",color:"#ffc832",padding:"5px 12px",borderRadius:7,fontSize:10,fontWeight:600,marginBottom:6,display:"block"}}>{showMnemonic?"Hide":"Show"} Memory Trick</button>{showMnemonic&&<div style={{padding:"8px 12px",background:"rgba(255,200,50,.08)",borderRadius:7,borderLeft:"3px solid #ffc832",fontSize:12,color:"#ffd866",marginBottom:8,lineHeight:1.5,fontWeight:600,animation:"pI .25s"}}>{q.mnemonic}</div>}</>}
+        <button onClick={nextQuestion} style={st.startBtn}>{qIndex+1>=questions.length?"See Results →":"Next →"}</button>
+      </div>}
+    </div>);
+  }
+
+  // ═══ RESULTS ═══
+  if(screen==="results"){
+    const pct=sessionTotal>0?Math.round(sessionCorrect/sessionTotal*100):0;const grade=pct>=90?"S":pct>=80?"A":pct>=70?"B":pct>=60?"C":"D";const gc={S:"#ffd700",A:"#4ade80",B:"#60a5fa",C:"#fb923c",D:"#f87171"}[grade];const gl={S:"OUTSTANDING",A:"EXCELLENT",B:"GOOD",C:"NEEDS WORK",D:"KEEP STUDYING"}[grade];
+    return(<div style={st.ctr}><SaveBadge/>
+      <div style={{...st.inn,textAlign:"center"}}>
+        <h2 style={{fontSize:18,fontWeight:800,color:"#fff",marginBottom:16}}>{GAME_MODES[gameMode]?.icon} {GAME_MODES[gameMode]?.name} Complete!</h2>
+        <div style={{width:100,height:100,borderRadius:"50%",border:`4px solid ${gc}`,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",margin:"0 auto 18px",animation:"gI .6s"}}><span style={{fontSize:36,fontWeight:900,color:gc}}>{grade}</span><span style={{fontSize:7,letterSpacing:2,color:"#888",textTransform:"uppercase",fontWeight:600}}>{gl}</span></div>
+        <div style={{display:"flex",justifyContent:"center",gap:20,marginBottom:20,flexWrap:"wrap",animation:"fI .5s .3s both"}}>{[{n:`${sessionCorrect}/${sessionTotal}`,l:"Correct"},{n:`${pct}%`,l:"Accuracy"},{n:`+${sessionScore}`,l:"XP"}].map((x,i)=><div key={i}><span style={{fontSize:20,fontWeight:800,color:"#fff",display:"block"}}>{x.n}</span><span style={{fontSize:9,color:"#666",textTransform:"uppercase",letterSpacing:1}}>{x.l}</span></div>)}</div>
+        {wrongAnswers.length>0&&<div style={{textAlign:"left",marginBottom:16,animation:"fI .5s .5s both"}}><h3 style={{fontSize:14,fontWeight:700,color:"#fff",marginBottom:8}}>📝 Review ({wrongAnswers.length})</h3>{wrongAnswers.map((q,i)=><div key={i} style={{padding:10,background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.06)",borderRadius:9,marginBottom:6}}><div style={{fontSize:11,color:"#ccc",marginBottom:4,lineHeight:1.5}}>{q.q}</div><div style={{fontSize:11,color:"#4ade80",fontWeight:600}}>✅ {q.options[q.answer]}</div>{q.mnemonic&&<div style={{fontSize:10,color:"#ffd866",marginTop:4,padding:"4px 7px",background:"rgba(255,200,50,.06)",borderRadius:5,lineHeight:1.4}}>{q.mnemonic}</div>}</div>)}</div>}
+        <div style={{display:"flex",gap:8,justifyContent:"center"}}><button style={{...st.startBtn,width:"auto",padding:"12px 20px"}} onClick={()=>startGame(gameMode,selectedCats)}>Play Again</button><button onClick={()=>setScreen("home")} style={{padding:"12px 20px",background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.1)",borderRadius:10,fontSize:13,fontWeight:700,color:"#aaa"}}>Home</button></div>
+      </div>
+    </div>);
+  }
+  return null;
+}
+
+// ═══════════════════════════════════════════
+// APP WRAPPER
+// ═══════════════════════════════════════════
+function App() {
+  const [auth, setAuth] = useState(null); // {pin, data}
+  if (!auth) return <PinScreen onLogin={(pin, data) => setAuth({pin, data})} />;
+  return <Game pin={auth.pin} initialData={auth.data} />;
+}
+
+// ═══════════════════════════════════════════
+// STYLES
+// ═══════════════════════════════════════════
+const st={
+  ctr:{minHeight:"100vh",background:"#0f0f14",color:"#e8e6e3",fontFamily:"inherit",overflowX:"hidden"},
+  inn:{maxWidth:640,margin:"0 auto",padding:"24px 16px"},
+  ttl:{fontSize:32,fontWeight:900,color:"#fff",margin:0,letterSpacing:4},
+  acc:{background:"linear-gradient(135deg,#667eea,#764ba2)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"},
+  sBar:{display:"flex",alignItems:"center",justifyContent:"center",gap:12,padding:"12px 14px",background:"rgba(255,255,255,.04)",borderRadius:11,border:"1px solid rgba(255,255,255,.06)",marginBottom:14,flexWrap:"wrap"},
+  si:{display:"flex",flexDirection:"column",alignItems:"center",gap:2},sv:{fontSize:13,fontWeight:700,color:"#fff"},sl:{fontSize:8,color:"#666",textTransform:"uppercase",letterSpacing:1},
+  dv:{width:1,height:26,background:"rgba(255,255,255,.08)"},
+  sh:{display:"flex",alignItems:"center",gap:8,marginBottom:12},sln:{flex:1,height:1,background:"rgba(255,255,255,.08)"},stt:{fontSize:9,color:"#555",letterSpacing:3,fontWeight:600},
+  mc:{display:"flex",alignItems:"center",gap:10,padding:"13px 14px",background:"rgba(255,255,255,.03)",border:"1px solid rgba(255,255,255,.08)",borderRadius:10,textAlign:"left"},
+  startBtn:{display:"block",width:"100%",padding:13,marginTop:12,background:"linear-gradient(135deg,#667eea,#764ba2)",color:"#fff",borderRadius:10,fontSize:14,fontWeight:700,letterSpacing:1},
+  bk:{color:"#888",fontSize:12,padding:"3px 0",marginBottom:10},
+};
+
+ReactDOM.render(<App/>, document.getElementById("root"));
+</script>
+</body>
+</html>
