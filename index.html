@@ -169,9 +169,9 @@ const CATS = {
   }
 };
 
-// ═══════════════════════════════════════════
+// ===========================================
 // PASSAGE-BASED QUESTIONS
-// ═══════════════════════════════════════════
+// ===========================================
 const PASSAGES = {
 p1: {
 text: “A researcher investigates enzyme X, which converts substrate S to product P. She measures initial reaction velocity at varying [S] with and without a 10mM dose of inhibitor I. With inhibitor: Vmax decreases from 100 to 50 umol/min, and Km decreases from 8mM to 4mM. A Lineweaver-Burk plot shows two parallel lines.”
@@ -198,21 +198,21 @@ p8: {
 text: “A study examines conformity behavior. Participants are placed in a room with 7 confederates who unanimously give an obviously wrong answer to a simple visual perception question. The researchers measure how often the real participant conforms to the group’s incorrect answer across 18 trials.”
 },
 c1: {
-text: “The concept of ‘structural violence’ was first articulated by sociologist Johan Galtung in 1969 to describe social structures that systematically disadvantage certain groups. Unlike direct violence, structural violence is embedded in political and economic systems — it produces inequality in life chances without any single actor intending harm. Critics of this framework argue it dilutes the concept of violence beyond usefulness, conflating poverty with assault. Defenders counter that the bodily harm produced by preventable disease and malnutrition is no less real for being indirect. In medicine, structural violence manifests as health disparities: differences in disease burden, access to care, and health outcomes that track along lines of race, class, and geography. Paul Farmer’s work in Haiti demonstrated how tuberculosis outcomes were shaped less by biology than by poverty, showing that ‘supposedly personal health choices’ are in fact constrained by social position.”
+text: “The concept of ‘structural violence’ was first articulated by sociologist Johan Galtung in 1969 to describe social structures that systematically disadvantage certain groups. Unlike direct violence, structural violence is embedded in political and economic systems – it produces inequality in life chances without any single actor intending harm. Critics of this framework argue it dilutes the concept of violence beyond usefulness, conflating poverty with assault. Defenders counter that the bodily harm produced by preventable disease and malnutrition is no less real for being indirect. In medicine, structural violence manifests as health disparities: differences in disease burden, access to care, and health outcomes that track along lines of race, class, and geography. Paul Farmer’s work in Haiti demonstrated how tuberculosis outcomes were shaped less by biology than by poverty, showing that ‘supposedly personal health choices’ are in fact constrained by social position.”
 },
 c2: {
-text: “The principle of autonomy holds that competent individuals have the right to make decisions about their own medical care, even when those decisions conflict with medical advice. This principle emerged partly as a reaction to historical paternalism in medicine, where physicians routinely made decisions for patients without their informed consent. The Tuskegee syphilis study and Nazi medical experiments revealed the catastrophic consequences of disregarding patient autonomy. Yet autonomy is not absolute. Emergency medicine regularly overrides expressed wishes when patients cannot give informed consent. Involuntary psychiatric commitment restricts autonomy in the name of preventing harm. Cultural contexts complicate matters further — in many traditions, medical decisions are made collectively by families, and insisting on individual autonomy may itself constitute a form of cultural imposition.”
+text: “The principle of autonomy holds that competent individuals have the right to make decisions about their own medical care, even when those decisions conflict with medical advice. This principle emerged partly as a reaction to historical paternalism in medicine, where physicians routinely made decisions for patients without their informed consent. The Tuskegee syphilis study and Nazi medical experiments revealed the catastrophic consequences of disregarding patient autonomy. Yet autonomy is not absolute. Emergency medicine regularly overrides expressed wishes when patients cannot give informed consent. Involuntary psychiatric commitment restricts autonomy in the name of preventing harm. Cultural contexts complicate matters further – in many traditions, medical decisions are made collectively by families, and insisting on individual autonomy may itself constitute a form of cultural imposition.”
 },
 c3: {
-text: “Durkheim argued that deviance is not merely a social problem but serves essential functions for society. By defining what is unacceptable, deviant behavior clarifies moral boundaries and reinforces social norms. The public punishment of deviance reaffirms shared values and strengthens group solidarity — a community united against a common transgressor feels its bonds tighten. Furthermore, deviance can drive social change: acts once considered deviant (women voting, interracial marriage) may eventually become accepted norms, pushing society to evolve. Merton extended this analysis with strain theory, arguing that deviance results from a disconnect between culturally valued goals (wealth, status) and legitimate means to achieve them. When the path to success is blocked, individuals adapt — some innovate through crime, others retreat into substance abuse, and still others rebel by rejecting both the goals and the means entirely.”
+text: “Durkheim argued that deviance is not merely a social problem but serves essential functions for society. By defining what is unacceptable, deviant behavior clarifies moral boundaries and reinforces social norms. The public punishment of deviance reaffirms shared values and strengthens group solidarity – a community united against a common transgressor feels its bonds tighten. Furthermore, deviance can drive social change: acts once considered deviant (women voting, interracial marriage) may eventually become accepted norms, pushing society to evolve. Merton extended this analysis with strain theory, arguing that deviance results from a disconnect between culturally valued goals (wealth, status) and legitimate means to achieve them. When the path to success is blocked, individuals adapt – some innovate through crime, others retreat into substance abuse, and still others rebel by rejecting both the goals and the means entirely.”
 }
 };
 
-// ═══════════════════════════════════════════
+// ===========================================
 // QUESTION BANK (200+ including passages)
-// ═══════════════════════════════════════════
+// ===========================================
 const QS = [
-// ──── ENZYME KINETICS ────
+// –– ENZYME KINETICS ––
 {
 id: “ek1”,
 cat: “ENZYME_KINETICS”,
@@ -221,7 +221,7 @@ diff: 2,
 q: “In uncompetitive inhibition, what happens to Km and Vmax?”,
 o: [“Both decrease”, “Km↑ Vmax↓”, “Both increase”, “Km↓ Vmax same”],
 a: 0,
-ex: “Both decrease. Inhibitor binds only ES complex, removing it from equilibrium. By Le Chatelier’s, more ES forms (apparent lower Km). Trapped ESI is dead (lower Vmax). Both shift together — the defining feature of uncompetitive inhibition.”,
+ex: “Both decrease. Inhibitor binds only ES complex, removing it from equilibrium. By Le Chatelier’s, more ES forms (apparent lower Km). Trapped ESI is dead (lower Vmax). Both shift together – the defining feature of uncompetitive inhibition.”,
 mn: “🔑 UN-competitive = UN-der (both down)”
 }, {
 id: “ek2”,
@@ -231,7 +231,7 @@ diff: 2,
 q: “Noncompetitive inhibition changes:”,
 o: [“Only Vmax decreases”, “Only Km increases”, “Both decrease”, “Only Km decreases”],
 a: 0,
-ex: “Binds allosteric site regardless of substrate. Substrate still binds normally (Km same), but enzyme-inhibitor complex has reduced activity. Like removing machines from a factory — each works the same, but fewer are functional.”,
+ex: “Binds allosteric site regardless of substrate. Substrate still binds normally (Km same), but enzyme-inhibitor complex has reduced activity. Like removing machines from a factory – each works the same, but fewer are functional.”,
 mn: “🔑 NON-competitive = NO Km change, Vmax down”
 }, {
 id: “ek3”,
@@ -241,7 +241,7 @@ diff: 2,
 q: “LB plot for uncompetitive inhibition:”,
 o: [“Parallel lines”, “Cross on y-axis”, “Cross on x-axis”, “Same line”],
 a: 0,
-ex: “Parallel lines because both y-intercept (1/Vmax) and x-intercept (-1/Km) change proportionally while slope (Km/Vmax) stays constant. This is unique — competitive crosses on y, noncompetitive on x, only uncompetitive gives parallel.”,
+ex: “Parallel lines because both y-intercept (1/Vmax) and x-intercept (-1/Km) change proportionally while slope (Km/Vmax) stays constant. This is unique – competitive crosses on y, noncompetitive on x, only uncompetitive gives parallel.”,
 mn: “🔑 Parallel = uncompetitive (only type)”
 }, {
 id: “ek4”,
@@ -261,7 +261,7 @@ diff: 3,
 q: “Why does Km decrease in uncompetitive inhibition?”,
 o: [“Inhibitor traps ES shifting equilibrium toward ES”, “Directly increases affinity”, “[S] increases”, “Conformation changes”],
 a: 0,
-ex: “Inhibitor binds ES→ESI (dead-end). Removes ES from E+S⇌ES equilibrium. Le Chatelier: system makes more ES to compensate, appearing as higher affinity (lower Km). Not real affinity change — equilibrium disturbance.”,
+ex: “Inhibitor binds ES→ESI (dead-end). Removes ES from E+S⇌ES equilibrium. Le Chatelier: system makes more ES to compensate, appearing as higher affinity (lower Km). Not real affinity change – equilibrium disturbance.”,
 mn: “🔑 Le Chatelier: remove ES → more ES forms”
 }, {
 id: “ek6”,
@@ -326,7 +326,7 @@ diff: 2,
 q: “Which inhibition preserves Vmax?”,
 o: [“Competitive”, “Noncompetitive”, “Uncompetitive”, “Mixed”],
 a: 0,
-ex: “Only competitive — substrate can always outcompete inhibitor at high [S], reaching full Vmax. All others create dead-end complexes that can’t be overcome regardless of [S].”,
+ex: “Only competitive – substrate can always outcompete inhibitor at high [S], reaching full Vmax. All others create dead-end complexes that can’t be overcome regardless of [S].”,
 mn: “🔑 Competitive = only type with unchanged Vmax”
 },
 // Passage-based enzyme kinetics
@@ -351,7 +351,7 @@ a: 0,
 ex: “Competitive inhibition increases apparent Km (harder to reach half-max because inhibitor occupies active site) while leaving Vmax unchanged (can always be overcome by high [S]).”,
 mn: “🔑 Competitive: Km UP, Vmax SAME”
 },
-// ──── METABOLISM ────
+// –– METABOLISM ––
 {
 id: “met1”,
 cat: “METABOLISM”,
@@ -413,7 +413,7 @@ diff: 2,
 q: “Glucagon targets:”,
 o: [“Liver”, “Muscle”, “Brain”, “Adipose”],
 a: 0,
-ex: “Liver ONLY — glycogenolysis + gluconeogenesis. Muscle has NO glucagon receptors (uses epinephrine instead). This is commonly tested.”,
+ex: “Liver ONLY – glycogenolysis + gluconeogenesis. Muscle has NO glucagon receptors (uses epinephrine instead). This is commonly tested.”,
 mn: “🔑 Glucagon = liver. No muscle receptors!”
 }, {
 id: “met8”,
@@ -474,7 +474,7 @@ a: 0,
 ex: “Succinate is oxidized by succinate dehydrogenase (Complex II), which feeds electrons to CoQ→Complex III→IV→O2, completely bypassing rotenone-blocked Complex I. The reduced rate reflects fewer protons pumped (skipping Complex I).”,
 mn: “🔑 Complex II bypasses Complex I entirely”
 },
-// ──── AMINO ACIDS ────
+// –– AMINO ACIDS ––
 {
 id: “aa1”,
 cat: “AMINO_ACIDS”,
@@ -539,7 +539,7 @@ a: 0,
 ex: “Zero net charge (zwitterion). No migration in electric field. Simple AAs: pI=average of flanking pKas. Acidic AAs: average of two lowest. Basic: two highest.”,
 mn: “🔑 pI = no movement in electrophoresis”
 },
-// ──── CELL BIOLOGY (NEW) ────
+// –– CELL BIOLOGY (NEW) ––
 {
 id: “cb1”,
 cat: “CELL_BIO”,
@@ -556,7 +556,7 @@ diff: 2,
 q: “G1/S checkpoint regulated by:”,
 o: [“p53 and Rb”, “Cyclins only”, “ATP levels”, “Cell size only”],
 a: 0,
-ex: “p53 monitors DNA damage—halts cycle if damage detected. Rb (retinoblastoma protein) blocks E2F transcription factor until phosphorylated by cyclin-CDK complexes. Both are tumor suppressors. Loss of either→uncontrolled division→cancer.”,
+ex: “p53 monitors DNA damage–halts cycle if damage detected. Rb (retinoblastoma protein) blocks E2F transcription factor until phosphorylated by cyclin-CDK complexes. Both are tumor suppressors. Loss of either→uncontrolled division→cancer.”,
 mn: “🔑 p53 checks DNA damage. Rb gates S-phase entry.”
 }, {
 id: “cb3”,
@@ -583,7 +583,7 @@ diff: 1,
 q: “Mitochondrial double membrane:”,
 o: [“Outer is permeable, inner is highly selective”, “Both are equally permeable”, “Inner is permeable, outer selective”, “Neither is permeable”],
 a: 0,
-ex: “Outer membrane has porins (allows small molecules). Inner membrane is highly impermeable—this is essential for maintaining the proton gradient that drives ATP synthase. ETC complexes and ATP synthase sit in the inner membrane. Cristae increase surface area.”,
+ex: “Outer membrane has porins (allows small molecules). Inner membrane is highly impermeable–this is essential for maintaining the proton gradient that drives ATP synthase. ETC complexes and ATP synthase sit in the inner membrane. Cristae increase surface area.”,
 mn: “🔑 Inner membrane impermeability = proton gradient”
 }, {
 id: “cb6”,
@@ -604,7 +604,7 @@ a: 0,
 ex: “Apoptosis: controlled cell death (caspase cascade), cell shrinks, fragments into apoptotic bodies, no inflammation, phagocytosed cleanly. Necrosis: uncontrolled (trauma, toxins), cell swells and bursts, releases contents→inflammation. Apoptosis is essential for development and immune function.”,
 mn: “🔑 Apoptosis=clean suicide. Necrosis=messy explosion.”
 },
-// ──── GENETICS (NEW) ────
+// –– GENETICS (NEW) ––
 {
 id: “gen1”,
 cat: “GENETICS”,
@@ -630,7 +630,7 @@ diff: 2,
 q: “X-linked recessive trait is expressed more in:”,
 o: [“Males (XᵃY has no backup copy)”, “Females”, “Equal in both”, “Depends on penetrance”],
 a: 0,
-ex: “Males have one X—if it carries the recessive allele, it’s expressed (no second X to mask it). Females need TWO copies to be affected (homozygous). Examples: hemophilia, color blindness, Duchenne muscular dystrophy, G6PD deficiency.”,
+ex: “Males have one X–if it carries the recessive allele, it’s expressed (no second X to mask it). Females need TWO copies to be affected (homozygous). Examples: hemophilia, color blindness, Duchenne muscular dystrophy, G6PD deficiency.”,
 mn: “🔑 Males: one X = no backup. Hemophilia, colorblindness.”
 }, {
 id: “gen4”,
@@ -639,7 +639,7 @@ diff: 3,
 q: “Codominance means:”,
 o: [“Both alleles fully expressed simultaneously”, “One allele masks the other”, “Intermediate phenotype”, “Neither expressed”],
 a: 0,
-ex: “Both alleles produce their full phenotype. Classic example: AB blood type—both A and B antigens present on RBCs. Different from incomplete dominance (blending, like red×white=pink flowers). Codominance=both visible, not blended.”,
+ex: “Both alleles produce their full phenotype. Classic example: AB blood type–both A and B antigens present on RBCs. Different from incomplete dominance (blending, like red×white=pink flowers). Codominance=both visible, not blended.”,
 mn: “🔑 Codominance=both show (AB blood). Incomplete=blend (pink).”
 }, {
 id: “gen5”,
@@ -670,10 +670,10 @@ pass: “p5”,
 q: “Approximately how many carriers exist in this population?”,
 o: [“~950”, “~25”, “~500”, “~5000”],
 a: 0,
-ex: “Carrier frequency = 2pq = 2(0.95)(0.05) = 0.095. In 10,000 people: 0.095 × 10,000 = 950 carriers. Note: ~950 carriers vs only 25 affected—carriers vastly outnumber affected individuals in recessive conditions.”,
+ex: “Carrier frequency = 2pq = 2(0.95)(0.05) = 0.095. In 10,000 people: 0.095 × 10,000 = 950 carriers. Note: ~950 carriers vs only 25 affected–carriers vastly outnumber affected individuals in recessive conditions.”,
 mn: “🔑 2pq × population = number of carriers”
 },
-// ──── BIO SYSTEMS ────
+// –– BIO SYSTEMS ––
 {
 id: “bs1”,
 cat: “BIO_SYSTEMS”,
@@ -791,7 +791,7 @@ a: 0,
 ex: “K+ efflux drives repolarization. Blocking K+ channels delays the return to resting potential, prolonging the action potential duration. The neuron can still fire (Na+ channels work) but takes longer to reset, potentially affecting firing frequency.”,
 mn: “🔑 TEA blocks K+ → slow repolarization → prolonged AP”
 },
-// ──── MOLECULAR BIO ────
+// –– MOLECULAR BIO ––
 {
 id: “mb1”,
 cat: “MOLECULAR_BIO”,
@@ -877,7 +877,7 @@ a: 0,
 ex: “The passage states the enzyme maintains tertiary structure despite the mutation, so it is not an unfolding issue. His is commonly an acid-base catalyst in enzyme active sites (imidazole ring, pKa~6). Removing the catalytic His eliminates the chemical mechanism while leaving the structure intact.”,
 mn: “🔑 His in active sites = acid-base catalyst. Structure ≠ function.”
 },
-// ──── GEN CHEM ────
+// –– GEN CHEM ––
 {
 id: “gc1”,
 cat: “GEN_CHEM”,
@@ -973,7 +973,7 @@ a: 0,
 ex: “Adding Cl⁻ may complex with Zn²+ slightly, and adding ions changes activity coefficients. Per Nernst equation, changing ion concentrations from standard conditions shifts voltage. The effect is typically small and would slightly decrease voltage.”,
 mn: “🔑 Nernst: changing [ions] shifts voltage from standard”
 },
-// ──── ORGO ────
+// –– ORGO ––
 {
 id: “org1”,
 cat: “ORGO”,
@@ -1038,7 +1038,7 @@ a: 0,
 ex: “E1/E2: more substituted=more stable alkene (hyperconjugation). Exception: bulky bases (t-BuOK) give Hofmann product (less substituted, less hindered H abstracted).”,
 mn: “🔑 Zaitsev = more substituted wins”
 },
-// ──── PHYSICS ────
+// –– PHYSICS ––
 {
 id: “ph1”,
 cat: “PHYSICS”,
@@ -1121,12 +1121,12 @@ a: 0,
 ex: “Opposite of resistors! Series capacitors: 1/Ctotal=1/C1+1/C2 (total less). Parallel: Ctotal=C1+C2 (total more). Series: same charge on each. Parallel: same voltage across each.”,
 mn: “🔑 Capacitors = opposite of resistors for series/parallel”
 },
-// ──── PSYCH/SOC (Expanded) ────
+// –– PSYCH/SOC (Expanded) ––
 {
 id: “ps1”,
 cat: “PSYCH_SOC”,
 diff: 1,
-q: “Object permanence — Piaget stage:”,
+q: “Object permanence – Piaget stage:”,
 o: [“Sensorimotor (0-2)”, “Preoperational”, “Concrete operational”, “Formal operational”],
 a: 0,
 ex: “PMAT of development: Sensorimotor(0-2,object permanence ~8mo), Preoperational(2-7,egocentrism,no conservation), Concrete operational(7-11,logic about concrete things), Formal operational(12+,abstract thought).”,
@@ -1267,7 +1267,7 @@ pass: “p8”,
 q: “This experiment most closely resembles which classic study?”,
 o: [“Asch conformity experiments”, “Milgram obedience study”, “Stanford prison experiment”, “Zimbardo’s study”],
 a: 0,
-ex: “Asch (1951): participants judged line lengths with confederates who gave wrong answers. ~75% conformed at least once. The key feature is conformity to an obviously wrong group answer with no authority figure pressuring—pure social pressure. Milgram=obedience to authority. Stanford prison=role conformity.”,
+ex: “Asch (1951): participants judged line lengths with confederates who gave wrong answers. ~75% conformed at least once. The key feature is conformity to an obviously wrong group answer with no authority figure pressuring–pure social pressure. Milgram=obedience to authority. Stanford prison=role conformity.”,
 mn: “🔑 Asch = conformity to wrong group answer (no authority)”
 }, {
 id: “pps2”,
@@ -1280,7 +1280,7 @@ a: 0,
 ex: “Asch found that even ONE dissenter dramatically reduced conformity (from ~37% to ~5%). Having an ally breaks the unanimity of the group, making it psychologically safer to disagree. This finding highlights that unanimity, not just group size, drives conformity.”,
 mn: “🔑 One ally breaks the spell. Unanimity is key.”
 },
-// ──── CARS ────
+// –– CARS ––
 {
 id: “cars1a”,
 cat: “CARS”,
@@ -1327,7 +1327,7 @@ cat: “CARS”,
 diff: 3,
 pass: “c2”,
 q: “The author’s tone toward autonomy is best described as:”,
-o: [“Nuanced — supportive but acknowledging limits”, “Entirely supportive without qualification”, “Dismissive and critical”, “Neutral with no opinion expressed”],
+o: [“Nuanced – supportive but acknowledging limits”, “Entirely supportive without qualification”, “Dismissive and critical”, “Neutral with no opinion expressed”],
 a: 0,
 ex: “The author supports autonomy (describes paternalism negatively, cites Tuskegee) but presents multiple limitations (emergency medicine, psychiatric holds, cultural contexts). This is a nuanced/balanced position, not absolute support or rejection.”,
 mn: “🔑 CARS tone Qs: look for qualifiers and counterpoints”
@@ -1340,7 +1340,7 @@ q: “The passage suggests that insisting on individual autonomy in collectivist
 o: [“Itself be a form of cultural imposition”, “Always benefit the patient”, “Have no cultural significance”, “Violate medical ethics”],
 a: 0,
 ex: “The final sentence explicitly states that ‘insisting on individual autonomy may itself constitute a form of cultural imposition.’ This is a subtle point: the Western value of individual choice can conflict with cultures where family/community decisions are the norm.”,
-mn: “🔑 CARS: read final sentences carefully — they often contain the most nuanced claims”
+mn: “🔑 CARS: read final sentences carefully – they often contain the most nuanced claims”
 }, {
 id: “cars3a”,
 cat: “CARS”,
@@ -1359,7 +1359,7 @@ pass: “c3”,
 q: “Merton’s strain theory explains deviance as resulting from:”,
 o: [“A gap between culturally valued goals and legitimate means to achieve them”, “Biological predisposition”, “Lack of education”, “Random chance”],
 a: 0,
-ex: “Merton: when the path to culturally valued goals (wealth, status) is blocked, people adapt through deviance — innovation (crime), retreatism (substance abuse), rebellion (rejecting both goals and means). The ‘strain’ is the disconnect between what society values and what individuals can access.”,
+ex: “Merton: when the path to culturally valued goals (wealth, status) is blocked, people adapt through deviance – innovation (crime), retreatism (substance abuse), rebellion (rejecting both goals and means). The ‘strain’ is the disconnect between what society values and what individuals can access.”,
 mn: “🔑 CARS: strain theory = blocked goals → deviant adaptations”
 }, {
 id: “cars3c”,
@@ -1373,7 +1373,7 @@ ex: “Innovation: accepting cultural goals (wealth) but using illegitimate mean
 mn: “🔑 Innovation = right goals, wrong means”
 }];
 
-// ═══ SPACED REPETITION ENGINE (Leitner Boxes) ═══
+// === SPACED REPETITION ENGINE (Leitner Boxes) ===
 const BOX_INTERVALS = {
 1: 1,
 2: 3,
@@ -1413,7 +1413,7 @@ function getDueCount(data) {
 return QS.filter(q => isDueForReview(data, q.id)).length;
 }
 
-// ═══ GAME MODES ═══
+// === GAME MODES ===
 const MODES = {
 BLITZ: {
 name: “Blitz”,
@@ -1685,7 +1685,7 @@ a: so.indexOf(ct)
 });
 }
 
-// ═══ PIN SCREEN ═══
+// === PIN SCREEN ===
 function PinScreen(_ref) {
 let {
 onLogin
@@ -1845,7 +1845,7 @@ opacity: pin.length >= 3 ? 1 : .4
 }, loading ? “Loading…” : “Enter”)));
 }
 
-// ═══ MAIN GAME ═══
+// === MAIN GAME ===
 function Game(_ref2) {
 let {
 pin,
@@ -2083,7 +2083,7 @@ zIndex: 999
 }
 }, ss === “saving” ? “💾 Syncing…” : ss === “saved” ? “✅ Synced” : “⚠️ Error”) : null;
 
-// ═══ HOME ═══
+// === HOME ===
 if (scr === “home”) {
 const acc = data.totalAnswered > 0 ? Math.round(data.totalCorrect / data.totalAnswered * 100) : 0;
 return /*#**PURE***/React.createElement(“div”, {
@@ -2243,7 +2243,7 @@ fontWeight: 700,
 color: c,
 marginTop: 1
 }
-}, ac.seen > 0 ? `${p}%` : “—”));
+}, ac.seen > 0 ? `${p}%` : “–”));
 }))), /*#**PURE***/React.createElement(“div”, {
 style: S.sh
 }, /*#**PURE***/React.createElement(“span”, {
@@ -2402,7 +2402,7 @@ color: “#444”
 }, QS.length, “ Qs \xB7 \u2601\uFE0F "”, pin, “" \xB7 “, newC, “ unseen \xB7 “, dueC, “ due”))));
 }
 
-// ═══ STATS ═══
+// === STATS ===
 if (scr === “stats”) {
 const acc = data.totalAnswered > 0 ? Math.round(data.totalCorrect / data.totalAnswered * 100) : 0;
 const cs = Object.entries(CATS).map(_ref6 => {
@@ -2620,7 +2620,7 @@ fontSize: 12,
 fontWeight: 800,
 color: c.pct != null ? c.pct >= 80 ? “#4ade80” : c.pct >= 60 ? “#fbbf24” : “#f87171” : “#555”
 }
-}, c.pct != null ? `${c.pct}%` : “—”)), /*#**PURE***/React.createElement(“div”, {
+}, c.pct != null ? `${c.pct}%` : “–”)), /*#**PURE***/React.createElement(“div”, {
 style: {
 height: 3,
 background: “rgba(255,255,255,.08)”,
@@ -2699,7 +2699,7 @@ fontSize: 14,
 fontWeight: 800,
 color: color
 }
-}, t > 0 ? `${pct}%` : “—”)), /*#**PURE***/React.createElement(“div”, {
+}, t > 0 ? `${pct}%` : “–”)), /*#**PURE***/React.createElement(“div”, {
 style: {
 height: 4,
 background: “rgba(255,255,255,.08)”,
@@ -2730,7 +2730,7 @@ fontSize: 11,
 color: “#bbb”,
 lineHeight: 1.5
 }
-}, cal.high.correct / cal.high.total > 0.85 ? “✅ Well calibrated — your high-confidence answers are usually right!” : “⚠️ Overconfident — your ‘sure’ answers are wrong too often. Review those blind spots!”)), sTab === “history” && /*#**PURE***/React.createElement(“div”, null, !rec.length ? /*#**PURE***/React.createElement(“div”, {
+}, cal.high.correct / cal.high.total > 0.85 ? “✅ Well calibrated – your high-confidence answers are usually right!” : “⚠️ Overconfident – your ‘sure’ answers are wrong too often. Review those blind spots!”)), sTab === “history” && /*#**PURE***/React.createElement(“div”, null, !rec.length ? /*#**PURE***/React.createElement(“div”, {
 style: {
 color: “#555”,
 fontSize: 12,
@@ -2799,7 +2799,7 @@ margin: “20px auto 0”
 }, “Reset Progress”)));
 }
 
-// ═══ CAT SELECT ═══
+// === CAT SELECT ===
 if (scr === “select_cats”) {
 const tog = k => setSelCats(p => p.includes(k) ? p.filter(x => x !== k) : […p, k]);
 const secs = {};
@@ -2918,7 +2918,7 @@ onClick: () => startGame(gm, selCats)
 }, selCats.length === 0 ? “Start All Topics” : `Start ${selCats.length} Topic${selCats.length > 1 ? "s" : ""}`)));
 }
 
-// ═══ PLAY ═══
+// === PLAY ===
 if (scr === “play”) {
 const q = qs[qi];
 if (!q) {
@@ -3268,7 +3268,7 @@ style: S.btn
 }, qi + 1 >= qs.length ? “See Results →” : “Next →”)));
 }
 
-// ═══ RESULTS ═══
+// === RESULTS ===
 if (scr === “results”) {
 const pct = sTotal > 0 ? Math.round(sCorrect / sTotal * 100) : 0;
 const grade = pct >= 90 ? “S” : pct >= 80 ? “A” : pct >= 70 ? “B” : pct >= 60 ? “C” : “D”;
