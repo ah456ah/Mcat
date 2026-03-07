@@ -889,14 +889,19 @@ function PinScreen(_ref) {
     setLt(0);
     loadFromCloud(p).then(function (d) {
       rememberPin(p);
-      onLogin(p, d || Object.assign({}, DD));
+      var merged = Object.assign({}, DD, d || {});
+      onLogin(p, merged);
     }).catch(function () {
       setLoading(false);
       setErr("Failed. Retry.");
     });
   }
   if (saved && loading) return /*#__PURE__*/React.createElement("div", {
-    style: S.c
+    style: {
+      ...S.c,
+      background: "#0f0f14",
+      color: "#e8e6e3"
+    }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
@@ -956,6 +961,8 @@ function PinScreen(_ref) {
   return /*#__PURE__*/React.createElement("div", {
     style: {
       ...S.c,
+      background: "#0f0f14",
+      color: "#e8e6e3",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
@@ -1003,10 +1010,10 @@ function PinScreen(_ref) {
     style: {
       width: "100%",
       padding: "14px 16px",
-      background: "rgba(255,255,255,.06)",
-      border: "1.5px solid rgba(255,255,255,.12)",
+      background: TC.card,
+      border: "1.5px solid " + TC.cbr,
       borderRadius: 10,
-      color: "#fff",
+      color: fg,
       fontSize: 18,
       fontFamily: "inherit",
       textAlign: "center",
@@ -1127,6 +1134,8 @@ function Game(_ref2) {
   const [showConceptCard, setShowConceptCard] = useState(null);
   const [simSection, setSimSection] = useState(null);
   const [simTimer, setSimTimer] = useState(null);
+  const [openCard, setOpenCard] = useState(null);
+  const [refTab, setRefTab] = useState("aa");
   var theme = data.theme || "dark";
   var fz = data.fontSize || 0;
   function toggleTheme() {
@@ -1695,7 +1704,7 @@ function Game(_ref2) {
         fontSize: 9,
         padding: "4px 10px",
         borderRadius: 10,
-        background: ss === "saved" ? "rgba(74,222,128,.15)" : ss === "error" ? "rgba(248,113,113,.15)" : "rgba(102,126,234,.15)",
+        background: ss === "saved" ? "rgba(74,222,128,.2)" : ss === "error" ? "rgba(248,113,113,.2)" : "rgba(102,126,234,.2)",
         color: ss === "saved" ? "#4ade80" : ss === "error" ? "#f87171" : "#667eea",
         zIndex: 999
       }
@@ -1707,7 +1716,11 @@ function Game(_ref2) {
     var cardTag = showConceptCard;
     var cardData = typeof CARDS !== "undefined" && CARDS[cardTag] ? CARDS[cardTag] : null;
     return /*#__PURE__*/React.createElement("div", {
-      style: S.c
+      style: {
+        ...S.c,
+        background: bg,
+        color: fg
+      }
     }, /*#__PURE__*/React.createElement("div", {
       style: S.i
     }, /*#__PURE__*/React.createElement("button", {
@@ -1753,7 +1766,7 @@ function Game(_ref2) {
           border: "1px solid rgba(102,126,234,.15)",
           borderRadius: 10,
           fontSize: 12,
-          color: "#ccc",
+          color: TC.muted,
           lineHeight: 1.7
         }
       }, /*#__PURE__*/React.createElement("span", {
@@ -1787,7 +1800,6 @@ function Game(_ref2) {
       if (!cardCats[sec]) cardCats[sec] = [];
       cardCats[sec].push(tag);
     });
-    var [openCard, setOpenCard] = useState(null);
     return /*#__PURE__*/React.createElement("div", {
       style: S.c
     }, /*#__PURE__*/React.createElement("div", {
@@ -1801,13 +1813,13 @@ function Game(_ref2) {
       style: {
         fontSize: 18,
         fontWeight: 800,
-        color: "#fff",
+        color: fg,
         margin: "0 0 14px"
       }
     }, "\u{1F4D6}", " Study Cards"), /*#__PURE__*/React.createElement("p", {
       style: {
         fontSize: 11,
-        color: "#888",
+        color: TC.muted,
         marginBottom: 14,
         lineHeight: 1.5
       }
@@ -1828,7 +1840,7 @@ function Game(_ref2) {
       style: {
         fontSize: 16,
         fontWeight: 700,
-        color: "#fff",
+        color: fg,
         marginBottom: 10
       }
     }, openCard), /*#__PURE__*/React.createElement("div", {
@@ -1846,7 +1858,7 @@ function Game(_ref2) {
           border: "1px solid rgba(102,126,234,.15)",
           borderRadius: 10,
           fontSize: 12,
-          color: "#ccc",
+          color: TC.muted,
           lineHeight: 1.7
         }
       }, /*#__PURE__*/React.createElement("span", {
@@ -2128,7 +2140,7 @@ function Game(_ref2) {
     }, /*#__PURE__*/React.createElement("div", {
       style: {
         height: 6,
-        background: "rgba(255,255,255,.08)",
+        background: TC.sbg,
         borderRadius: 3,
         overflow: "hidden",
         marginBottom: 4
@@ -2167,14 +2179,14 @@ function Game(_ref2) {
     }, "\u{1F9E0}", " ", dueC, " due for review"), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 10,
-        color: "#888",
+        color: TC.muted,
         marginTop: 2
       }
     }, "Spaced repetition")), (dueC > 0 || blindC > 0 || daysSinceCars >= 3 || weakC.length > 0) && /*#__PURE__*/React.createElement("div", {
       style: {
         padding: "12px 14px",
-        background: "rgba(255,255,255,.03)",
-        border: "1px solid rgba(255,255,255,.08)",
+        background: TC.card,
+        border: "1px solid " + TC.cbr,
         borderRadius: 12,
         marginBottom: 14
       }
@@ -2182,7 +2194,7 @@ function Game(_ref2) {
       style: {
         fontSize: 11,
         fontWeight: 700,
-        color: "#fff",
+        color: fg,
         marginBottom: 8
       }
     }, "\u{1F4CB}", " Today's Plan"), /*#__PURE__*/React.createElement("div", {
@@ -2265,7 +2277,7 @@ function Game(_ref2) {
     }, "\u{1F4D6}", " Study Cards"), /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 10,
-        color: "#888",
+        color: TC.muted,
         marginLeft: 8
       }
     }, "30 concept mini-lessons")), /*#__PURE__*/React.createElement("div", {
@@ -2340,10 +2352,11 @@ function Game(_ref2) {
         key: k,
         style: {
           padding: "6px 3px",
-          background: "rgba(255,255,255,.03)",
+          background: TC.card,
           borderRadius: 6,
           textAlign: "center",
-          borderBottom: "2px solid " + c
+          borderBottom: "2px solid " + c,
+          background: TC.card
         }
       }, /*#__PURE__*/React.createElement("div", {
         style: {
@@ -2352,7 +2365,7 @@ function Game(_ref2) {
       }, cat.icon), /*#__PURE__*/React.createElement("div", {
         style: {
           fontSize: 7,
-          color: "#777"
+          color: TC.dim
         }
       }, cat.name), /*#__PURE__*/React.createElement("div", {
         style: {
@@ -2394,7 +2407,7 @@ function Game(_ref2) {
         style: {
           fontSize: 12,
           fontWeight: 700,
-          color: "#fff",
+          color: fg,
           display: "block"
         }
       }, MODES[k].name), /*#__PURE__*/React.createElement("span", {
@@ -2480,13 +2493,13 @@ function Game(_ref2) {
         style: {
           fontSize: 12,
           fontWeight: 700,
-          color: "#fff",
+          color: fg,
           display: "block"
         }
       }, MODES[x.k].name), /*#__PURE__*/React.createElement("span", {
         style: {
           fontSize: 10,
-          color: x.n ? "#888" : "#555"
+          color: x.n ? TC.muted : TC.dim
         }
       }, x.l)));
     })), /*#__PURE__*/React.createElement("div", {
@@ -2557,7 +2570,7 @@ function Game(_ref2) {
       style: {
         fontSize: 18,
         fontWeight: 800,
-        color: "#fff",
+        color: fg,
         margin: "0 0 12px"
       }
     }, "\u{1F3F7}\uFE0F", " Practice by Concept"), /*#__PURE__*/React.createElement("input", {
@@ -2570,10 +2583,10 @@ function Game(_ref2) {
       style: {
         width: "100%",
         padding: "10px 14px",
-        background: "rgba(255,255,255,.06)",
-        border: "1.5px solid rgba(255,255,255,.12)",
+        background: TC.card,
+        border: "1.5px solid " + TC.cbr,
         borderRadius: 8,
-        color: "#fff",
+        color: fg,
         fontSize: 13,
         fontFamily: "inherit",
         outline: "none",
@@ -2614,7 +2627,7 @@ function Game(_ref2) {
           fontWeight: 600,
           border: "1px solid " + (isHY ? "rgba(255,200,50,.3)" : "rgba(255,255,255,.1)"),
           background: isHY ? "rgba(255,200,50,.06)" : "rgba(255,255,255,.04)",
-          color: "#ccc"
+          color: fg
         }
       }, isHY && /*#__PURE__*/React.createElement("span", {
         style: {
@@ -2722,7 +2735,6 @@ function Game(_ref2) {
 
   // === REFERENCE SHEETS ===
   if (scr === "reference") {
-    var [refTab, setRefTab] = useState("aa");
     var R = typeof REFS !== "undefined" ? REFS : {};
     var tStyle = {
       fontSize: 10 + fz,
@@ -3033,7 +3045,7 @@ function Game(_ref2) {
       style: {
         fontSize: 18,
         fontWeight: 800,
-        color: "#fff",
+        color: fg,
         margin: "0 0 14px"
       }
     }, "\u{1F4CA}", " Stats"), /*#__PURE__*/React.createElement("div", {
@@ -3041,7 +3053,7 @@ function Game(_ref2) {
         display: "flex",
         gap: 2,
         marginBottom: 14,
-        background: "rgba(255,255,255,.04)",
+        background: TC.sbg,
         padding: 3,
         borderRadius: 10,
         flexWrap: "wrap"
@@ -3059,7 +3071,7 @@ function Game(_ref2) {
           fontSize: 8,
           fontWeight: 600,
           background: sTab === e[0] ? "rgba(102,126,234,.25)" : "transparent",
-          color: sTab === e[0] ? "#667eea" : "#555",
+          color: sTab === e[0] ? "#667eea" : TC.dim,
           minWidth: 0
         }
       }, e[1]);
@@ -3093,14 +3105,14 @@ function Game(_ref2) {
         key: i,
         style: {
           padding: 10,
-          background: "rgba(255,255,255,.03)",
+          background: TC.card,
           borderRadius: 10,
-          border: "1px solid rgba(255,255,255,.06)"
+          border: "1px solid " + TC.cbr
         }
       }, /*#__PURE__*/React.createElement("div", {
         style: {
           fontSize: 8,
-          color: "#666",
+          color: TC.dim,
           textTransform: "uppercase",
           letterSpacing: 1
         }
@@ -3108,21 +3120,21 @@ function Game(_ref2) {
         style: {
           fontSize: 16,
           fontWeight: 800,
-          color: "#fff"
+          color: fg
         }
       }, x.v));
     })), /*#__PURE__*/React.createElement("div", {
       style: {
         padding: 12,
-        background: "rgba(255,255,255,.03)",
+        background: TC.card,
         borderRadius: 10,
-        border: "1px solid rgba(255,255,255,.06)",
+        border: "1px solid " + TC.cbr,
         marginBottom: 14
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 9,
-        color: "#666",
+        color: TC.dim,
         textTransform: "uppercase",
         letterSpacing: 1,
         marginBottom: 4
@@ -3237,7 +3249,7 @@ function Game(_ref2) {
         key: c.key,
         style: {
           padding: 10,
-          background: "rgba(255,255,255,.03)",
+          background: TC.card,
           borderRadius: 10,
           borderLeft: "3px solid " + c.color
         }
@@ -3250,7 +3262,7 @@ function Game(_ref2) {
         style: {
           fontSize: 12,
           fontWeight: 700,
-          color: "#fff"
+          color: fg
         }
       }, c.icon, " ", c.name), /*#__PURE__*/React.createElement("span", {
         style: {
@@ -3261,7 +3273,7 @@ function Game(_ref2) {
       }, c.pct != null ? c.pct + "%" : "\u2014")), /*#__PURE__*/React.createElement("div", {
         style: {
           height: 3,
-          background: "rgba(255,255,255,.08)",
+          background: TC.sbg,
           borderRadius: 2,
           overflow: "hidden",
           marginTop: 4
@@ -3275,7 +3287,7 @@ function Game(_ref2) {
       })), /*#__PURE__*/React.createElement("div", {
         style: {
           fontSize: 8,
-          color: "#555",
+          color: TC.dim,
           marginTop: 3
         }
       }, c.correct, "/", c.seen, " of ", QS.filter(function (q) {
@@ -3291,15 +3303,15 @@ function Game(_ref2) {
     }, "MCAT target: ~95s per question. Green = on pace. Yellow = fast. Red = slow."), /*#__PURE__*/React.createElement("div", {
       style: {
         padding: 10,
-        background: "rgba(255,255,255,.03)",
+        background: TC.card,
         borderRadius: 10,
-        border: "1px solid rgba(255,255,255,.06)",
+        border: "1px solid " + TC.cbr,
         marginBottom: 12
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 9,
-        color: "#666",
+        color: TC.dim,
         textTransform: "uppercase",
         marginBottom: 4
       }
@@ -3322,9 +3334,9 @@ function Game(_ref2) {
         key: k,
         style: {
           padding: 10,
-          background: "rgba(255,255,255,.03)",
+          background: TC.card,
           borderRadius: 10,
-          border: "1px solid rgba(255,255,255,.06)",
+          border: "1px solid " + TC.cbr,
           marginBottom: 6
         }
       }, /*#__PURE__*/React.createElement("div", {
@@ -3337,7 +3349,7 @@ function Game(_ref2) {
         style: {
           fontSize: 12,
           fontWeight: 600,
-          color: "#fff"
+          color: fg
         }
       }, cat.icon, " ", cat.name), /*#__PURE__*/React.createElement("div", {
         style: {
@@ -3358,7 +3370,7 @@ function Game(_ref2) {
       }, label))), /*#__PURE__*/React.createElement("div", {
         style: {
           height: 4,
-          background: "rgba(255,255,255,.08)",
+          background: TC.sbg,
           borderRadius: 2,
           overflow: "hidden",
           marginTop: 4,
@@ -3383,7 +3395,7 @@ function Game(_ref2) {
       })), /*#__PURE__*/React.createElement("div", {
         style: {
           fontSize: 8,
-          color: "#555",
+          color: TC.dim,
           marginTop: 2
         }
       }, t.count, " Qs ", "\u2022", " 95s target (white line)"));
@@ -3421,9 +3433,9 @@ function Game(_ref2) {
         key: sec,
         style: {
           padding: 12,
-          background: "rgba(255,255,255,.03)",
+          background: TC.card,
           borderRadius: 10,
-          border: "1px solid rgba(255,255,255,.06)",
+          border: "1px solid " + TC.cbr,
           marginBottom: 8
         }
       }, /*#__PURE__*/React.createElement("div", {
@@ -3441,7 +3453,7 @@ function Game(_ref2) {
       }, sec), /*#__PURE__*/React.createElement("div", {
         style: {
           fontSize: 8,
-          color: "#555",
+          color: TC.dim,
           marginTop: 2
         }
       }, qs_count, " Qs answered")), /*#__PURE__*/React.createElement("div", {
@@ -3573,9 +3585,9 @@ function Game(_ref2) {
         key: x.k,
         style: {
           padding: 12,
-          background: "rgba(255,255,255,.03)",
+          background: TC.card,
           borderRadius: 10,
-          border: "1px solid rgba(255,255,255,.06)",
+          border: "1px solid " + TC.cbr,
           marginBottom: 8
         }
       }, /*#__PURE__*/React.createElement("div", {
@@ -3586,7 +3598,8 @@ function Game(_ref2) {
       }, /*#__PURE__*/React.createElement("span", {
         style: {
           fontSize: 12,
-          fontWeight: 600
+          fontWeight: 600,
+          color: fg
         }
       }, x.e, " ", x.l), /*#__PURE__*/React.createElement("span", {
         style: {
@@ -3597,7 +3610,7 @@ function Game(_ref2) {
       }, t > 0 ? pct + "%" : "\u2014")), /*#__PURE__*/React.createElement("div", {
         style: {
           height: 4,
-          background: "rgba(255,255,255,.08)",
+          background: TC.sbg,
           borderRadius: 2,
           overflow: "hidden",
           marginTop: 4
@@ -3611,7 +3624,7 @@ function Game(_ref2) {
       })), /*#__PURE__*/React.createElement("div", {
         style: {
           fontSize: 9,
-          color: "#666",
+          color: TC.dim,
           marginTop: 3
         }
       }, co, "/", t));
@@ -3628,9 +3641,9 @@ function Game(_ref2) {
         key: i,
         style: {
           padding: 10,
-          background: "rgba(255,255,255,.03)",
+          background: TC.card,
           borderRadius: 10,
-          border: "1px solid rgba(255,255,255,.06)",
+          border: "1px solid " + TC.cbr,
           marginBottom: 6
         }
       }, /*#__PURE__*/React.createElement("div", {
@@ -3642,7 +3655,7 @@ function Game(_ref2) {
         style: {
           fontSize: 12,
           fontWeight: 700,
-          color: "#fff"
+          color: fg
         }
       }, (MODES[s.mode] || {}).icon, " ", (MODES[s.mode] || {}).name || s.mode), /*#__PURE__*/React.createElement("span", {
         style: {
@@ -3653,7 +3666,7 @@ function Game(_ref2) {
       }, p, "%")), /*#__PURE__*/React.createElement("div", {
         style: {
           fontSize: 10,
-          color: "#555",
+          color: TC.dim,
           marginTop: 3
         }
       }, new Date(s.date).toLocaleDateString(), " ", "\u2022", " ", s.correct, "/", s.total, " ", "\u2022", " +", s.score, "XP"));
@@ -3702,7 +3715,7 @@ function Game(_ref2) {
       style: {
         fontSize: 18,
         fontWeight: 800,
-        color: "#fff",
+        color: fg,
         margin: "0 0 12px"
       }
     }, MODES[gm].icon, " ", MODES[gm].name), Object.entries(secs).map(function (e) {
@@ -3714,7 +3727,7 @@ function Game(_ref2) {
       }, /*#__PURE__*/React.createElement("h3", {
         style: {
           fontSize: 9,
-          color: "#555",
+          color: TC.dim,
           letterSpacing: 2,
           textTransform: "uppercase",
           marginBottom: 6
@@ -3743,8 +3756,8 @@ function Game(_ref2) {
             gap: 2,
             padding: "8px 4px",
             borderRadius: 8,
-            border: "1.5px solid " + (is ? c.color : "rgba(255,255,255,.08)"),
-            background: is ? c.color + "22" : "rgba(255,255,255,.03)"
+            border: "1.5px solid " + (is ? c.color : TC.cbr),
+            background: is ? c.color + "22" : TC.card
           }
         }, /*#__PURE__*/React.createElement("span", {
           style: {
@@ -3783,7 +3796,11 @@ function Game(_ref2) {
 
     // Pause overlay
     if (paused) return /*#__PURE__*/React.createElement("div", {
-      style: S.c
+      style: {
+        ...S.c,
+        background: bg,
+        color: fg
+      }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
@@ -3804,7 +3821,7 @@ function Game(_ref2) {
       style: {
         fontSize: 18,
         fontWeight: 800,
-        color: "#fff",
+        color: fg,
         marginBottom: 8
       }
     }, "Paused"), /*#__PURE__*/React.createElement("div", {
@@ -3820,7 +3837,10 @@ function Game(_ref2) {
       style: S.btn
     }, "Resume"))));
     return /*#__PURE__*/React.createElement("div", {
-      style: Object.assign({}, S.c, flash ? {
+      style: Object.assign({}, S.c, {
+        background: bg,
+        color: fg
+      }, flash ? {
         animation: "fG .5s"
       } : {}, shake ? {
         animation: "sS .4s"
@@ -3839,12 +3859,12 @@ function Game(_ref2) {
       }
     }, /*#__PURE__*/React.createElement("button", {
       style: {
-        background: "rgba(255,255,255,.06)",
+        background: TC.card,
         width: 28,
         height: 28,
         borderRadius: 7,
         fontSize: 13,
-        color: "#888",
+        color: TC.muted,
         flexShrink: 0
       },
       onClick: fin
@@ -3854,12 +3874,12 @@ function Game(_ref2) {
         clearTimeout(tr.current);
       },
       style: {
-        background: "rgba(255,255,255,.06)",
+        background: TC.card,
         width: 28,
         height: 28,
         borderRadius: 7,
         fontSize: 11,
-        color: "#888",
+        color: TC.muted,
         flexShrink: 0
       }
     }, "\u23F8"), /*#__PURE__*/React.createElement("div", {
@@ -3873,7 +3893,8 @@ function Game(_ref2) {
       style: {
         fontSize: 14,
         padding: "2px 6px",
-        flexShrink: 0
+        flexShrink: 0,
+        color: TC.muted
       }
     }, isFlagged ? "\u{1F6A9}" : "\u2690"), streak >= 2 && /*#__PURE__*/React.createElement("span", {
       style: {
@@ -3918,7 +3939,7 @@ function Game(_ref2) {
           height: isCurrent ? 12 : 8,
           borderRadius: "50%",
           border: isCurrent ? "2px solid #667eea" : "none",
-          background: isAnswered ? "#4ade80" : isCurrent ? "#667eea" : "rgba(255,255,255,.15)",
+          background: isAnswered ? "#4ade80" : isCurrent ? "#667eea" : TC.sbg,
           transition: "all .15s",
           opacity: canJump || isCurrent ? 1 : .4
         }
@@ -3983,7 +4004,7 @@ function Game(_ref2) {
     }, cat.icon, " ", cat.name), /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 8,
-        color: "#555"
+        color: TC.dim
       }
     }, ["", "Easy", "Med", "Hard"][q.diff || 1]), isMatch && /*#__PURE__*/React.createElement("span", {
       style: {
@@ -4003,7 +4024,7 @@ function Game(_ref2) {
           padding: "1px 6px",
           borderRadius: 10,
           background: "rgba(255,255,255,.05)",
-          color: "#777"
+          color: TC.dim
         }
       }, t);
     })), passageData && /*#__PURE__*/React.createElement("div", {
@@ -4022,9 +4043,9 @@ function Game(_ref2) {
       }
     }, /*#__PURE__*/React.createElement("h2", {
       style: {
-        fontSize: 16,
+        fontSize: 16 + fz,
         fontWeight: 700,
-        color: "#fff",
+        color: fg,
         lineHeight: 1.5,
         margin: 0
       }
@@ -4137,15 +4158,15 @@ function Game(_ref2) {
     })), /*#__PURE__*/React.createElement("div", {
       style: {
         padding: "12px 14px",
-        background: "rgba(255,255,255,.04)",
+        background: TC.card,
         borderRadius: 10,
-        border: "1px solid rgba(255,255,255,.06)",
+        border: "1px solid " + TC.cbr,
         marginBottom: 8
       }
     }, /*#__PURE__*/React.createElement("p", {
       style: {
         fontSize: 12,
-        color: "#ccc",
+        color: TC.muted,
         lineHeight: 1.8
       }
     }, q.ex)), q.mn && /*#__PURE__*/React.createElement("div", {
@@ -4174,23 +4195,23 @@ function Game(_ref2) {
       }
     }, q.o.map(function (opt, i) {
       var isEliminated = eliminated.indexOf(i) >= 0;
-      var bg = "rgba(255,255,255,.04)",
-        bc = "rgba(255,255,255,.1)",
+      var bg2 = TC.card,
+        bc2 = TC.cbr,
         op = 1;
       if (sr) {
         if (i === q.a) {
-          bg = "rgba(74,222,128,.12)";
-          bc = "#4ade80";
+          bg2 = "rgba(74,222,128,.12)";
+          bc2 = "#4ade80";
         } else if (i === sel && i !== q.a) {
-          bg = "rgba(248,113,113,.12)";
-          bc = "#f87171";
+          bg2 = "rgba(248,113,113,.12)";
+          bc2 = "#f87171";
         } else op = 0.4;
       } else if (awaitConf && i === sel) {
-        bg = "rgba(102,126,234,.15)";
-        bc = "#667eea";
+        bg2 = "rgba(102,126,234,.15)";
+        bc2 = "#667eea";
       } else if (!awaitConf && i === sel) {
-        bg = "rgba(102,126,234,.08)";
-        bc = "rgba(102,126,234,.5)";
+        bg2 = "rgba(102,126,234,.08)";
+        bc2 = "rgba(102,126,234,.5)";
       } else if (isEliminated) {
         op = 0.2;
       }
@@ -4201,8 +4222,8 @@ function Game(_ref2) {
           alignItems: "flex-start",
           gap: 8,
           padding: "10px 11px",
-          background: bg,
-          border: "1.5px solid " + bc,
+          background: bg2,
+          border: "1.5px solid " + bc2,
           borderRadius: 9,
           textAlign: "left",
           opacity: op,
@@ -4217,13 +4238,13 @@ function Game(_ref2) {
           width: 20,
           height: 20,
           borderRadius: 5,
-          background: "rgba(255,255,255,.06)",
+          background: TC.sbg,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           fontSize: 9,
           fontWeight: 700,
-          color: "#888",
+          color: TC.muted,
           flexShrink: 0
         }
       }, String.fromCharCode(65 + i)), /*#__PURE__*/React.createElement("span", {
@@ -4251,7 +4272,8 @@ function Game(_ref2) {
         fontSize: 12,
         fontWeight: 600,
         color: "#ffc832",
-        whiteSpace: "nowrap"
+        whiteSpace: "nowrap",
+        color: "#ffc832"
       }
     }, "\u{1F4A1}", " 50/50"), sel !== null && /*#__PURE__*/React.createElement("button", {
       onClick: lockIn,
@@ -4275,7 +4297,7 @@ function Game(_ref2) {
     }, /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 11,
-        color: "#888",
+        color: TC.muted,
         marginBottom: 6,
         textAlign: "center"
       }
@@ -4334,9 +4356,9 @@ function Game(_ref2) {
       style: {
         padding: "16px",
         textAlign: "center",
-        background: "rgba(255,255,255,.03)",
+        background: TC.card,
         borderRadius: 10,
-        border: "1px solid rgba(255,255,255,.06)",
+        border: "1px solid " + TC.cbr,
         marginBottom: 8
       }
     }, /*#__PURE__*/React.createElement("div", {
@@ -4355,15 +4377,15 @@ function Game(_ref2) {
     }, thinkDelay)) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
       style: {
         padding: "12px 14px",
-        background: "rgba(255,255,255,.04)",
+        background: TC.card,
         borderRadius: 10,
-        border: "1px solid rgba(255,255,255,.06)",
+        border: "1px solid " + TC.cbr,
         marginBottom: 8
       }
     }, /*#__PURE__*/React.createElement("p", {
       style: {
         fontSize: 12,
-        color: "#ccc",
+        color: TC.muted,
         lineHeight: 1.8,
         margin: 0
       }
@@ -4502,7 +4524,7 @@ function Game(_ref2) {
       style: {
         fontSize: 13,
         fontWeight: 700,
-        color: "#fff",
+        color: fg,
         marginBottom: 8
       }
     }, "\u{1F4DD}", " Review (", wrong.length, ")"), wrong.map(function (wq, i) {
@@ -4526,7 +4548,7 @@ function Game(_ref2) {
       }, /*#__PURE__*/React.createElement("span", {
         style: {
           fontSize: 10,
-          color: "#ccc",
+          color: TC.muted,
           lineHeight: 1.4,
           flex: 1
         }
@@ -4553,7 +4575,7 @@ function Game(_ref2) {
       }, "\u2705", " ", wq.o[wq.a]), /*#__PURE__*/React.createElement("div", {
         style: {
           fontSize: 11,
-          color: "#aaa",
+          color: TC.muted,
           lineHeight: 1.7
         }
       }, wq.ex), wq.mn && /*#__PURE__*/React.createElement("div", {
@@ -4616,8 +4638,6 @@ function App() {
 const S = {
   c: {
     minHeight: "100vh",
-    background: "#0f0f14",
-    color: "#e8e6e3",
     fontFamily: "inherit",
     overflowX: "hidden"
   },
@@ -4670,7 +4690,7 @@ const S = {
   dv: {
     width: 1,
     height: 24,
-    background: "rgba(255,255,255,.08)"
+    background: TC.sbg
   },
   sh: {
     display: "flex",
@@ -4681,7 +4701,7 @@ const S = {
   sln: {
     flex: 1,
     height: 1,
-    background: "rgba(255,255,255,.08)"
+    background: TC.sbg
   },
   stt: {
     fontSize: 8,
@@ -4694,8 +4714,8 @@ const S = {
     alignItems: "center",
     gap: 10,
     padding: "12px",
-    background: "rgba(255,255,255,.03)",
-    border: "1px solid rgba(255,255,255,.08)",
+    background: TC.card,
+    border: "1px solid " + TC.cbr,
     borderRadius: 10,
     textAlign: "left",
     width: "100%"
