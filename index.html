@@ -1,48 +1,87 @@
 <!DOCTYPE html>
 
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<title>MCAT Quest</title>
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="MCAT Quest">
-<meta name="theme-color" content="#0f0f14">
-<link rel="manifest" href="data:application/json,%7B%22name%22%3A%22MCAT%20Quest%22%2C%22short_name%22%3A%22MCAT%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%230f0f14%22%2C%22theme_color%22%3A%22%230f0f14%22%7D">
+<html><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Firebase Test</title>
+<style>*{margin:0;padding:0;box-sizing:border-box}body{background:#0f0f14;color:#fff;font-family:monospace;padding:30px}pre{white-space:pre-wrap;font-size:12px;margin:8px 0;padding:10px;background:rgba(255,255,255,0.05);border-radius:8px;color:#ccc;line-height:1.6}.ok{color:#4ade80}.err{color:#f87171}.warn{color:#fbbf24}h2{margin:20px 0 10px;font-size:16px}</style>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-html,body,#root{min-height:100%;width:100%;background:#0f0f14;color:#e8e6e3;overflow-x:hidden}
-body{font-family:'SF Mono','Menlo','Fira Code',monospace;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
-button{font-family:inherit;-webkit-tap-highlight-color:transparent;cursor:pointer;outline:none;border:none;background:none;color:inherit}
-button:active{opacity:.85}
-::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:2px}
-.passage-box{padding:14px;background:rgba(102,126,234,0.06);border:1px solid rgba(102,126,234,0.15);border-radius:10px;margin-bottom:14px;font-size:12px;line-height:1.7;color:#bbb}
-.conf-bar{display:flex;gap:6px;margin:10px 0}
-.conf-btn{flex:1;padding:10px 6px;border-radius:8px;font-size:11px;font-weight:600;text-align:center;border:1.5px solid rgba(255,255,255,.1);background:rgba(255,255,255,.03)}
-.conf-btn:active{border-color:#667eea;background:rgba(102,126,234,.15)}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-@keyframes fG{0%,100%{background:#0f0f14}50%{background:#0a2e0a}}
-@keyframes sS{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
-@keyframes pu{0%,100%{opacity:1}50%{opacity:.5}}
-@keyframes sU{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
-@keyframes pI{from{transform:scale(.8);opacity:0}to{transform:scale(1);opacity:1}}
-@keyframes fI{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
-@keyframes gI{from{transform:scale(0);opacity:0}to{transform:scale(1);opacity:1}}
-</style>
-</head>
-<body>
-<div id="root"><div style="display:flex;align-items:center;justify-content:center;min-height:100vh"><div style="text-align:center"><div style="font-size:48px;animation:pulse 1.5s infinite">🧬</div><div style="font-size:12px;color:#555;margin-top:10px">Loading...</div></div></div></div>
+</head><body>
+<h1>🧬 Firebase Diagnostic</h1>
+<div id="log"></div>
 <script>
-window.onerror=function(m,s,l){document.getElementById("root").innerHTML='<div style="padding:40px;color:#f87171;font-family:monospace;background:#0f0f14;min-height:100vh"><h2>Error</h2><pre style="white-space:pre-wrap;color:#ccc;margin-top:12px">'+m+'
-Line: '+l+'</pre></div>';};
-firebase.initializeApp({apiKey:"AIzaSyCkm0XHE_cubG1AdZd2QXXz9g4oOxqT0Mo",authDomain:"mcat-804a5.firebaseapp.com",projectId:"mcat-804a5",storageBucket:"mcat-804a5.firebasestorage.app",messagingSenderId:"146740482880",appId:"1:146740482880:web:80faf1a84fe5a9a86220a5"});
-var db=firebase.firestore();
+var log = document.getElementById("log");
+function add(msg, cls) {
+  var p = document.createElement("pre");
+  p.className = cls || "";
+  p.textContent = msg;
+  log.appendChild(p);
+}
+
+add(“Step 1: Initializing Firebase…”);
+try {
+firebase.initializeApp({
+apiKey: “AIzaSyCkm0XHE_cubG1AdZd2QXXz9g4oOxqT0Mo”,
+authDomain: “mcat-804a5.firebaseapp.com”,
+projectId: “mcat-804a5”,
+storageBucket: “mcat-804a5.firebasestorage.app”,
+messagingSenderId: “146740482880”,
+appId: “1:146740482880:web:80faf1a84fe5a9a86220a5”
+});
+var db = firebase.firestore();
+add(“✅ Firebase initialized”, “ok”);
+} catch(e) {
+add(“❌ Firebase init failed: “ + e.message, “err”);
+}
+
+add(”\nStep 2: Testing WRITE to Firestore…”);
+db.collection(“mcatquest”).doc(”*test*”).set({
+test: true,
+timestamp: Date.now(),
+message: “diagnostic test”
+}).then(function() {
+add(“✅ WRITE successful!”, “ok”);
+
+add(”\nStep 3: Testing READ from Firestore…”);
+return db.collection(“mcatquest”).doc(”*test*”).get();
+}).then(function(doc) {
+if (doc.exists) {
+add(“✅ READ successful! Data: “ + JSON.stringify(doc.data()), “ok”);
+} else {
+add(“⚠️ READ returned but doc doesn’t exist”, “warn”);
+}
+
+add(”\nStep 4: Checking for your save data (pin: 5798)…”);
+return db.collection(“mcatquest”).doc(“5798”).get();
+}).then(function(doc) {
+if (doc.exists) {
+var data = doc.data();
+add(“✅ Found save data for pin 5798!”, “ok”);
+add(“XP: “ + (data.xp || 0) + “, Answered: “ + (data.totalAnswered || 0), “ok”);
+} else {
+add(“ℹ️ No save data found for pin 5798 (normal if first time)”, “warn”);
+}
+
+add(”\nStep 5: Writing test save for pin 5798…”);
+return db.collection(“mcatquest”).doc(“5798”).set({xp:0,totalCorrect:0,totalAnswered:0,bestStreak:0,questionStats:{},sessionHistory:[]}, {merge:true});
+}).then(function() {
+add(“✅ Write to pin 5798 successful!”, “ok”);
+add(”\n🎉 ALL TESTS PASSED — Firebase is working correctly.”, “ok”);
+add(“The issue is in the app code, not Firebase.”, “ok”);
+}).catch(function(e) {
+add(“❌ FAILED: “ + e.message, “err”);
+add(”\nFull error: “ + e.code + “ — “ + e.message, “err”);
+if (e.code === “permission-denied”) {
+add(”\n⚠️ FIRESTORE RULES ARE BLOCKING ACCESS”, “warn”);
+add(“Go to Firebase Console → Firestore → Rules tab”, “warn”);
+add(“Make sure your rules look EXACTLY like this:”, “warn”);
+add(‘rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    match /{document=**} {\n      allow read, write: if true;\n    }\n  }\n}’, “warn”);
+}
+if (e.code === “not-found” || e.message.includes(“not found”)) {
+add(”\n⚠️ FIRESTORE DATABASE MAY NOT BE CREATED”, “warn”);
+add(“Go to Firebase Console → Build → Firestore Database → Create Database”, “warn”);
+}
+});
 </script>
-<script src="app.js"></script>
-</body>
-</html>
+
+</body></html>
