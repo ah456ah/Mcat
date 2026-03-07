@@ -2,86 +2,88 @@
 
 <html><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Firebase Test</title>
-<style>*{margin:0;padding:0;box-sizing:border-box}body{background:#0f0f14;color:#fff;font-family:monospace;padding:30px}pre{white-space:pre-wrap;font-size:12px;margin:8px 0;padding:10px;background:rgba(255,255,255,0.05);border-radius:8px;color:#ccc;line-height:1.6}.ok{color:#4ade80}.err{color:#f87171}.warn{color:#fbbf24}h2{margin:20px 0 10px;font-size:16px}</style>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<title>Debug</title>
+<style>*{margin:0;padding:0;box-sizing:border-box}body{background:#0f0f14;color:#fff;font-family:monospace;padding:30px;font-size:13px;line-height:1.8}.ok{color:#4ade80}.err{color:#f87171}.warn{color:#fbbf24}</style>
 </head><body>
-<h1>🧬 Firebase Diagnostic</h1>
+<h1>🔍 Debug</h1>
 <div id="log"></div>
 <script>
 var log = document.getElementById("log");
-function add(msg, cls) {
-  var p = document.createElement("pre");
-  p.className = cls || "";
-  p.textContent = msg;
-  log.appendChild(p);
+function add(msg, cls) { var p = document.createElement("div"); p.className = cls||""; p.textContent = msg; log.appendChild(p); }
+
+add(“1. Basic JS works ✓”, “ok”);
+
+// Test if external scripts can load at all
+add(“2. Testing script loading…”);
+
+function testScript(url, name, callback) {
+var s = document.createElement(“script”);
+s.src = url;
+s.onload = function() { add(”   ✅ “ + name + “ loaded”, “ok”); if(callback) callback(); };
+s.onerror = function() { add(”   ❌ “ + name + “ BLOCKED or failed to load”, “err”); add(”   URL: “ + url, “err”); };
+document.head.appendChild(s);
 }
 
-add(“Step 1: Initializing Firebase…”);
+// Test React first (from unpkg)
+testScript(“https://unpkg.com/react@18/umd/react.production.min.js”, “React (unpkg.com)”, function() {
+add(”   React version: “ + (typeof React !== “undefined” ? “OK” : “undefined”), typeof React !== “undefined” ? “ok” : “err”);
+});
+
+// Test Firebase
+testScript(“https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js”, “Firebase App (gstatic.com)”, function() {
+testScript(“https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js”, “Firebase Firestore (gstatic.com)”, function() {
+add(””);
+add(“3. Testing Firebase connection…”);
 try {
-firebase.initializeApp({
-apiKey: “AIzaSyCkm0XHE_cubG1AdZd2QXXz9g4oOxqT0Mo”,
-authDomain: “mcat-804a5.firebaseapp.com”,
-projectId: “mcat-804a5”,
-storageBucket: “mcat-804a5.firebasestorage.app”,
-messagingSenderId: “146740482880”,
-appId: “1:146740482880:web:80faf1a84fe5a9a86220a5”
-});
+firebase.initializeApp({apiKey:“AIzaSyCkm0XHE_cubG1AdZd2QXXz9g4oOxqT0Mo”,authDomain:“mcat-804a5.firebaseapp.com”,projectId:“mcat-804a5”,storageBucket:“mcat-804a5.firebasestorage.app”,messagingSenderId:“146740482880”,appId:“1:146740482880:web:80faf1a84fe5a9a86220a5”});
 var db = firebase.firestore();
-add(“✅ Firebase initialized”, “ok”);
+add(”   ✅ Firebase initialized”, “ok”);
+
+```
+  add("4. Testing Firestore write...");
+  db.collection("mcatquest").doc("_test_").set({t:Date.now()}).then(function() {
+    add("   ✅ Write OK!", "ok");
+    add("5. Testing Firestore read...");
+    return db.collection("mcatquest").doc("_test_").get();
+  }).then(function(doc) {
+    add("   ✅ Read OK! Data exists: " + doc.exists, "ok");
+    add("");
+    add("🎉 Everything works! The issue is in the app code.", "ok");
+  }).catch(function(e) {
+    add("   ❌ Firestore error: " + e.code + " — " + e.message, "err");
+    if (e.code === "permission-denied") {
+      add("   FIX: Update Firestore Rules (see below)", "warn");
+      add('   rules_version = "2";', "warn");
+      add('   service cloud.firestore {', "warn");
+      add('     match /databases/{database}/documents {', "warn");
+      add('       match /{document=**} {', "warn");
+      add('         allow read, write: if true;', "warn");
+      add('       }', "warn");
+      add('     }', "warn");
+      add('   }', "warn");
+    }
+  });
 } catch(e) {
-add(“❌ Firebase init failed: “ + e.message, “err”);
+  add("   ❌ Firebase init error: " + e.message, "err");
 }
+```
 
-add(”\nStep 2: Testing WRITE to Firestore…”);
-db.collection(“mcatquest”).doc(”*test*”).set({
-test: true,
-timestamp: Date.now(),
-message: “diagnostic test”
-}).then(function() {
-add(“✅ WRITE successful!”, “ok”);
-
-add(”\nStep 3: Testing READ from Firestore…”);
-return db.collection(“mcatquest”).doc(”*test*”).get();
-}).then(function(doc) {
-if (doc.exists) {
-add(“✅ READ successful! Data: “ + JSON.stringify(doc.data()), “ok”);
-} else {
-add(“⚠️ READ returned but doc doesn’t exist”, “warn”);
-}
-
-add(”\nStep 4: Checking for your save data (pin: 5798)…”);
-return db.collection(“mcatquest”).doc(“5798”).get();
-}).then(function(doc) {
-if (doc.exists) {
-var data = doc.data();
-add(“✅ Found save data for pin 5798!”, “ok”);
-add(“XP: “ + (data.xp || 0) + “, Answered: “ + (data.totalAnswered || 0), “ok”);
-} else {
-add(“ℹ️ No save data found for pin 5798 (normal if first time)”, “warn”);
-}
-
-add(”\nStep 5: Writing test save for pin 5798…”);
-return db.collection(“mcatquest”).doc(“5798”).set({xp:0,totalCorrect:0,totalAnswered:0,bestStreak:0,questionStats:{},sessionHistory:[]}, {merge:true});
-}).then(function() {
-add(“✅ Write to pin 5798 successful!”, “ok”);
-add(”\n🎉 ALL TESTS PASSED — Firebase is working correctly.”, “ok”);
-add(“The issue is in the app code, not Firebase.”, “ok”);
-}).catch(function(e) {
-add(“❌ FAILED: “ + e.message, “err”);
-add(”\nFull error: “ + e.code + “ — “ + e.message, “err”);
-if (e.code === “permission-denied”) {
-add(”\n⚠️ FIRESTORE RULES ARE BLOCKING ACCESS”, “warn”);
-add(“Go to Firebase Console → Firestore → Rules tab”, “warn”);
-add(“Make sure your rules look EXACTLY like this:”, “warn”);
-add(‘rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    match /{document=**} {\n      allow read, write: if true;\n    }\n  }\n}’, “warn”);
-}
-if (e.code === “not-found” || e.message.includes(“not found”)) {
-add(”\n⚠️ FIRESTORE DATABASE MAY NOT BE CREATED”, “warn”);
-add(“Go to Firebase Console → Build → Firestore Database → Create Database”, “warn”);
-}
 });
+});
+
+// Timeout check
+setTimeout(function() {
+var items = log.children.length;
+if (items <= 2) {
+add(””);
+add(“⚠️ External scripts are not loading!”, “err”);
+add(“This usually means:”, “warn”);
+add(”• An ad blocker or content blocker is active”, “warn”);
+add(”• Try: Settings → Safari → Content Blockers → turn all OFF”, “warn”);
+add(”• Or try opening in Chrome instead of Safari”, “warn”);
+add(”• Or try in a Private/Incognito window”, “warn”);
+}
+}, 5000);
 </script>
 
 </body></html>
