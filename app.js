@@ -1,0 +1,2654 @@
+const {
+  useState,
+  useEffect,
+  useRef,
+  useCallback
+} = React;
+window.onerror = function (m, s, l) {
+  document.getElementById("root").innerHTML = '<div style="padding:40px;color:#f87171;font-family:monospace;background:#0f0f14;min-height:100vh"><h2>Error</h2><pre style="white-space:pre-wrap;color:#ccc;margin-top:12px">' + m + '\nLine: ' + l + '</pre></div>';
+  return true;
+};
+const COL = "mcatquest";
+async function loadFromCloud(p) {
+  try {
+    var tp = new Promise(function (_, rej) {
+      setTimeout(function () {
+        rej(new Error("timeout"));
+      }, 8000);
+    });
+    var fp = db.collection(COL).doc(p).get().then(function (d) {
+      if (d.exists) return d.data();
+      return null;
+    });
+    return await Promise.race([fp, tp]);
+  } catch (e) {
+    return null;
+  }
+}
+async function saveToCloud(p, d) {
+  try {
+    var tp = new Promise(function (_, rej) {
+      setTimeout(function () {
+        rej(new Error("timeout"));
+      }, 8000);
+    });
+    await Promise.race([db.collection(COL).doc(p).set(d), tp]);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+function getSavedPin() {
+  try {
+    return localStorage.getItem("mcat_pin") || "";
+  } catch (e) {
+    return "";
+  }
+}
+function rememberPin(p) {
+  try {
+    localStorage.setItem("mcat_pin", p);
+  } catch (e) {}
+}
+
+// === TAG INDEX ===
+const ALL_TAGS = [...new Set(QS.flatMap(function (q) {
+  return q.tags || [];
+}))].sort();
+function getTagCounts(data) {
+  var m = {};
+  QS.forEach(function (q) {
+    (q.tags || []).forEach(function (t) {
+      if (!m[t]) m[t] = {
+        total: 0,
+        seen: 0,
+        correct: 0
+      };
+      m[t].total++;
+      var s = data.questionStats[q.id];
+      if (s) {
+        m[t].seen += s.seen;
+        m[t].correct += s.correct;
+      }
+    });
+  });
+  return m;
+}
+
+// === SPACED REP ===
+const BOX_INT = {
+  1: 1,
+  2: 3,
+  3: 7,
+  4: 14,
+  5: 30
+};
+function getBox(d, id) {
+  return d.questionStats[id] && d.questionStats[id].box || 1;
+}
+function getNextReview(d, id) {
+  return d.questionStats[id] && d.questionStats[id].nextReview || 0;
+}
+function isDue(d, id) {
+  var nr = getNextReview(d, id);
+  return nr === 0 || Date.now() >= nr;
+}
+function updateBox(d, id, ok) {
+  var st = d.questionStats[id] || {
+    box: 1
+  };
+  var nb = ok ? Math.min(st.box + 1, 5) : 1;
+  return {
+    box: nb,
+    nextReview: Date.now() + BOX_INT[nb] * 86400000
+  };
+}
+function getDueCount(d) {
+  return QS.filter(function (q) {
+    return isDue(d, q.id);
+  }).length;
+}
+const MODES = {
+  BLITZ: {
+    name: "Blitz",
+    icon: "\u26A1",
+    desc: "30s per question",
+    time: 30
+  },
+  MARATHON: {
+    name: "Marathon",
+    icon: "\u{1F3C3}",
+    desc: "No timer, deep learning",
+    time: null
+  },
+  BOSS_BATTLE: {
+    name: "Boss Battle",
+    icon: "\u{1F479}",
+    desc: "5 hard Qs, 3 lives",
+    time: 45
+  },
+  SPACED_REVIEW: {
+    name: "Spaced Review",
+    icon: "\u{1F9E0}",
+    desc: "Due for review now",
+    time: null,
+    smart: true
+  },
+  HARD_QS: {
+    name: "Hard Questions",
+    icon: "\u{1F480}",
+    desc: "Below 70% accuracy",
+    time: null,
+    smart: true
+  },
+  NEW_QS: {
+    name: "New Questions",
+    icon: "\u2728",
+    desc: "Questions you haven't seen",
+    time: null,
+    smart: true
+  },
+  WEAK_TOPICS: {
+    name: "Weak Topics",
+    icon: "\u{1F3AF}",
+    desc: "Your lowest categories",
+    time: null,
+    smart: true
+  },
+  INTERLEAVED: {
+    name: "Interleaved",
+    icon: "\u{1F500}",
+    desc: "Random mix, all topics",
+    time: null,
+    smart: true
+  },
+  TAG_PRACTICE: {
+    name: "Practice by Tag",
+    icon: "\u{1F3F7}\uFE0F",
+    desc: "Hyper-specific concepts",
+    time: null,
+    smart: true
+  },
+  FLAGGED: {
+    name: "Flagged Questions",
+    icon: "\u{1F6A9}",
+    desc: "Questions you flagged",
+    time: null,
+    smart: true
+  },
+  CARS_MODE: {
+    name: "CARS Practice",
+    icon: "\u{1F4D6}",
+    desc: "Reading comprehension",
+    time: null,
+    smart: true
+  },
+  REVIEW: {
+    name: "Review Missed",
+    icon: "\u{1F4DD}",
+    desc: "Recent mistakes",
+    time: null,
+    smart: true
+  }
+};
+const RANKS = [{
+  name: "Pre-Med Newbie",
+  min: 0,
+  b: "\u{1F95A}"
+}, {
+  name: "Anatomy Apprentice",
+  min: 100,
+  b: "\u{1F423}"
+}, {
+  name: "Lab Rat",
+  min: 300,
+  b: "\u{1F401}"
+}, {
+  name: "Study Machine",
+  min: 600,
+  b: "\u2699\uFE0F"
+}, {
+  name: "Knowledge Knight",
+  min: 1000,
+  b: "\u{1F6E1}\uFE0F"
+}, {
+  name: "Science Sorcerer",
+  min: 1800,
+  b: "\u{1F9D9}"
+}, {
+  name: "MCAT Warrior",
+  min: 3000,
+  b: "\u2694\uFE0F"
+}, {
+  name: "528 Legend",
+  min: 5000,
+  b: "\u{1F451}"
+}];
+function getRank(x) {
+  var r = RANKS[0];
+  RANKS.forEach(function (k) {
+    if (x >= k.min) r = k;
+  });
+  return r;
+}
+function getNext(x) {
+  for (var i = 0; i < RANKS.length; i++) {
+    if (x < RANKS[i].min) return RANKS[i];
+  }
+  return null;
+}
+function shuf(a) {
+  var b = a.slice();
+  for (var i = b.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var t = b[i];
+    b[i] = b[j];
+    b[j] = t;
+  }
+  return b;
+}
+const DD = {
+  xp: 0,
+  totalCorrect: 0,
+  totalAnswered: 0,
+  bestStreak: 0,
+  questionStats: {},
+  sessionHistory: [],
+  calibration: {
+    high: {
+      total: 0,
+      correct: 0
+    },
+    med: {
+      total: 0,
+      correct: 0
+    },
+    low: {
+      total: 0,
+      correct: 0
+    }
+  },
+  flagged: []
+};
+function getCatAcc(d, cat) {
+  var qs = QS.filter(function (q) {
+    return q.cat === cat;
+  });
+  var s = 0,
+    c = 0;
+  qs.forEach(function (q) {
+    var st = d.questionStats[q.id];
+    if (st) {
+      s += st.seen;
+      c += st.correct;
+    }
+  });
+  return {
+    seen: s,
+    correct: c,
+    pct: s > 0 ? Math.round(c / s * 100) : null
+  };
+}
+function getSmartPool(mode, data, selTag) {
+  if (mode === "SPACED_REVIEW") return function () {
+    var due = QS.filter(function (q) {
+      return isDue(data, q.id);
+    });
+    return due.length ? {
+      pool: due
+    } : {
+      msg: "All caught up!"
+    };
+  }();
+  if (mode === "HARD_QS") return function () {
+    var h = QS.filter(function (q) {
+      var s = data.questionStats[q.id];
+      return s && s.seen >= 1 && s.correct / s.seen < 0.7;
+    });
+    return h.length ? {
+      pool: h
+    } : {
+      msg: "No hard questions yet!"
+    };
+  }();
+  if (mode === "NEW_QS") return function () {
+    var u = QS.filter(function (q) {
+      return !data.questionStats[q.id];
+    });
+    return u.length ? {
+      pool: u
+    } : {
+      msg: "All questions seen!"
+    };
+  }();
+  if (mode === "WEAK_TOPICS") return function () {
+    var cs = Object.keys(CATS).filter(function (k) {
+      return k !== "CARS";
+    }).map(function (k) {
+      return Object.assign({
+        key: k
+      }, getCatAcc(data, k));
+    }).filter(function (c) {
+      return c.seen >= 2;
+    }).sort(function (a, b) {
+      return a.pct - b.pct;
+    });
+    if (!cs.length) return {
+      msg: "Play more!"
+    };
+    return {
+      pool: QS.filter(function (q) {
+        return cs.slice(0, 3).some(function (c) {
+          return c.key === q.cat;
+        });
+      })
+    };
+  }();
+  if (mode === "INTERLEAVED") return {
+    pool: QS.filter(function (q) {
+      return q.cat !== "CARS";
+    })
+  };
+  if (mode === "TAG_PRACTICE") return function () {
+    if (!selTag) return {
+      msg: "Select a tag"
+    };
+    var tq = QS.filter(function (q) {
+      return (q.tags || []).indexOf(selTag) >= 0;
+    });
+    return tq.length ? {
+      pool: tq
+    } : {
+      msg: "No questions for this tag"
+    };
+  }();
+  if (mode === "FLAGGED") return function () {
+    var fl = data.flagged || [];
+    var fq = QS.filter(function (q) {
+      return fl.indexOf(q.id) >= 0;
+    });
+    return fq.length ? {
+      pool: fq
+    } : {
+      msg: "No flagged questions. Flag questions during play!"
+    };
+  }();
+  if (mode === "CARS_MODE") return function () {
+    var c = QS.filter(function (q) {
+      return q.cat === "CARS";
+    });
+    return c.length ? {
+      pool: c
+    } : {
+      msg: "No CARS questions"
+    };
+  }();
+  if (mode === "REVIEW") return function () {
+    var m = QS.filter(function (q) {
+      var s = data.questionStats[q.id];
+      return s && s.seen > 0 && s.correct / s.seen < 0.6;
+    });
+    return m.length ? {
+      pool: m
+    } : {
+      msg: "No missed questions!"
+    };
+  }();
+  return {
+    pool: QS.filter(function (q) {
+      return q.cat !== "CARS";
+    })
+  };
+}
+function buildQSet(pool, mode) {
+  var count = mode === "BOSS_BATTLE" ? 5 : Math.min(15, pool.length);
+  var byCat = {};
+  pool.forEach(function (q) {
+    if (!byCat[q.cat]) byCat[q.cat] = [];
+    byCat[q.cat].push(q);
+  });
+  Object.keys(byCat).forEach(function (k) {
+    byCat[k] = shuf(byCat[k]);
+  });
+  var ck = shuf(Object.keys(byCat));
+  var picked = [];
+  var r = 0;
+  while (picked.length < count) {
+    var any = false;
+    ck.forEach(function (c) {
+      if (picked.length < count && r < byCat[c].length) {
+        picked.push(byCat[c][r]);
+        any = true;
+      }
+    });
+    if (!any) break;
+    r++;
+  }
+  return shuf(picked).map(function (q) {
+    if (q.type === "match") {
+      var sp = shuf(q.pairs.map(function (p) {
+        return p.slice();
+      }));
+      return Object.assign({}, q, {
+        pairs: sp,
+        shuffledRight: shuf(sp.map(function (p) {
+          return p[1];
+        }))
+      });
+    }
+    var ct = q.o[q.a];
+    var so = shuf(q.o.slice());
+    return Object.assign({}, q, {
+      o: so,
+      a: so.indexOf(ct)
+    });
+  });
+}
+
+// === PIN SCREEN ===
+function PinScreen(_ref) {
+  let {
+    onLogin
+  } = _ref;
+  const [pin, setPin] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
+  const [lt, setLt] = useState(0);
+  var saved = getSavedPin();
+  useEffect(function () {
+    if (saved) {
+      setPin(saved);
+      dl(saved);
+    }
+  }, []);
+  useEffect(function () {
+    if (!loading) return;
+    var iv = setInterval(function () {
+      setLt(function (t) {
+        return t + 1;
+      });
+    }, 1000);
+    return function () {
+      clearInterval(iv);
+    };
+  }, [loading]);
+  function dl(p) {
+    if (p.length < 3) {
+      setErr("PIN 3+ chars");
+      return;
+    }
+    setLoading(true);
+    setErr("");
+    setLt(0);
+    loadFromCloud(p).then(function (d) {
+      rememberPin(p);
+      onLogin(p, d || Object.assign({}, DD));
+    }).catch(function () {
+      setLoading(false);
+      setErr("Failed. Retry.");
+    });
+  }
+  if (saved && loading) return /*#__PURE__*/React.createElement("div", {
+    style: S.c
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      minHeight: "100vh"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 48,
+      animation: "pulse 1.5s infinite"
+    }
+  }, "\u{1F9EC}"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "#555",
+      marginTop: 10
+    }
+  }, "Loading..."), lt > 5 ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 16
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      onLogin(saved, Object.assign({}, DD));
+    },
+    style: {
+      padding: "10px 20px",
+      background: "rgba(102,126,234,.2)",
+      border: "1px solid rgba(102,126,234,.4)",
+      borderRadius: 8,
+      color: "#667eea",
+      fontSize: 12,
+      fontWeight: 600
+    }
+  }, "Start offline"), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      try {
+        localStorage.removeItem("mcat_pin");
+      } catch (e) {}
+      setLoading(false);
+    },
+    style: {
+      padding: "10px 20px",
+      marginLeft: 8,
+      background: "rgba(255,255,255,.06)",
+      border: "1px solid rgba(255,255,255,.1)",
+      borderRadius: 8,
+      color: "#888",
+      fontSize: 12
+    }
+  }, "Change PIN")) : null)));
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...S.c,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      minHeight: "100vh",
+      padding: 20
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      maxWidth: 340,
+      width: "100%",
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 52,
+      marginBottom: 8
+    }
+  }, "\u{1F9EC}"), /*#__PURE__*/React.createElement("h1", {
+    style: {
+      fontSize: 28,
+      fontWeight: 900,
+      color: "#fff",
+      letterSpacing: 3,
+      margin: "0 0 4px"
+    }
+  }, "MCAT", /*#__PURE__*/React.createElement("span", {
+    style: S.a
+  }, "QUEST")), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 11,
+      color: "#555",
+      marginBottom: 30,
+      letterSpacing: 2
+    }
+  }, "ENTER PIN TO SYNC"), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    value: pin,
+    onChange: function (e) {
+      setPin(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ""));
+    },
+    onKeyDown: function (e) {
+      if (e.key === "Enter") dl(pin);
+    },
+    placeholder: "your-pin",
+    style: {
+      width: "100%",
+      padding: "14px 16px",
+      background: "rgba(255,255,255,.06)",
+      border: "1.5px solid rgba(255,255,255,.12)",
+      borderRadius: 10,
+      color: "#fff",
+      fontSize: 18,
+      fontFamily: "inherit",
+      textAlign: "center",
+      letterSpacing: 4,
+      outline: "none"
+    },
+    autoFocus: true
+  }), err && /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 11,
+      color: "#f87171",
+      marginTop: 8
+    }
+  }, err), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      dl(pin);
+    },
+    disabled: loading || pin.length < 3,
+    style: {
+      width: "100%",
+      padding: 14,
+      marginTop: 16,
+      background: pin.length >= 3 ? "linear-gradient(135deg,#667eea,#764ba2)" : "rgba(255,255,255,.06)",
+      color: "#fff",
+      borderRadius: 10,
+      fontSize: 15,
+      fontWeight: 700,
+      opacity: pin.length >= 3 ? 1 : .4
+    }
+  }, loading ? "Loading..." : "Enter")));
+}
+
+// === GAME ===
+function Game(_ref2) {
+  let {
+    pin,
+    initialData
+  } = _ref2;
+  const [scr, setScr] = useState("home");
+  const [data, setData] = useState(initialData);
+  const [ss, setSS] = useState("");
+  const [streak, setStreak] = useState(0);
+  const [gm, setGM] = useState(null);
+  const [selCats, setSelCats] = useState([]);
+  const [selTag, setSelTag] = useState(null);
+  const [qs, setQs] = useState([]);
+  const [qi, setQI] = useState(0);
+  const [sel, setSel] = useState(null);
+  const [sr, setSR] = useState(false);
+  const [tl, setTL] = useState(null);
+  const [sScore, setSScore] = useState(0);
+  const [sCorrect, setSC] = useState(0);
+  const [sTotal, setST] = useState(0);
+  const [wrong, setWrong] = useState([]);
+  const [shake, setShake] = useState(false);
+  const [flash, setFlash] = useState(false);
+  const [lives, setLives] = useState(3);
+  const [showMn, setShowMn] = useState(false);
+  const [sTab, setSTab] = useState("overview");
+  const [conf, setConf] = useState(null);
+  const [awaitConf, setAwaitConf] = useState(false);
+  const [tagSearch, setTagSearch] = useState("");
+  const [matchSel, setMatchSel] = useState(null);
+  const [matchDone, setMatchDone] = useState([]);
+  const [matchResults, setMatchResults] = useState([]);
+  const tr = useRef(null);
+  useEffect(function () {
+    var t = setTimeout(function () {
+      setSS("saving");
+      saveToCloud(pin, data).then(function (ok) {
+        setSS(ok ? "saved" : "error");
+        if (ok) setTimeout(function () {
+          setSS("");
+        }, 1500);
+      });
+    }, 800);
+    return function () {
+      clearTimeout(t);
+    };
+  }, [data]);
+  useEffect(function () {
+    if (tl === null || tl <= 0 || sr) return;
+    tr.current = setTimeout(function () {
+      setTL(function (t) {
+        return t - 1;
+      });
+    }, 1000);
+    return function () {
+      clearTimeout(tr.current);
+    };
+  }, [tl, sr]);
+  useEffect(function () {
+    if (tl === 0 && !sr && !awaitConf) {
+      setAwaitConf(true);
+      commitAnswer(sel !== null ? sel : -1, "low");
+    }
+  }, [tl]);
+  function startGame(mode, cats, tag) {
+    var pool;
+    if (MODES[mode].smart) {
+      var r = getSmartPool(mode, data, tag);
+      if (!r.pool) {
+        alert(r.msg);
+        return;
+      }
+      pool = r.pool;
+    } else {
+      var ck = cats.length ? cats : Object.keys(CATS).filter(function (k) {
+        return k !== "CARS";
+      });
+      pool = QS.filter(function (q) {
+        return ck.indexOf(q.cat) >= 0;
+      });
+    }
+    var built = buildQSet(pool, mode);
+    setQs(built);
+    setQI(0);
+    setSel(null);
+    setSR(false);
+    setSScore(0);
+    setSC(0);
+    setST(0);
+    setWrong([]);
+    setGM(mode);
+    setLives(3);
+    setShowMn(false);
+    setStreak(0);
+    setConf(null);
+    setAwaitConf(false);
+    setMatchSel(null);
+    setMatchDone([]);
+    setMatchResults([]);
+    setTL(MODES[mode].time || null);
+    setScr("play");
+  }
+  function handleAnswer(idx) {
+    if (sr || awaitConf) return;
+    setSel(idx);
+  }
+  function lockIn() {
+    if (sel === null || sr || awaitConf) return;
+    setAwaitConf(true);
+    clearTimeout(tr.current);
+  }
+  function commitAnswer(idx, confidence) {
+    var actualIdx = sel !== null ? sel : -1;
+    var q = qs[qi];
+    var correct = actualIdx === q.a;
+    setSR(true);
+    setAwaitConf(false);
+    setST(function (t) {
+      return t + 1;
+    });
+    setConf(confidence);
+    var earned = 0;
+    if (correct) {
+      var tb = tl ? Math.floor(tl * 2) : 0;
+      var sb = streak >= 5 ? 25 : streak >= 3 ? 15 : 0;
+      earned = (gm === "BOSS_BATTLE" ? 30 : 15) + tb + sb + (q.diff || 1) * 3;
+      setSScore(function (s) {
+        return s + earned;
+      });
+      setSC(function (c) {
+        return c + 1;
+      });
+      setStreak(function (s) {
+        return s + 1;
+      });
+      setFlash(true);
+      setTimeout(function () {
+        setFlash(false);
+      }, 600);
+    } else {
+      setStreak(0);
+      setWrong(function (w) {
+        return w.concat([q]);
+      });
+      setShake(true);
+      setTimeout(function () {
+        setShake(false);
+      }, 500);
+      if (gm === "BOSS_BATTLE") setLives(function (l) {
+        return l - 1;
+      });
+    }
+    setData(function (d) {
+      var st = Object.assign({}, d.questionStats);
+      var p = st[q.id] || {
+        seen: 0,
+        correct: 0,
+        box: 1,
+        nextReview: 0,
+        streak: 0
+      };
+      var ub = updateBox({
+        questionStats: st
+      }, q.id, correct);
+      st[q.id] = Object.assign({}, p, ub, {
+        seen: p.seen + 1,
+        correct: p.correct + (correct ? 1 : 0),
+        lastSeen: Date.now(),
+        streak: correct ? (p.streak || 0) + 1 : 0
+      });
+      var cal = Object.assign({}, d.calibration || DD.calibration);
+      if (confidence && cal[confidence]) cal[confidence] = {
+        total: (cal[confidence].total || 0) + 1,
+        correct: (cal[confidence].correct || 0) + (correct ? 1 : 0)
+      };
+      return Object.assign({}, d, {
+        xp: d.xp + earned,
+        totalCorrect: d.totalCorrect + (correct ? 1 : 0),
+        totalAnswered: d.totalAnswered + 1,
+        bestStreak: correct ? Math.max(d.bestStreak, streak + 1) : d.bestStreak,
+        questionStats: st,
+        calibration: cal
+      });
+    });
+  }
+  // Matching mode handlers
+  function handleMatchTap(side, idx) {
+    var q = qs[qi];
+    if (sr) return;
+    if (side === "left") {
+      setMatchSel(matchSel === idx ? null : idx);
+    } else if (matchSel !== null) {
+      var leftItem = q.pairs[matchSel][0];
+      var rightItem = q.shuffledRight[idx];
+      var correctRight = q.pairs[matchSel][1];
+      var isCorrect = rightItem === correctRight;
+      var newDone = matchDone.concat([matchSel]);
+      var newResults = matchResults.concat([{
+        left: leftItem,
+        right: rightItem,
+        correct: isCorrect,
+        expected: correctRight
+      }]);
+      setMatchDone(newDone);
+      setMatchResults(newResults);
+      setMatchSel(null);
+      if (newDone.length === q.pairs.length) {
+        var allCorrect = newResults.every(function (r) {
+          return r.correct;
+        });
+        var score = newResults.filter(function (r) {
+          return r.correct;
+        }).length;
+        setSR(true);
+        setST(function (t) {
+          return t + 1;
+        });
+        var earned = (allCorrect ? 20 : 5) + (q.diff || 1) * 3;
+        if (allCorrect) {
+          setSScore(function (s) {
+            return s + earned;
+          });
+          setSC(function (c) {
+            return c + 1;
+          });
+          setStreak(function (s) {
+            return s + 1;
+          });
+          setFlash(true);
+          setTimeout(function () {
+            setFlash(false);
+          }, 600);
+        } else {
+          setStreak(0);
+          setWrong(function (w) {
+            return w.concat([q]);
+          });
+          setShake(true);
+          setTimeout(function () {
+            setShake(false);
+          }, 500);
+        }
+        setData(function (d) {
+          var st = Object.assign({}, d.questionStats);
+          var p = st[q.id] || {
+            seen: 0,
+            correct: 0,
+            box: 1,
+            nextReview: 0,
+            streak: 0
+          };
+          var ub = updateBox({
+            questionStats: st
+          }, q.id, allCorrect);
+          st[q.id] = Object.assign({}, p, ub, {
+            seen: p.seen + 1,
+            correct: p.correct + (allCorrect ? 1 : 0),
+            lastSeen: Date.now()
+          });
+          return Object.assign({}, d, {
+            xp: d.xp + earned,
+            totalCorrect: d.totalCorrect + (allCorrect ? 1 : 0),
+            totalAnswered: d.totalAnswered + 1,
+            bestStreak: allCorrect ? Math.max(d.bestStreak, streak + 1) : d.bestStreak,
+            questionStats: st
+          });
+        });
+      }
+    }
+  }
+  function nextQ() {
+    if (gm === "BOSS_BATTLE" && lives <= 0) {
+      fin();
+      return;
+    }
+    if (qi + 1 >= qs.length) {
+      fin();
+      return;
+    }
+    setQI(function (i) {
+      return i + 1;
+    });
+    setSel(null);
+    setSR(false);
+    setShowMn(false);
+    setConf(null);
+    setAwaitConf(false);
+    setMatchSel(null);
+    setMatchDone([]);
+    setMatchResults([]);
+    if (MODES[gm].time) setTL(MODES[gm].time);
+  }
+  function fin() {
+    setData(function (d) {
+      return Object.assign({}, d, {
+        sessionHistory: d.sessionHistory.concat([{
+          date: Date.now(),
+          mode: gm,
+          correct: sCorrect,
+          total: sTotal,
+          score: sScore
+        }]).slice(-50)
+      });
+    });
+    setScr("results");
+  }
+  function toggleFlag(qid) {
+    setData(function (d) {
+      var fl = (d.flagged || []).slice();
+      var idx = fl.indexOf(qid);
+      if (idx >= 0) fl.splice(idx, 1);else fl.push(qid);
+      return Object.assign({}, d, {
+        flagged: fl
+      });
+    });
+  }
+  var rank = getRank(data.xp),
+    nr = getNext(data.xp);
+  var newC = QS.filter(function (q) {
+    return !data.questionStats[q.id];
+  }).length;
+  var hardC = QS.filter(function (q) {
+    var s = data.questionStats[q.id];
+    return s && s.seen >= 1 && s.correct / s.seen < 0.7;
+  }).length;
+  var missC = QS.filter(function (q) {
+    var s = data.questionStats[q.id];
+    return s && s.seen > 0 && s.correct / s.seen < 0.6;
+  }).length;
+  var dueC = getDueCount(data);
+  var flagC = (data.flagged || []).length;
+  var weakC = Object.keys(CATS).filter(function (k) {
+    return k !== "CARS";
+  }).map(function (k) {
+    return Object.assign({
+      key: k
+    }, getCatAcc(data, k));
+  }).filter(function (c) {
+    return c.seen >= 2;
+  }).sort(function (a, b) {
+    return a.pct - b.pct;
+  }).slice(0, 3);
+  var carsC = QS.filter(function (q) {
+    return q.cat === "CARS";
+  }).length;
+  var SB = function () {
+    return ss ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        position: "fixed",
+        bottom: 12,
+        right: 12,
+        fontSize: 9,
+        padding: "4px 10px",
+        borderRadius: 10,
+        background: ss === "saved" ? "rgba(74,222,128,.15)" : ss === "error" ? "rgba(248,113,113,.15)" : "rgba(102,126,234,.15)",
+        color: ss === "saved" ? "#4ade80" : ss === "error" ? "#f87171" : "#667eea",
+        zIndex: 999
+      }
+    }, ss === "saving" ? "Syncing..." : ss === "saved" ? "\u2705 Synced" : "\u26A0\uFE0F Error") : null;
+  };
+
+  // === HOME ===
+  if (scr === "home") {
+    var acc = data.totalAnswered > 0 ? Math.round(data.totalCorrect / data.totalAnswered * 100) : 0;
+    return /*#__PURE__*/React.createElement("div", {
+      style: S.c
+    }, /*#__PURE__*/React.createElement(SB, null), /*#__PURE__*/React.createElement("div", {
+      style: S.i
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "center",
+        marginBottom: 20
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 42
+      }
+    }, "\u{1F9EC}"), /*#__PURE__*/React.createElement("h1", {
+      style: S.t
+    }, "MCAT", /*#__PURE__*/React.createElement("span", {
+      style: S.a
+    }, "QUEST")), /*#__PURE__*/React.createElement("p", {
+      style: {
+        fontSize: 10,
+        color: "#555",
+        letterSpacing: 2
+      }
+    }, "v5 ", "\u2022", " TAGS ", "\u2022", " MATCHING ", "\u2022", " FLAGS")), /*#__PURE__*/React.createElement("div", {
+      style: S.sb
+    }, /*#__PURE__*/React.createElement("div", {
+      style: S.si
+    }, /*#__PURE__*/React.createElement("span", {
+      style: S.sv
+    }, rank.b, " ", rank.name), /*#__PURE__*/React.createElement("span", {
+      style: S.sl
+    }, "Rank")), /*#__PURE__*/React.createElement("div", {
+      style: S.dv
+    }), /*#__PURE__*/React.createElement("div", {
+      style: S.si
+    }, /*#__PURE__*/React.createElement("span", {
+      style: S.sv
+    }, data.xp), /*#__PURE__*/React.createElement("span", {
+      style: S.sl
+    }, "XP")), /*#__PURE__*/React.createElement("div", {
+      style: S.dv
+    }), /*#__PURE__*/React.createElement("div", {
+      style: S.si
+    }, /*#__PURE__*/React.createElement("span", {
+      style: S.sv
+    }, acc, "%"), /*#__PURE__*/React.createElement("span", {
+      style: S.sl
+    }, "Accuracy")), /*#__PURE__*/React.createElement("div", {
+      style: S.dv
+    }), /*#__PURE__*/React.createElement("div", {
+      style: S.si
+    }, /*#__PURE__*/React.createElement("span", {
+      style: S.sv
+    }, data.totalAnswered), /*#__PURE__*/React.createElement("span", {
+      style: S.sl
+    }, "Answered"))), nr && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: 14,
+        textAlign: "center"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        height: 6,
+        background: "rgba(255,255,255,.08)",
+        borderRadius: 3,
+        overflow: "hidden",
+        marginBottom: 4
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        height: "100%",
+        background: "linear-gradient(90deg,#667eea,#764ba2)",
+        borderRadius: 3,
+        width: Math.min((data.xp - rank.min) / (nr.min - rank.min) * 100, 100) + "%"
+      }
+    })), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        color: "#555"
+      }
+    }, nr.min - data.xp, " XP to ", nr.b, " ", nr.name)), dueC > 0 && /*#__PURE__*/React.createElement("button", {
+      onClick: function () {
+        startGame("SPACED_REVIEW", []);
+      },
+      style: {
+        width: "100%",
+        padding: 14,
+        marginBottom: 14,
+        background: "linear-gradient(135deg,rgba(102,126,234,.12),rgba(118,75,162,.12))",
+        border: "1.5px solid rgba(102,126,234,.3)",
+        borderRadius: 12,
+        textAlign: "center"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 13,
+        fontWeight: 700,
+        color: "#667eea"
+      }
+    }, "\u{1F9E0}", " ", dueC, " due for review"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: "#888",
+        marginTop: 2
+      }
+    }, "Spaced repetition")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: 14
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: S.sh
+    }, /*#__PURE__*/React.createElement("span", {
+      style: S.sln
+    }), /*#__PURE__*/React.createElement("span", {
+      style: S.stt
+    }, "MASTERY"), /*#__PURE__*/React.createElement("span", {
+      style: S.sln
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr 1fr",
+        gap: 4
+      }
+    }, Object.entries(CATS).filter(function (e) {
+      return e[0] !== "CARS";
+    }).map(function (e) {
+      var k = e[0],
+        cat = e[1],
+        ac = getCatAcc(data, k),
+        p = ac.pct || 0,
+        c = p >= 80 ? "#4ade80" : p >= 60 ? "#fbbf24" : p > 0 ? "#f87171" : "#333";
+      return /*#__PURE__*/React.createElement("div", {
+        key: k,
+        style: {
+          padding: "6px 3px",
+          background: "rgba(255,255,255,.03)",
+          borderRadius: 6,
+          textAlign: "center",
+          borderBottom: "2px solid " + c
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 13
+        }
+      }, cat.icon), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 7,
+          color: "#777"
+        }
+      }, cat.name), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 11,
+          fontWeight: 700,
+          color: c
+        }
+      }, ac.seen > 0 ? p + "%" : "\u2014"));
+    }))), /*#__PURE__*/React.createElement("div", {
+      style: S.sh
+    }, /*#__PURE__*/React.createElement("span", {
+      style: S.sln
+    }), /*#__PURE__*/React.createElement("span", {
+      style: S.stt
+    }, "GAME MODES"), /*#__PURE__*/React.createElement("span", {
+      style: S.sln
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        flexDirection: "column",
+        gap: 6,
+        marginBottom: 12
+      }
+    }, ["BLITZ", "MARATHON", "BOSS_BATTLE"].map(function (k) {
+      return /*#__PURE__*/React.createElement("button", {
+        key: k,
+        style: S.mc,
+        onClick: function () {
+          setGM(k);
+          setScr("select_cats");
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 20,
+          width: 30,
+          textAlign: "center"
+        }
+      }, MODES[k].icon), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 12,
+          fontWeight: 700,
+          color: "#fff",
+          display: "block"
+        }
+      }, MODES[k].name), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 10,
+          color: "#666"
+        }
+      }, MODES[k].desc)));
+    })), /*#__PURE__*/React.createElement("div", {
+      style: S.sh
+    }, /*#__PURE__*/React.createElement("span", {
+      style: S.sln
+    }), /*#__PURE__*/React.createElement("span", {
+      style: S.stt
+    }, "SMART PRACTICE"), /*#__PURE__*/React.createElement("span", {
+      style: S.sln
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        flexDirection: "column",
+        gap: 6,
+        marginBottom: 12
+      }
+    }, [{
+      k: "SPACED_REVIEW",
+      n: dueC,
+      l: dueC ? dueC + " due" : "Caught up!"
+    }, {
+      k: "TAG_PRACTICE",
+      n: 1,
+      l: ALL_TAGS.length + " concept tags"
+    }, {
+      k: "FLAGGED",
+      n: flagC,
+      l: flagC ? flagC + " flagged" : "Flag Qs during play"
+    }, {
+      k: "HARD_QS",
+      n: hardC,
+      l: hardC ? hardC + " below 70%" : "Play more"
+    }, {
+      k: "NEW_QS",
+      n: newC,
+      l: newC ? newC + " unseen" : "All seen!"
+    }, {
+      k: "WEAK_TOPICS",
+      n: weakC.length,
+      l: weakC.length ? weakC.map(function (c) {
+        return CATS[c.key].icon + (c.pct || 0) + "%";
+      }).join(" ") : "Play more"
+    }, {
+      k: "INTERLEAVED",
+      n: 1,
+      l: "Random all-topic mix"
+    }, {
+      k: "CARS_MODE",
+      n: carsC,
+      l: carsC + " CARS Qs"
+    }, {
+      k: "REVIEW",
+      n: missC,
+      l: missC ? missC + " to review" : "None"
+    }].map(function (x) {
+      return /*#__PURE__*/React.createElement("button", {
+        key: x.k,
+        style: Object.assign({}, S.mc, {
+          opacity: x.n ? 1 : .4
+        }),
+        onClick: function () {
+          if (!x.n) return;
+          if (x.k === "TAG_PRACTICE") setScr("select_tag");else startGame(x.k, []);
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 18,
+          width: 30,
+          textAlign: "center"
+        }
+      }, MODES[x.k].icon), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 12,
+          fontWeight: 700,
+          color: "#fff",
+          display: "block"
+        }
+      }, MODES[x.k].name), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 10,
+          color: x.n ? "#888" : "#555"
+        }
+      }, x.l)));
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8
+      }
+    }, data.bestStreak > 0 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1,
+        textAlign: "center",
+        padding: 8,
+        background: "rgba(255,150,50,.08)",
+        borderRadius: 8,
+        fontSize: 12,
+        color: "#ffa033",
+        fontWeight: 600
+      }
+    }, "\u{1F525}", " Best: ", data.bestStreak), /*#__PURE__*/React.createElement("button", {
+      onClick: function () {
+        setScr("stats");
+      },
+      style: {
+        flex: 1,
+        padding: 8,
+        background: "rgba(102,126,234,.1)",
+        borderRadius: 8,
+        fontSize: 12,
+        color: "#667eea",
+        fontWeight: 600
+      }
+    }, "\u{1F4CA}", " Stats")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "center",
+        marginTop: 12
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 9,
+        color: "#444"
+      }
+    }, QS.length, " Qs ", "\u2022", " ", ALL_TAGS.length, " tags ", "\u2022", " ", newC, " unseen"))));
+  }
+
+  // === TAG SELECT ===
+  if (scr === "select_tag") {
+    var tc = getTagCounts(data);
+    var filtered = ALL_TAGS.filter(function (t) {
+      return !tagSearch || t.toLowerCase().indexOf(tagSearch.toLowerCase()) >= 0;
+    });
+    return /*#__PURE__*/React.createElement("div", {
+      style: S.c
+    }, /*#__PURE__*/React.createElement("div", {
+      style: S.i
+    }, /*#__PURE__*/React.createElement("button", {
+      style: S.bk,
+      onClick: function () {
+        setScr("home");
+        setTagSearch("");
+      }
+    }, "<", "- Back"), /*#__PURE__*/React.createElement("h2", {
+      style: {
+        fontSize: 18,
+        fontWeight: 800,
+        color: "#fff",
+        margin: "0 0 12px"
+      }
+    }, "\u{1F3F7}\uFE0F", " Practice by Concept"), /*#__PURE__*/React.createElement("input", {
+      type: "text",
+      value: tagSearch,
+      onChange: function (e) {
+        setTagSearch(e.target.value);
+      },
+      placeholder: "Search tags...",
+      style: {
+        width: "100%",
+        padding: "10px 14px",
+        background: "rgba(255,255,255,.06)",
+        border: "1.5px solid rgba(255,255,255,.12)",
+        borderRadius: 8,
+        color: "#fff",
+        fontSize: 13,
+        fontFamily: "inherit",
+        outline: "none",
+        marginBottom: 12
+      }
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        flexWrap: "wrap",
+        gap: 6
+      }
+    }, filtered.map(function (tag) {
+      var info = tc[tag] || {
+        total: 0,
+        seen: 0,
+        correct: 0
+      };
+      var pct = info.seen > 0 ? Math.round(info.correct / info.seen * 100) : null;
+      var c = pct === null ? "#555" : pct >= 80 ? "#4ade80" : pct >= 60 ? "#fbbf24" : "#f87171";
+      return /*#__PURE__*/React.createElement("button", {
+        key: tag,
+        onClick: function () {
+          setSelTag(tag);
+          startGame("TAG_PRACTICE", [], tag);
+          setTagSearch("");
+        },
+        style: {
+          padding: "6px 12px",
+          borderRadius: 16,
+          fontSize: 11,
+          fontWeight: 600,
+          border: "1px solid rgba(255,255,255,.1)",
+          background: "rgba(255,255,255,.04)",
+          color: "#ccc"
+        }
+      }, tag, " ", /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 9,
+          color: c
+        }
+      }, pct !== null ? pct + "%" : info.total));
+    }))));
+  }
+
+  // === STATS ===
+  if (scr === "stats") {
+    var acc = data.totalAnswered > 0 ? Math.round(data.totalCorrect / data.totalAnswered * 100) : 0;
+    var cs = Object.entries(CATS).map(function (e) {
+      return Object.assign({
+        key: e[0]
+      }, e[1], getCatAcc(data, e[0]));
+    }).sort(function (a, b) {
+      return (a.pct || 999) - (b.pct || 999);
+    });
+    var rec = data.sessionHistory.slice().reverse().slice(0, 10);
+    var trend = data.sessionHistory.slice(-20).map(function (s, i) {
+      return {
+        i: i,
+        pct: s.total > 0 ? Math.round(s.correct / s.total * 100) : 0
+      };
+    });
+    var cal = data.calibration || DD.calibration;
+    return /*#__PURE__*/React.createElement("div", {
+      style: S.c
+    }, /*#__PURE__*/React.createElement(SB, null), /*#__PURE__*/React.createElement("div", {
+      style: S.i
+    }, /*#__PURE__*/React.createElement("button", {
+      style: S.bk,
+      onClick: function () {
+        setScr("home");
+      }
+    }, "<", "- Back"), /*#__PURE__*/React.createElement("h2", {
+      style: {
+        fontSize: 18,
+        fontWeight: 800,
+        color: "#fff",
+        margin: "0 0 14px"
+      }
+    }, "\u{1F4CA}", " Stats"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 3,
+        marginBottom: 14,
+        background: "rgba(255,255,255,.04)",
+        padding: 3,
+        borderRadius: 10
+      }
+    }, [["overview", "Overview"], ["topics", "Topics"], ["calibration", "Confidence"], ["history", "History"]].map(function (e) {
+      return /*#__PURE__*/React.createElement("button", {
+        key: e[0],
+        onClick: function () {
+          setSTab(e[0]);
+        },
+        style: {
+          flex: 1,
+          padding: "7px 3px",
+          borderRadius: 7,
+          fontSize: 10,
+          fontWeight: 600,
+          background: sTab === e[0] ? "rgba(102,126,234,.25)" : "transparent",
+          color: sTab === e[0] ? "#667eea" : "#555"
+        }
+      }, e[1]);
+    })), sTab === "overview" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr 1fr",
+        gap: 8,
+        marginBottom: 14
+      }
+    }, [{
+      l: "XP",
+      v: data.xp
+    }, {
+      l: "Accuracy",
+      v: acc + "%"
+    }, {
+      l: "Answered",
+      v: data.totalAnswered
+    }, {
+      l: "Streak",
+      v: data.bestStreak
+    }, {
+      l: "Due",
+      v: dueC
+    }, {
+      l: "Flagged",
+      v: flagC
+    }].map(function (x, i) {
+      return /*#__PURE__*/React.createElement("div", {
+        key: i,
+        style: {
+          padding: 10,
+          background: "rgba(255,255,255,.03)",
+          borderRadius: 10,
+          border: "1px solid rgba(255,255,255,.06)"
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 8,
+          color: "#666",
+          textTransform: "uppercase",
+          letterSpacing: 1
+        }
+      }, x.l), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 16,
+          fontWeight: 800,
+          color: "#fff"
+        }
+      }, x.v));
+    })), trend.length > 1 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: 12
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: "#777",
+        fontWeight: 600,
+        marginBottom: 6
+      }
+    }, "Trend"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "flex-end",
+        gap: 2,
+        height: 50
+      }
+    }, trend.map(function (t, i) {
+      return /*#__PURE__*/React.createElement("div", {
+        key: i,
+        style: {
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "flex-end",
+          height: "100%"
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          width: "100%",
+          maxWidth: 16,
+          background: t.pct >= 80 ? "#4ade80" : t.pct >= 60 ? "#fbbf24" : "#f87171",
+          borderRadius: "2px 2px 0 0",
+          height: Math.max(t.pct * .5, 3) + "%",
+          minHeight: 2
+        }
+      }));
+    })))), sTab === "topics" && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        flexDirection: "column",
+        gap: 6
+      }
+    }, cs.map(function (c) {
+      return /*#__PURE__*/React.createElement("div", {
+        key: c.key,
+        style: {
+          padding: 10,
+          background: "rgba(255,255,255,.03)",
+          borderRadius: 10,
+          borderLeft: "3px solid " + c.color
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          justifyContent: "space-between"
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 12,
+          fontWeight: 700,
+          color: "#fff"
+        }
+      }, c.icon, " ", c.name), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 12,
+          fontWeight: 800,
+          color: c.pct != null ? c.pct >= 80 ? "#4ade80" : c.pct >= 60 ? "#fbbf24" : "#f87171" : "#555"
+        }
+      }, c.pct != null ? c.pct + "%" : "\u2014")), /*#__PURE__*/React.createElement("div", {
+        style: {
+          height: 3,
+          background: "rgba(255,255,255,.08)",
+          borderRadius: 2,
+          overflow: "hidden",
+          marginTop: 4
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          height: "100%",
+          width: (c.pct || 0) + "%",
+          background: c.color
+        }
+      })), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 8,
+          color: "#555",
+          marginTop: 3
+        }
+      }, c.correct, "/", c.seen, " of ", QS.filter(function (q) {
+        return q.cat === c.key;
+      }).length));
+    })), sTab === "calibration" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
+      style: {
+        fontSize: 11,
+        color: "#999",
+        marginBottom: 12,
+        lineHeight: 1.5
+      }
+    }, "When you feel confident, are you actually right?"), [{
+      k: "high",
+      l: "Confident",
+      c: "#4ade80",
+      e: "\u{1F60E}"
+    }, {
+      k: "med",
+      l: "Somewhat",
+      c: "#fbbf24",
+      e: "\u{1F914}"
+    }, {
+      k: "low",
+      l: "Guessing",
+      c: "#f87171",
+      e: "\u{1F62C}"
+    }].map(function (x) {
+      var t = (cal[x.k] || {}).total || 0,
+        co = (cal[x.k] || {}).correct || 0,
+        pct = t > 0 ? Math.round(co / t * 100) : 0;
+      return /*#__PURE__*/React.createElement("div", {
+        key: x.k,
+        style: {
+          padding: 12,
+          background: "rgba(255,255,255,.03)",
+          borderRadius: 10,
+          border: "1px solid rgba(255,255,255,.06)",
+          marginBottom: 8
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          justifyContent: "space-between"
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 12,
+          fontWeight: 600
+        }
+      }, x.e, " ", x.l), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 14,
+          fontWeight: 800,
+          color: x.c
+        }
+      }, t > 0 ? pct + "%" : "\u2014")), /*#__PURE__*/React.createElement("div", {
+        style: {
+          height: 4,
+          background: "rgba(255,255,255,.08)",
+          borderRadius: 2,
+          overflow: "hidden",
+          marginTop: 4
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          height: "100%",
+          width: pct + "%",
+          background: x.c
+        }
+      })), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 9,
+          color: "#666",
+          marginTop: 3
+        }
+      }, co, "/", t));
+    })), sTab === "history" && /*#__PURE__*/React.createElement("div", null, !rec.length ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        color: "#555",
+        fontSize: 12,
+        textAlign: "center",
+        padding: 30
+      }
+    }, "No sessions") : rec.map(function (s, i) {
+      var p = s.total > 0 ? Math.round(s.correct / s.total * 100) : 0;
+      return /*#__PURE__*/React.createElement("div", {
+        key: i,
+        style: {
+          padding: 10,
+          background: "rgba(255,255,255,.03)",
+          borderRadius: 10,
+          border: "1px solid rgba(255,255,255,.06)",
+          marginBottom: 6
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          justifyContent: "space-between"
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 12,
+          fontWeight: 700,
+          color: "#fff"
+        }
+      }, (MODES[s.mode] || {}).icon, " ", (MODES[s.mode] || {}).name || s.mode), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 11,
+          fontWeight: 800,
+          color: p >= 80 ? "#4ade80" : p >= 60 ? "#fbbf24" : "#f87171"
+        }
+      }, p, "%")), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 10,
+          color: "#555",
+          marginTop: 3
+        }
+      }, new Date(s.date).toLocaleDateString(), " ", "\u2022", " ", s.correct, "/", s.total, " ", "\u2022", " +", s.score, "XP"));
+    })), /*#__PURE__*/React.createElement("button", {
+      onClick: function () {
+        if (confirm("Reset ALL progress?")) {
+          setData(Object.assign({}, DD));
+          setScr("home");
+        }
+      },
+      style: {
+        marginTop: 18,
+        border: "1px solid rgba(248,113,113,.3)",
+        color: "#f87171",
+        padding: "8px 16px",
+        borderRadius: 8,
+        fontSize: 10,
+        display: "block",
+        margin: "18px auto 0"
+      }
+    }, "Reset Progress")));
+  }
+
+  // === CAT SELECT ===
+  if (scr === "select_cats") {
+    var secs = {};
+    Object.entries(CATS).filter(function (e) {
+      return e[0] !== "CARS";
+    }).forEach(function (e) {
+      if (!secs[e[1].sec]) secs[e[1].sec] = [];
+      secs[e[1].sec].push(Object.assign({
+        key: e[0]
+      }, e[1]));
+    });
+    return /*#__PURE__*/React.createElement("div", {
+      style: S.c
+    }, /*#__PURE__*/React.createElement(SB, null), /*#__PURE__*/React.createElement("div", {
+      style: S.i
+    }, /*#__PURE__*/React.createElement("button", {
+      style: S.bk,
+      onClick: function () {
+        setSelCats([]);
+        setScr("home");
+      }
+    }, "<", "- Back"), /*#__PURE__*/React.createElement("h2", {
+      style: {
+        fontSize: 18,
+        fontWeight: 800,
+        color: "#fff",
+        margin: "0 0 12px"
+      }
+    }, MODES[gm].icon, " ", MODES[gm].name), Object.entries(secs).map(function (e) {
+      return /*#__PURE__*/React.createElement("div", {
+        key: e[0],
+        style: {
+          marginBottom: 12
+        }
+      }, /*#__PURE__*/React.createElement("h3", {
+        style: {
+          fontSize: 9,
+          color: "#555",
+          letterSpacing: 2,
+          textTransform: "uppercase",
+          marginBottom: 6
+        }
+      }, e[0]), /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill,minmax(100px,1fr))",
+          gap: 5
+        }
+      }, e[1].map(function (c) {
+        var is = selCats.indexOf(c.key) >= 0;
+        return /*#__PURE__*/React.createElement("button", {
+          key: c.key,
+          onClick: function () {
+            setSelCats(function (p) {
+              return is ? p.filter(function (x) {
+                return x !== c.key;
+              }) : p.concat([c.key]);
+            });
+          },
+          style: {
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 2,
+            padding: "8px 4px",
+            borderRadius: 8,
+            border: "1.5px solid " + (is ? c.color : "rgba(255,255,255,.08)"),
+            background: is ? c.color + "22" : "rgba(255,255,255,.03)"
+          }
+        }, /*#__PURE__*/React.createElement("span", {
+          style: {
+            fontSize: 16
+          }
+        }, c.icon), /*#__PURE__*/React.createElement("span", {
+          style: {
+            fontSize: 9,
+            fontWeight: 600
+          }
+        }, c.name));
+      })));
+    }), /*#__PURE__*/React.createElement("button", {
+      style: S.btn,
+      onClick: function () {
+        startGame(gm, selCats);
+      }
+    }, selCats.length === 0 ? "Start All" : "Start " + selCats.length + " topic" + (selCats.length > 1 ? "s" : ""))));
+  }
+
+  // === PLAY ===
+  if (scr === "play") {
+    var q = qs[qi];
+    if (!q) {
+      setScr("results");
+      return null;
+    }
+    var cat = CATS[q.cat];
+    var prog = (qi + 1) / qs.length * 100;
+    var low = tl != null && tl <= 10;
+    var passageData = q.pass ? PASSAGES[q.pass] : null;
+    var isFlagged = (data.flagged || []).indexOf(q.id) >= 0;
+    var isMatch = q.type === "match";
+    return /*#__PURE__*/React.createElement("div", {
+      style: Object.assign({}, S.c, flash ? {
+        animation: "fG .5s"
+      } : {}, shake ? {
+        animation: "sS .4s"
+      } : {})
+    }, /*#__PURE__*/React.createElement(SB, null), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "12px 14px 4px",
+        maxWidth: 640,
+        margin: "0 auto"
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      style: {
+        background: "rgba(255,255,255,.06)",
+        width: 28,
+        height: 28,
+        borderRadius: 7,
+        fontSize: 13,
+        color: "#888"
+      },
+      onClick: fin
+    }, "\u2715"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1,
+        display: "flex",
+        alignItems: "center",
+        gap: 6
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1,
+        height: 4,
+        background: "rgba(255,255,255,.08)",
+        borderRadius: 2,
+        overflow: "hidden"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        height: "100%",
+        background: "linear-gradient(90deg,#667eea,#764ba2)",
+        borderRadius: 2,
+        width: prog + "%"
+      }
+    })), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        color: "#555",
+        fontWeight: 600
+      }
+    }, qi + 1, "/", qs.length)), /*#__PURE__*/React.createElement("button", {
+      onClick: function () {
+        toggleFlag(q.id);
+      },
+      style: {
+        fontSize: 14,
+        padding: "2px 6px"
+      }
+    }, isFlagged ? "\u{1F6A9}" : "\u2690"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 4
+      }
+    }, streak >= 2 && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        fontWeight: 700,
+        color: "#ff9933",
+        padding: "2px 6px",
+        background: "rgba(255,153,51,.12)",
+        borderRadius: 12
+      }
+    }, "\u{1F525}", streak), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        fontWeight: 700,
+        color: "#667eea",
+        padding: "2px 6px",
+        background: "rgba(102,126,234,.12)",
+        borderRadius: 12
+      }
+    }, "\u2B50", sScore))), tl != null && /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "center",
+        fontSize: 16,
+        fontWeight: 800,
+        maxWidth: 640,
+        margin: "0 auto",
+        color: low ? "#ff4444" : "#88ff88",
+        animation: low ? "pu .8s infinite" : "none"
+      }
+    }, "\u23F1", " ", tl, "s"), gm === "BOSS_BATTLE" && /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "center",
+        display: "flex",
+        justifyContent: "center",
+        gap: 3
+      }
+    }, [0, 1, 2].map(function (i) {
+      return /*#__PURE__*/React.createElement("span", {
+        key: i,
+        style: {
+          fontSize: 18,
+          opacity: i < lives ? 1 : .2
+        }
+      }, "\u2764\uFE0F");
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        maxWidth: 640,
+        margin: "0 auto",
+        padding: "3px 14px 6px",
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        flexWrap: "wrap"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 3,
+        padding: "3px 10px",
+        borderRadius: 14,
+        fontSize: 9,
+        fontWeight: 600,
+        color: "#fff",
+        background: cat.color
+      }
+    }, cat.icon, " ", cat.name), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 8,
+        color: "#555"
+      }
+    }, ["", "Easy", "Med", "Hard"][q.diff || 1]), isMatch && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 8,
+        color: "#9b5de5"
+      }
+    }, "Matching"), q.pass && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 8,
+        color: "#9b5de5"
+      }
+    }, "Passage"), (q.tags || []).slice(0, 2).map(function (t) {
+      return /*#__PURE__*/React.createElement("span", {
+        key: t,
+        style: {
+          fontSize: 8,
+          padding: "1px 6px",
+          borderRadius: 10,
+          background: "rgba(255,255,255,.05)",
+          color: "#777"
+        }
+      }, t);
+    })), passageData && /*#__PURE__*/React.createElement("div", {
+      style: {
+        maxWidth: 640,
+        margin: "0 auto",
+        padding: "0 14px 8px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "passage-box"
+    }, passageData.text)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        maxWidth: 640,
+        margin: "0 auto",
+        padding: "0 14px 10px"
+      }
+    }, /*#__PURE__*/React.createElement("h2", {
+      style: {
+        fontSize: 16,
+        fontWeight: 700,
+        color: "#fff",
+        lineHeight: 1.5,
+        margin: 0
+      }
+    }, q.q)), isMatch && !sr && /*#__PURE__*/React.createElement("div", {
+      style: {
+        maxWidth: 640,
+        margin: "0 auto",
+        padding: "0 14px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: 8
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        flexDirection: "column",
+        gap: 5
+      }
+    }, q.pairs.map(function (p, i) {
+      var done = matchDone.indexOf(i) >= 0;
+      var selected = matchSel === i;
+      return /*#__PURE__*/React.createElement("button", {
+        key: i,
+        onClick: function () {
+          handleMatchTap("left", i);
+        },
+        disabled: done,
+        style: {
+          padding: "10px",
+          borderRadius: 8,
+          fontSize: 11,
+          textAlign: "left",
+          border: "1.5px solid " + (selected ? "#667eea" : done ? "rgba(74,222,128,.3)" : "rgba(255,255,255,.1)"),
+          background: selected ? "rgba(102,126,234,.15)" : done ? "rgba(74,222,128,.08)" : "rgba(255,255,255,.04)",
+          opacity: done ? .5 : 1,
+          color: "#fff",
+          fontWeight: 600
+        }
+      }, p[0]);
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        flexDirection: "column",
+        gap: 5
+      }
+    }, q.shuffledRight.map(function (r, i) {
+      var used = matchResults.some(function (mr) {
+        return mr.right === r;
+      });
+      return /*#__PURE__*/React.createElement("button", {
+        key: i,
+        onClick: function () {
+          handleMatchTap("right", i);
+        },
+        disabled: used || matchSel === null,
+        style: {
+          padding: "10px",
+          borderRadius: 8,
+          fontSize: 11,
+          textAlign: "left",
+          border: "1.5px solid " + (used ? "rgba(255,255,255,.05)" : "rgba(255,255,255,.1)"),
+          background: used ? "rgba(255,255,255,.02)" : "rgba(255,255,255,.04)",
+          opacity: used ? .4 : 1,
+          color: used ? "#666" : "#ccc"
+        }
+      }, r);
+    })))), isMatch && sr && /*#__PURE__*/React.createElement("div", {
+      style: {
+        maxWidth: 640,
+        margin: "12px auto 0",
+        padding: "0 14px 24px",
+        animation: "sU .3s"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: 8
+      }
+    }, matchResults.every(function (r) {
+      return r.correct;
+    }) ? /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 13,
+        fontWeight: 700,
+        color: "#4ade80"
+      }
+    }, "\u2705", " All correct!") : /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 13,
+        fontWeight: 700,
+        color: "#f87171"
+      }
+    }, "\u274C", " ", matchResults.filter(function (r) {
+      return r.correct;
+    }).length, "/", matchResults.length, " correct")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: 8
+      }
+    }, matchResults.map(function (r, i) {
+      return /*#__PURE__*/React.createElement("div", {
+        key: i,
+        style: {
+          fontSize: 11,
+          padding: "4px 0",
+          color: r.correct ? "#4ade80" : "#f87171"
+        }
+      }, r.correct ? "\u2705" : "\u274C", " ", r.left, " ", "\u2192", " ", r.right, !r.correct ? " (should be: " + r.expected + ")" : "");
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: "12px 14px",
+        background: "rgba(255,255,255,.04)",
+        borderRadius: 10,
+        border: "1px solid rgba(255,255,255,.06)",
+        marginBottom: 8
+      }
+    }, /*#__PURE__*/React.createElement("p", {
+      style: {
+        fontSize: 12,
+        color: "#ccc",
+        lineHeight: 1.8
+      }
+    }, q.ex)), q.mn && /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: "7px 11px",
+        background: "rgba(255,200,50,.08)",
+        borderRadius: 7,
+        borderLeft: "3px solid #ffc832",
+        fontSize: 11,
+        color: "#ffd866",
+        marginBottom: 8,
+        lineHeight: 1.5,
+        fontWeight: 600
+      }
+    }, q.mn), /*#__PURE__*/React.createElement("button", {
+      onClick: nextQ,
+      style: S.btn
+    }, qi + 1 >= qs.length ? "Results" : "Next")), !isMatch && /*#__PURE__*/React.createElement("div", {
+      style: {
+        maxWidth: 640,
+        margin: "0 auto",
+        padding: "0 14px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 6
+      }
+    }, q.o.map(function (opt, i) {
+      var bg = "rgba(255,255,255,.04)",
+        bc = "rgba(255,255,255,.1)",
+        op = 1;
+      if (sr) {
+        if (i === q.a) {
+          bg = "rgba(74,222,128,.12)";
+          bc = "#4ade80";
+        } else if (i === sel && i !== q.a) {
+          bg = "rgba(248,113,113,.12)";
+          bc = "#f87171";
+        } else op = 0.4;
+      } else if (awaitConf && i === sel) {
+        bg = "rgba(102,126,234,.15)";
+        bc = "#667eea";
+      } else if (!awaitConf && i === sel) {
+        bg = "rgba(102,126,234,.08)";
+        bc = "rgba(102,126,234,.5)";
+      }
+      return /*#__PURE__*/React.createElement("button", {
+        key: qi + "-" + i,
+        style: {
+          display: "flex",
+          alignItems: "flex-start",
+          gap: 8,
+          padding: "10px 11px",
+          background: bg,
+          border: "1.5px solid " + bc,
+          borderRadius: 9,
+          textAlign: "left",
+          opacity: op,
+          width: "100%"
+        },
+        onClick: function () {
+          handleAnswer(i);
+        },
+        disabled: sr || awaitConf
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          width: 20,
+          height: 20,
+          borderRadius: 5,
+          background: "rgba(255,255,255,.06)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 9,
+          fontWeight: 700,
+          color: "#888",
+          flexShrink: 0
+        }
+      }, String.fromCharCode(65 + i)), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 12,
+          lineHeight: 1.5
+        }
+      }, opt));
+    })), !isMatch && sel !== null && !awaitConf && !sr && /*#__PURE__*/React.createElement("div", {
+      style: {
+        maxWidth: 640,
+        margin: "8px auto 0",
+        padding: "0 14px"
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: lockIn,
+      style: {
+        display: "block",
+        width: "100%",
+        padding: 12,
+        background: "linear-gradient(135deg,#667eea,#764ba2)",
+        color: "#fff",
+        borderRadius: 10,
+        fontSize: 13,
+        fontWeight: 700,
+        letterSpacing: 1
+      }
+    }, "Lock In Answer")), !isMatch && awaitConf && !sr && /*#__PURE__*/React.createElement("div", {
+      style: {
+        maxWidth: 640,
+        margin: "8px auto 0",
+        padding: "0 14px",
+        animation: "sU .2s"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: "#888",
+        marginBottom: 6,
+        textAlign: "center"
+      }
+    }, "How confident?"), /*#__PURE__*/React.createElement("div", {
+      className: "conf-bar"
+    }, /*#__PURE__*/React.createElement("button", {
+      className: "conf-btn",
+      onClick: function () {
+        commitAnswer(sel, "low");
+      }
+    }, "\u{1F62C}", " Guessing"), /*#__PURE__*/React.createElement("button", {
+      className: "conf-btn",
+      onClick: function () {
+        commitAnswer(sel, "med");
+      }
+    }, "\u{1F914}", " Somewhat"), /*#__PURE__*/React.createElement("button", {
+      className: "conf-btn",
+      onClick: function () {
+        commitAnswer(sel, "high");
+      }
+    }, "\u{1F60E}", " Confident"))), !isMatch && sr && /*#__PURE__*/React.createElement("div", {
+      style: {
+        maxWidth: 640,
+        margin: "10px auto 0",
+        padding: "0 14px 24px",
+        animation: "sU .3s"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: 6
+      }
+    }, sel === q.a ? /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 13,
+        fontWeight: 700,
+        color: "#4ade80"
+      }
+    }, "\u2705", " Correct!") : /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 13,
+        fontWeight: 700,
+        color: "#f87171"
+      }
+    }, "\u274C", " ", tl === 0 && sel === -1 ? "Time's up!" : "Incorrect")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: "12px 14px",
+        background: "rgba(255,255,255,.04)",
+        borderRadius: 10,
+        border: "1px solid rgba(255,255,255,.06)",
+        marginBottom: 8
+      }
+    }, /*#__PURE__*/React.createElement("p", {
+      style: {
+        fontSize: 12,
+        color: "#ccc",
+        lineHeight: 1.8
+      }
+    }, q.ex)), q.mn && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
+      onClick: function () {
+        setShowMn(!showMn);
+      },
+      style: {
+        background: "rgba(255,200,50,.1)",
+        border: "1px solid rgba(255,200,50,.25)",
+        color: "#ffc832",
+        padding: "5px 10px",
+        borderRadius: 7,
+        fontSize: 10,
+        fontWeight: 600,
+        marginBottom: 6
+      }
+    }, showMn ? "Hide" : "Show", " Memory Trick"), showMn && /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: "7px 11px",
+        background: "rgba(255,200,50,.08)",
+        borderRadius: 7,
+        borderLeft: "3px solid #ffc832",
+        fontSize: 11,
+        color: "#ffd866",
+        marginBottom: 8,
+        lineHeight: 1.5,
+        fontWeight: 600,
+        animation: "pI .25s"
+      }
+    }, q.mn)), /*#__PURE__*/React.createElement("button", {
+      onClick: nextQ,
+      style: S.btn
+    }, qi + 1 >= qs.length ? "Results" : "Next")));
+  }
+
+  // === RESULTS ===
+  if (scr === "results") {
+    var pct = sTotal > 0 ? Math.round(sCorrect / sTotal * 100) : 0;
+    var grade = pct >= 90 ? "S" : pct >= 80 ? "A" : pct >= 70 ? "B" : pct >= 60 ? "C" : "D";
+    var gc = {
+      S: "#ffd700",
+      A: "#4ade80",
+      B: "#60a5fa",
+      C: "#fb923c",
+      D: "#f87171"
+    }[grade];
+    return /*#__PURE__*/React.createElement("div", {
+      style: S.c
+    }, /*#__PURE__*/React.createElement(SB, null), /*#__PURE__*/React.createElement("div", {
+      style: Object.assign({}, S.i, {
+        textAlign: "center"
+      })
+    }, /*#__PURE__*/React.createElement("h2", {
+      style: {
+        fontSize: 16,
+        fontWeight: 800,
+        color: "#fff",
+        marginBottom: 14
+      }
+    }, (MODES[gm] || {}).icon, " ", (MODES[gm] || {}).name, " Complete!"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 90,
+        height: 90,
+        borderRadius: "50%",
+        border: "3px solid " + gc,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        margin: "0 auto 16px",
+        animation: "gI .6s"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 32,
+        fontWeight: 900,
+        color: gc
+      }
+    }, grade)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "center",
+        gap: 18,
+        marginBottom: 18
+      }
+    }, [{
+      n: sCorrect + "/" + sTotal,
+      l: "Correct"
+    }, {
+      n: pct + "%",
+      l: "Accuracy"
+    }, {
+      n: "+" + sScore,
+      l: "XP"
+    }].map(function (x, i) {
+      return /*#__PURE__*/React.createElement("div", {
+        key: i
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 18,
+          fontWeight: 800,
+          color: "#fff",
+          display: "block"
+        }
+      }, x.n), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 8,
+          color: "#666",
+          textTransform: "uppercase"
+        }
+      }, x.l));
+    })), wrong.length > 0 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "left",
+        marginBottom: 14
+      }
+    }, /*#__PURE__*/React.createElement("h3", {
+      style: {
+        fontSize: 13,
+        fontWeight: 700,
+        color: "#fff",
+        marginBottom: 8
+      }
+    }, "\u{1F4DD}", " Review (", wrong.length, ")"), wrong.map(function (q, i) {
+      return /*#__PURE__*/React.createElement("div", {
+        key: i,
+        style: {
+          padding: 9,
+          background: "rgba(255,255,255,.04)",
+          border: "1px solid rgba(255,255,255,.06)",
+          borderRadius: 8,
+          marginBottom: 5
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 10,
+          color: "#ccc",
+          marginBottom: 4,
+          lineHeight: 1.4
+        }
+      }, q.q), q.type !== "match" && /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 10,
+          color: "#4ade80",
+          fontWeight: 600,
+          marginBottom: 3
+        }
+      }, "\u2705", " ", q.o[q.a]), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 11,
+          color: "#aaa",
+          lineHeight: 1.7
+        }
+      }, q.ex), q.mn && /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 9,
+          color: "#ffd866",
+          marginTop: 3,
+          padding: "3px 6px",
+          background: "rgba(255,200,50,.06)",
+          borderRadius: 5
+        }
+      }, q.mn));
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8,
+        justifyContent: "center"
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      style: Object.assign({}, S.btn, {
+        width: "auto",
+        padding: "11px 18px"
+      }),
+      onClick: function () {
+        startGame(gm, selCats, selTag);
+      }
+    }, "Play Again"), /*#__PURE__*/React.createElement("button", {
+      onClick: function () {
+        setScr("home");
+      },
+      style: {
+        padding: "11px 18px",
+        background: "rgba(255,255,255,.06)",
+        border: "1px solid rgba(255,255,255,.1)",
+        borderRadius: 10,
+        fontSize: 12,
+        fontWeight: 700,
+        color: "#aaa"
+      }
+    }, "Home"))));
+  }
+  return null;
+}
+function App() {
+  var s = useState(null);
+  if (!s[0]) return /*#__PURE__*/React.createElement(PinScreen, {
+    onLogin: function (p, d) {
+      s[1]({
+        pin: p,
+        data: d
+      });
+    }
+  });
+  return /*#__PURE__*/React.createElement(Game, {
+    pin: s[0].pin,
+    initialData: s[0].data
+  });
+}
+const S = {
+  c: {
+    minHeight: "100vh",
+    background: "#0f0f14",
+    color: "#e8e6e3",
+    fontFamily: "inherit",
+    overflowX: "hidden"
+  },
+  i: {
+    maxWidth: 640,
+    margin: "0 auto",
+    padding: "24px 16px 40px"
+  },
+  t: {
+    fontSize: 30,
+    fontWeight: 900,
+    color: "#fff",
+    margin: 0,
+    letterSpacing: 4
+  },
+  a: {
+    background: "linear-gradient(135deg,#667eea,#764ba2)",
+    WebkitBackgroundClip: "text",
+    WebkitTextFillColor: "transparent"
+  },
+  sb: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    padding: "11px 12px",
+    background: "rgba(255,255,255,.04)",
+    borderRadius: 11,
+    border: "1px solid rgba(255,255,255,.06)",
+    marginBottom: 14,
+    flexWrap: "wrap"
+  },
+  si: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 2
+  },
+  sv: {
+    fontSize: 12,
+    fontWeight: 700,
+    color: "#fff"
+  },
+  sl: {
+    fontSize: 7,
+    color: "#666",
+    textTransform: "uppercase",
+    letterSpacing: 1
+  },
+  dv: {
+    width: 1,
+    height: 24,
+    background: "rgba(255,255,255,.08)"
+  },
+  sh: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 10
+  },
+  sln: {
+    flex: 1,
+    height: 1,
+    background: "rgba(255,255,255,.08)"
+  },
+  stt: {
+    fontSize: 8,
+    color: "#555",
+    letterSpacing: 3,
+    fontWeight: 600
+  },
+  mc: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    padding: "12px",
+    background: "rgba(255,255,255,.03)",
+    border: "1px solid rgba(255,255,255,.08)",
+    borderRadius: 10,
+    textAlign: "left",
+    width: "100%"
+  },
+  btn: {
+    display: "block",
+    width: "100%",
+    padding: 12,
+    marginTop: 10,
+    background: "linear-gradient(135deg,#667eea,#764ba2)",
+    color: "#fff",
+    borderRadius: 10,
+    fontSize: 13,
+    fontWeight: 700,
+    letterSpacing: 1
+  },
+  bk: {
+    color: "#888",
+    fontSize: 11,
+    padding: "3px 0",
+    marginBottom: 10
+  }
+};
+class EB extends React.Component {
+  constructor(p) {
+    super(p);
+    this.state = {
+      e: null
+    };
+  }
+  static getDerivedStateFromError(e) {
+    return {
+      e: e.message
+    };
+  }
+  render() {
+    if (this.state.e) return React.createElement("div", {
+      style: {
+        padding: 40,
+        color: "#f87171",
+        background: "#0f0f14",
+        minHeight: "100vh",
+        fontFamily: "monospace"
+      }
+    }, React.createElement("h2", null, "Error"), React.createElement("pre", {
+      style: {
+        whiteSpace: "pre-wrap",
+        fontSize: 12,
+        marginTop: 12,
+        color: "#ccc"
+      }
+    }, this.state.e));
+    return this.props.children;
+  }
+}
+try {
+  ReactDOM.render(React.createElement(EB, null, React.createElement(App)), document.getElementById("root"));
+} catch (e) {
+  document.getElementById("root").innerHTML = '<div style="padding:40px;color:#f87171;font-family:monospace"><h2>Error</h2><pre>' + e.message + '</pre></div>';
+}
