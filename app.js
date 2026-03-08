@@ -812,39 +812,119 @@ function getSmartPool(mode, data, selTag) {
     })
   };
 }
+// Group passage questions together (like real MCAT), standalone Qs fill gaps between passage blocks
+function groupByPassage(questions) {
+  var passageGroups = {};
+  var standalone = [];
+  questions.forEach(function (q) {
+    if (q.pass) {
+      if (!passageGroups[q.pass]) passageGroups[q.pass] = [];
+      passageGroups[q.pass].push(q);
+    } else {
+      standalone.push(q);
+    }
+  });
+  // Build final order: shuffle passage groups, interleave standalone between them
+  var groupKeys = shuf(Object.keys(passageGroups));
+  var result = [];
+  var si = 0;
+  groupKeys.forEach(function (key, gi) {
+    // Add 1-2 standalone questions between passage groups (if available)
+    if (gi > 0 && si < standalone.length) {
+      result.push(standalone[si++]);
+    }
+    // Add all questions from this passage in their original order
+    passageGroups[key].forEach(function (q) {
+      result.push(q);
+    });
+  });
+  // Append remaining standalone questions at end
+  while (si < standalone.length) {
+    result.push(standalone[si++]);
+  }
+  return result;
+}
 function buildQSet(pool, mode, data) {
   var count = mode === "BOSS_BATTLE" || mode === "QUICK_5" ? 5 : Math.min(15, pool.length);
-  // Adaptive difficulty: sort by diff tier, prioritize unmastered + due
-  var scored = pool.map(function (q) {
+  // Separate passage questions (grouped by passage) and standalone
+  var passageMap = {};
+  var standalone = [];
+  pool.forEach(function (q) {
+    if (q.pass) {
+      if (!passageMap[q.pass]) passageMap[q.pass] = [];
+      passageMap[q.pass].push(q);
+    } else {
+      standalone.push(q);
+    }
+  });
+  // Sort standalone by adaptive difficulty
+  standalone = standalone.map(function (q) {
     var s = data ? data.questionStats[q.id] : null;
     var acc = s && s.seen >= 2 ? s.correct / s.seen : 0;
     var mastered = acc >= 0.8;
     var due = data ? isDue(data, q.id) : true;
-    var priority = (q.diff || 2) * 100 + (mastered ? 50 : 0) + (due ? 0 : 25);
+    var pr = (q.diff || 2) * 100 + (mastered ? 50 : 0) + (due ? 0 : 25);
     return {
       q: q,
-      priority: priority
+      pr: pr
     };
-  });
-  scored.sort(function (a, b) {
-    return a.priority - b.priority;
-  });
-  var sorted = scored.map(function (s) {
+  }).sort(function (a, b) {
+    return a.pr - b.pr;
+  }).map(function (s) {
     return s.q;
   });
-  // Pick from sorted, ensuring category diversity
+  // Sort passage groups by priority (avg difficulty of unmastered questions)
+  var passageKeys = Object.keys(passageMap).map(function (k) {
+    var qs = passageMap[k];
+    var avgPr = qs.reduce(function (s, q) {
+      var st = data ? data.questionStats[q.id] : null;
+      var acc = st && st.seen >= 2 ? st.correct / st.seen : 0;
+      return s + ((q.diff || 2) * 100 + (acc >= 0.8 ? 50 : 0) + (data && isDue(data, q.id) ? 0 : 25));
+    }, 0) / qs.length;
+    return {
+      key: k,
+      pr: avgPr
+    };
+  }).sort(function (a, b) {
+    return a.pr - b.pr;
+  }).map(function (s) {
+    return s.key;
+  });
+  // Target: ~60% passage Qs for sessions >=10, lower for short sessions
+  var passTarget = count >= 10 ? Math.round(count * 0.6) : Math.round(count * 0.4);
+  var picked = [];
+  var usedIds = {};
+  // Pick complete passage groups up to target
+  var pi = 0;
+  while (picked.filter(function (q) {
+    return q.pass;
+  }).length < passTarget && pi < passageKeys.length) {
+    var pKey = passageKeys[pi++];
+    var siblings = passageMap[pKey];
+    if (picked.length + siblings.length <= count + 3) {
+      siblings.forEach(function (sq) {
+        if (!usedIds[sq.id]) {
+          usedIds[sq.id] = true;
+          picked.push(sq);
+        }
+      });
+    }
+  }
+  // Fill remaining with standalone, ensuring category diversity
   var byCat = {};
-  sorted.forEach(function (q) {
-    if (!byCat[q.cat]) byCat[q.cat] = [];
-    byCat[q.cat].push(q);
+  standalone.forEach(function (q) {
+    if (!usedIds[q.id]) {
+      if (!byCat[q.cat]) byCat[q.cat] = [];
+      byCat[q.cat].push(q);
+    }
   });
   var ck = shuf(Object.keys(byCat));
-  var picked = [];
   var r = 0;
   while (picked.length < count) {
     var any = false;
     ck.forEach(function (c) {
-      if (picked.length < count && r < byCat[c].length) {
+      if (picked.length < count && byCat[c] && r < byCat[c].length) {
+        usedIds[byCat[c][r].id] = true;
         picked.push(byCat[c][r]);
         any = true;
       }
@@ -852,9 +932,9 @@ function buildQSet(pool, mode, data) {
     if (!any) break;
     r++;
   }
-  // Light shuffle within same difficulty to avoid predictable order
-  var result = picked;
-  return result.map(function (q) {
+  // Group passage Qs together in final order
+  var grouped = groupByPassage(picked);
+  return grouped.map(function (q) {
     if (q.type === "match") {
       var sp = shuf(q.pairs.map(function (p) {
         return p.slice();
@@ -1292,34 +1372,38 @@ function Game(_ref2) {
     var pool = QS.filter(function (q) {
       return secCats.indexOf(q.cat) >= 0;
     });
-    // 70% passage, 30% standalone
-    var passQs = shuf(pool.filter(function (q) {
+    // Pick complete passages (all Qs from a passage together), then fill with standalone
+    var passageMap = {};
+    pool.filter(function (q) {
       return q.pass;
-    }));
+    }).forEach(function (q) {
+      if (!passageMap[q.pass]) passageMap[q.pass] = [];
+      passageMap[q.pass].push(q);
+    });
+    var passageKeys = shuf(Object.keys(passageMap));
     var standQs = shuf(pool.filter(function (q) {
       return !q.pass;
     }));
     var picked = [];
-    var pTarget = 14,
-      sTarget = 6;
-    picked = picked.concat(passQs.slice(0, Math.min(pTarget, passQs.length)));
-    picked = picked.concat(standQs.slice(0, Math.min(sTarget, standQs.length)));
-    while (picked.length < 20 && passQs.length > picked.filter(function (q) {
-      return q.pass;
-    }).length) {
-      picked.push(passQs[picked.filter(function (q) {
+    // Add complete passages until we approach 14 passage Qs
+    passageKeys.forEach(function (key) {
+      if (picked.filter(function (q) {
         return q.pass;
-      }).length]);
-    }
-    while (picked.length < 20 && standQs.length > picked.filter(function (q) {
-      return !q.pass;
-    }).length) {
-      picked.push(standQs[picked.filter(function (q) {
-        return !q.pass;
-      }).length]);
+      }).length < 14) {
+        passageMap[key].forEach(function (q) {
+          picked.push(q);
+        });
+      }
+    });
+    // Fill remaining with standalone
+    var si = 0;
+    while (picked.length < 20 && si < standQs.length) {
+      picked.push(standQs[si++]);
     }
     picked = picked.slice(0, 20);
-    var built = shuf(picked).map(function (q) {
+    // Group passage Qs together, standalone between passage blocks
+    var grouped = groupByPassage(picked);
+    var built = grouped.map(function (q) {
       if (q.type === "match") {
         var sp = shuf(q.pairs.map(function (p) {
           return p.slice();
