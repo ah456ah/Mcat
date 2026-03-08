@@ -1083,9 +1083,11 @@ function Game(_ref2) {
   const [qAnswered, setQAnswered] = useState({});
   const tr = useRef(null);
   const qStartRef = useRef(Date.now());
+  const dirtyRef = useRef(false);
 
-  // Cloud save debounce
+  // Cloud save debounce - ONLY when user has actually interacted (dirty)
   useEffect(function () {
+    if (!dirtyRef.current) return;
     var t = setTimeout(function () {
       setSS("saving");
       saveToCloud(pin, data).then(function (ok) {
@@ -1139,6 +1141,7 @@ function Game(_ref2) {
   var theme = data.theme || "dark";
   var fz = data.fontSize || 0;
   function toggleTheme() {
+    dirtyRef.current = true;
     setData(function (d) {
       return Object.assign({}, d, {
         theme: d.theme === "light" ? "dark" : "light"
@@ -1146,6 +1149,7 @@ function Game(_ref2) {
     });
   }
   function adjustFont(delta) {
+    dirtyRef.current = true;
     setData(function (d) {
       var nf = Math.max(-4, Math.min(8, (d.fontSize || 0) + delta));
       return Object.assign({}, d, {
@@ -1379,6 +1383,7 @@ function Game(_ref2) {
     if (sel !== null && toElim.indexOf(sel) >= 0) setSel(null);
   }
   function commitAnswer(confidence) {
+    dirtyRef.current = true;
     var q = qs[qi];
     var actualIdx = sel !== null ? sel : -1;
     var correct = actualIdx === q.a;
@@ -1559,6 +1564,7 @@ function Game(_ref2) {
             setShake(false);
           }, 500);
         }
+        dirtyRef.current = true;
         setData(function (d) {
           var st = Object.assign({}, d.questionStats);
           var p = st[q.id] || {
@@ -1636,6 +1642,7 @@ function Game(_ref2) {
     }
   }
   function fin() {
+    dirtyRef.current = true;
     setData(function (d) {
       return Object.assign({}, d, {
         sessionHistory: d.sessionHistory.concat([{
@@ -1650,6 +1657,7 @@ function Game(_ref2) {
     setScr("results");
   }
   function toggleFlag(qid) {
+    dirtyRef.current = true;
     setData(function (d) {
       var fl = (d.flagged || []).slice();
       var idx = fl.indexOf(qid);
@@ -2103,6 +2111,7 @@ function Game(_ref2) {
         onClick: function () {
           var nv = prompt("Set weekly question goal:", wg);
           if (nv && !isNaN(parseInt(nv))) {
+            dirtyRef.current = true;
             setData(function (d) {
               return Object.assign({}, d, {
                 weeklyGoal: parseInt(nv)
@@ -3773,6 +3782,7 @@ function Game(_ref2) {
     })), /*#__PURE__*/React.createElement("button", {
       onClick: function () {
         if (confirm("Reset ALL progress?")) {
+          dirtyRef.current = true;
           setData(Object.assign({}, DD));
           setScr("home");
         }
