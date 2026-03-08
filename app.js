@@ -219,6 +219,13 @@ const MODES = {
     desc: "20 Qs, 30 min, one MCAT section",
     time: null,
     smart: true
+  },
+  QUICK_5: {
+    name: "Quick 5",
+    icon: "\u{26A1}",
+    desc: "5 mixed Qs, perfect for on-the-go",
+    time: null,
+    smart: true
   }
 };
 function getTagTier(data, tag) {
@@ -785,6 +792,20 @@ function getSmartPool(mode, data, selTag) {
   if (mode === "SECTION_SIM") return {
     pool: []
   };
+  if (mode === "QUICK_5") {
+    var q5pool = QS.filter(function (q) {
+      return q.cat !== "CARS";
+    });
+    var due5 = q5pool.filter(function (q) {
+      return isDue(data, q.id);
+    });
+    if (due5.length >= 5) return {
+      pool: due5
+    };
+    return {
+      pool: q5pool
+    };
+  }
   return {
     pool: QS.filter(function (q) {
       return q.cat !== "CARS";
@@ -792,7 +813,7 @@ function getSmartPool(mode, data, selTag) {
   };
 }
 function buildQSet(pool, mode, data) {
-  var count = mode === "BOSS_BATTLE" ? 5 : Math.min(15, pool.length);
+  var count = mode === "BOSS_BATTLE" || mode === "QUICK_5" ? 5 : Math.min(15, pool.length);
   // Adaptive difficulty: sort by diff tier, prioritize unmastered + due
   var scored = pool.map(function (q) {
     var s = data ? data.questionStats[q.id] : null;
@@ -2447,8 +2468,35 @@ function Game(_ref2) {
           color: c
         }
       }, ac.seen > 0 ? p + "%" : "\u2014"));
-    }))), /*#__PURE__*/React.createElement("div", {
-      style: S.sh
+    }))), /*#__PURE__*/React.createElement("button", {
+      onClick: function () {
+        startGame("QUICK_5", []);
+      },
+      style: {
+        width: "100%",
+        padding: 14,
+        marginBottom: 14,
+        background: "linear-gradient(135deg,rgba(102,126,234,.1),rgba(118,75,162,.1))",
+        border: "1.5px solid rgba(102,126,234,.25)",
+        borderRadius: 12,
+        textAlign: "center"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 14,
+        fontWeight: 700,
+        color: "#667eea"
+      }
+    }, "\u26A1", " Quick 5"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: TC.muted,
+        marginTop: 2
+      }
+    }, "5 mixed questions ", "\u2022", " perfect for on-the-go")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        ...S.sh
+      }
     }, /*#__PURE__*/React.createElement("span", {
       style: {
         ...S.sln,
