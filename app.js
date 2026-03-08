@@ -4367,15 +4367,13 @@ function Game(_ref2) {
           textDecoration: isEliminated ? "line-through" : "none"
         }
       }, opt));
-    })), !isMatch && !sr && !awaitConf && /*#__PURE__*/React.createElement("div", {
+    })), !isMatch && !sr && !awaitConf && sel === null && !hintUsed && eliminated.length === 0 && /*#__PURE__*/React.createElement("div", {
       style: {
         maxWidth: 640,
         margin: "8px auto 0",
-        padding: "0 14px",
-        display: "flex",
-        gap: 8
+        padding: "0 14px"
       }
-    }, !hintUsed && eliminated.length === 0 && /*#__PURE__*/React.createElement("button", {
+    }, /*#__PURE__*/React.createElement("button", {
       onClick: useHint,
       style: {
         padding: "10px 16px",
@@ -4388,47 +4386,56 @@ function Game(_ref2) {
         whiteSpace: "nowrap",
         color: "#ffc832"
       }
-    }, "\u{1F4A1}", " 50/50"), sel !== null && /*#__PURE__*/React.createElement("button", {
-      onClick: lockIn,
-      style: {
-        flex: 1,
-        padding: 12,
-        background: "linear-gradient(135deg,#667eea,#764ba2)",
-        color: "#fff",
-        borderRadius: 10,
-        fontSize: 13,
-        fontWeight: 700,
-        letterSpacing: 1
-      }
-    }, "Lock In Answer")), !isMatch && awaitConf && !sr && /*#__PURE__*/React.createElement("div", {
+    }, "\u{1F4A1}", " 50/50")), !isMatch && sel !== null && !sr && !awaitConf && /*#__PURE__*/React.createElement("div", {
       style: {
         maxWidth: 640,
         margin: "8px auto 0",
         padding: "0 14px",
         animation: "sU .2s"
       }
-    }, /*#__PURE__*/React.createElement("div", {
+    }, !hintUsed && eliminated.length === 0 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: 8
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: useHint,
+      style: {
+        padding: "6px 12px",
+        background: "rgba(255,200,50,.1)",
+        border: "1px solid rgba(255,200,50,.25)",
+        borderRadius: 8,
+        fontSize: 10,
+        fontWeight: 600,
+        color: "#ffc832"
+      }
+    }, "\u{1F4A1}", " 50/50")), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 11,
         color: TC.muted,
         marginBottom: 6,
         textAlign: "center"
       }
-    }, "How confident?"), /*#__PURE__*/React.createElement("div", {
+    }, "How confident? (submits answer)"), /*#__PURE__*/React.createElement("div", {
       className: "conf-bar"
     }, /*#__PURE__*/React.createElement("button", {
       className: "conf-btn",
       onClick: function () {
+        setAwaitConf(true);
+        clearTimeout(tr.current);
         commitAnswer("low");
       }
     }, "\u{1F62C}", " Guessing"), /*#__PURE__*/React.createElement("button", {
       className: "conf-btn",
       onClick: function () {
+        setAwaitConf(true);
+        clearTimeout(tr.current);
         commitAnswer("med");
       }
     }, "\u{1F914}", " Somewhat"), /*#__PURE__*/React.createElement("button", {
       className: "conf-btn",
       onClick: function () {
+        setAwaitConf(true);
+        clearTimeout(tr.current);
         commitAnswer("high");
       }
     }, "\u{1F60E}", " Confident"))), !isMatch && sr && /*#__PURE__*/React.createElement("div", {
