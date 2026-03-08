@@ -1010,10 +1010,10 @@ function PinScreen(_ref) {
     style: {
       width: "100%",
       padding: "14px 16px",
-      background: TC.card,
-      border: "1.5px solid " + TC.cbr,
+      background: "rgba(255,255,255,.06)",
+      border: "1.5px solid rgba(255,255,255,.12)",
       borderRadius: 10,
-      color: fg,
+      color: "#fff",
       fontSize: 18,
       fontFamily: "inherit",
       textAlign: "center",
@@ -1724,7 +1724,10 @@ function Game(_ref2) {
     }, /*#__PURE__*/React.createElement("div", {
       style: S.i
     }, /*#__PURE__*/React.createElement("button", {
-      style: S.bk,
+      style: {
+        ...S.bk,
+        color: TC.muted
+      },
       onClick: function () {
         setShowConceptCard(null);
         setScr("home");
@@ -1805,7 +1808,10 @@ function Game(_ref2) {
     }, /*#__PURE__*/React.createElement("div", {
       style: S.i
     }, /*#__PURE__*/React.createElement("button", {
-      style: S.bk,
+      style: {
+        ...S.bk,
+        color: TC.muted
+      },
       onClick: function () {
         setScr("home");
       }
@@ -1885,11 +1891,20 @@ function Game(_ref2) {
       }, /*#__PURE__*/React.createElement("div", {
         style: S.sh
       }, /*#__PURE__*/React.createElement("span", {
-        style: S.sln
+        style: {
+          ...S.sln,
+          background: TC.sbg
+        }
       }), /*#__PURE__*/React.createElement("span", {
-        style: S.stt
+        style: {
+          ...S.stt,
+          color: TC.dim
+        }
       }, e[0].toUpperCase()), /*#__PURE__*/React.createElement("span", {
-        style: S.sln
+        style: {
+          ...S.sln,
+          background: TC.sbg
+        }
       })), /*#__PURE__*/React.createElement("div", {
         style: {
           display: "flex",
@@ -1971,7 +1986,10 @@ function Game(_ref2) {
         fontSize: 42
       }
     }, "\u{1F9EC}"), /*#__PURE__*/React.createElement("h1", {
-      style: S.t
+      style: {
+        ...S.t,
+        color: fg
+      }
     }, "MCAT", /*#__PURE__*/React.createElement("span", {
       style: S.a
     }, "QUEST")), /*#__PURE__*/React.createElement("p", {
@@ -2101,37 +2119,74 @@ function Game(_ref2) {
         }
       }, "Edit"));
     }(), /*#__PURE__*/React.createElement("div", {
-      style: S.sb
+      style: {
+        ...S.sb,
+        background: TC.sbg,
+        border: "1px solid " + TC.cbr
+      }
     }, /*#__PURE__*/React.createElement("div", {
       style: S.si
     }, /*#__PURE__*/React.createElement("span", {
-      style: S.sv
+      style: {
+        ...S.sv,
+        color: fg
+      }
     }, rank.b, " ", rank.name), /*#__PURE__*/React.createElement("span", {
-      style: S.sl
+      style: {
+        ...S.sl,
+        color: TC.dim
+      }
     }, "Rank")), /*#__PURE__*/React.createElement("div", {
-      style: S.dv
+      style: {
+        ...S.dv,
+        background: TC.sbg
+      }
     }), /*#__PURE__*/React.createElement("div", {
       style: S.si
     }, /*#__PURE__*/React.createElement("span", {
-      style: S.sv
+      style: {
+        ...S.sv,
+        color: fg
+      }
     }, data.xp), /*#__PURE__*/React.createElement("span", {
-      style: S.sl
+      style: {
+        ...S.sl,
+        color: TC.dim
+      }
     }, "XP")), /*#__PURE__*/React.createElement("div", {
-      style: S.dv
+      style: {
+        ...S.dv,
+        background: TC.sbg
+      }
     }), /*#__PURE__*/React.createElement("div", {
       style: S.si
     }, /*#__PURE__*/React.createElement("span", {
-      style: S.sv
+      style: {
+        ...S.sv,
+        color: fg
+      }
     }, acc, "%"), /*#__PURE__*/React.createElement("span", {
-      style: S.sl
+      style: {
+        ...S.sl,
+        color: TC.dim
+      }
     }, "Accuracy")), /*#__PURE__*/React.createElement("div", {
-      style: S.dv
+      style: {
+        ...S.dv,
+        background: TC.sbg
+      }
     }), /*#__PURE__*/React.createElement("div", {
       style: S.si
     }, /*#__PURE__*/React.createElement("span", {
-      style: S.sv
+      style: {
+        ...S.sv,
+        color: fg
+      }
     }, data.totalAnswered), /*#__PURE__*/React.createElement("span", {
-      style: S.sl
+      style: {
+        ...S.sl,
+        color: TC.dim
+      }
     }, "Answered"))), nr && /*#__PURE__*/React.createElement("div", {
       style: {
         marginBottom: 14,
@@ -2329,11 +2384,20 @@ function Game(_ref2) {
     }, /*#__PURE__*/React.createElement("div", {
       style: S.sh
     }, /*#__PURE__*/React.createElement("span", {
-      style: S.sln
+      style: {
+        ...S.sln,
+        background: TC.sbg
+      }
     }), /*#__PURE__*/React.createElement("span", {
-      style: S.stt
+      style: {
+        ...S.stt,
+        color: TC.dim
+      }
     }, "MASTERY"), /*#__PURE__*/React.createElement("span", {
-      style: S.sln
+      style: {
+        ...S.sln,
+        background: TC.sbg
+      }
     })), /*#__PURE__*/React.createElement("div", {
       style: {
         display: "grid",
@@ -2377,11 +2441,20 @@ function Game(_ref2) {
     }))), /*#__PURE__*/React.createElement("div", {
       style: S.sh
     }, /*#__PURE__*/React.createElement("span", {
-      style: S.sln
+      style: {
+        ...S.sln,
+        background: TC.sbg
+      }
     }), /*#__PURE__*/React.createElement("span", {
-      style: S.stt
+      style: {
+        ...S.stt,
+        color: TC.dim
+      }
     }, "GAME MODES"), /*#__PURE__*/React.createElement("span", {
-      style: S.sln
+      style: {
+        ...S.sln,
+        background: TC.sbg
+      }
     })), /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
@@ -2392,7 +2465,11 @@ function Game(_ref2) {
     }, ["BLITZ", "MARATHON", "BOSS_BATTLE"].map(function (k) {
       return /*#__PURE__*/React.createElement("button", {
         key: k,
-        style: S.mc,
+        style: {
+          ...S.mc,
+          background: TC.card,
+          border: "1px solid " + TC.cbr
+        },
         onClick: function () {
           setGM(k);
           setScr("select_cats");
@@ -2419,11 +2496,20 @@ function Game(_ref2) {
     })), /*#__PURE__*/React.createElement("div", {
       style: S.sh
     }, /*#__PURE__*/React.createElement("span", {
-      style: S.sln
+      style: {
+        ...S.sln,
+        background: TC.sbg
+      }
     }), /*#__PURE__*/React.createElement("span", {
-      style: S.stt
+      style: {
+        ...S.stt,
+        color: TC.dim
+      }
     }, "SMART PRACTICE"), /*#__PURE__*/React.createElement("span", {
-      style: S.sln
+      style: {
+        ...S.sln,
+        background: TC.sbg
+      }
     })), /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
@@ -2477,6 +2563,8 @@ function Game(_ref2) {
       return /*#__PURE__*/React.createElement("button", {
         key: x.k,
         style: Object.assign({}, S.mc, {
+          background: TC.card,
+          border: "1px solid " + TC.cbr,
           opacity: x.n ? 1 : .4
         }),
         onClick: function () {
@@ -2561,7 +2649,10 @@ function Game(_ref2) {
     }, /*#__PURE__*/React.createElement("div", {
       style: S.i
     }, /*#__PURE__*/React.createElement("button", {
-      style: S.bk,
+      style: {
+        ...S.bk,
+        color: TC.muted
+      },
       onClick: function () {
         setScr("home");
         setTagSearch("");
@@ -2672,7 +2763,10 @@ function Game(_ref2) {
     }, /*#__PURE__*/React.createElement("div", {
       style: S.i
     }, /*#__PURE__*/React.createElement("button", {
-      style: S.bk,
+      style: {
+        ...S.bk,
+        color: TC.muted
+      },
       onClick: function () {
         setScr("home");
       }
@@ -2764,7 +2858,10 @@ function Game(_ref2) {
     }, /*#__PURE__*/React.createElement("div", {
       style: S.i
     }, /*#__PURE__*/React.createElement("button", {
-      style: S.bk,
+      style: {
+        ...S.bk,
+        color: TC.muted
+      },
       onClick: function () {
         setScr("home");
       }
@@ -3037,7 +3134,10 @@ function Game(_ref2) {
     }, /*#__PURE__*/React.createElement(SB, null), /*#__PURE__*/React.createElement("div", {
       style: S.i
     }, /*#__PURE__*/React.createElement("button", {
-      style: S.bk,
+      style: {
+        ...S.bk,
+        color: TC.muted
+      },
       onClick: function () {
         setScr("home");
       }
@@ -3706,7 +3806,10 @@ function Game(_ref2) {
     }, /*#__PURE__*/React.createElement(SB, null), /*#__PURE__*/React.createElement("div", {
       style: S.i
     }, /*#__PURE__*/React.createElement("button", {
-      style: S.bk,
+      style: {
+        ...S.bk,
+        color: TC.muted
+      },
       onClick: function () {
         setSelCats([]);
         setScr("home");
@@ -4690,7 +4793,7 @@ const S = {
   dv: {
     width: 1,
     height: 24,
-    background: TC.sbg
+    background: "rgba(255,255,255,.08)"
   },
   sh: {
     display: "flex",
@@ -4701,7 +4804,7 @@ const S = {
   sln: {
     flex: 1,
     height: 1,
-    background: TC.sbg
+    background: "rgba(255,255,255,.08)"
   },
   stt: {
     fontSize: 8,
@@ -4714,8 +4817,8 @@ const S = {
     alignItems: "center",
     gap: 10,
     padding: "12px",
-    background: TC.card,
-    border: "1px solid " + TC.cbr,
+    background: "rgba(255,255,255,.04)",
+    border: "1px solid rgba(255,255,255,.08)",
     borderRadius: 10,
     textAlign: "left",
     width: "100%"
