@@ -52,6 +52,13 @@ function rememberPin(p) {
 function todayStr() {
   return new Date().toISOString().slice(0, 10);
 }
+
+// Merge wrong-answer explanations from WX_DATA into questions
+if (typeof WX_DATA !== "undefined") {
+  QS.forEach(function (q) {
+    if (WX_DATA[q.id]) q.wx = WX_DATA[q.id];
+  });
+}
 const ALL_TAGS = [...new Set(QS.flatMap(function (q) {
   return q.tags || [];
 }))].sort();
@@ -947,10 +954,21 @@ function buildQSet(pool, mode, data) {
       });
     }
     var ct = q.o[q.a];
-    var so = shuf(q.o.slice());
+    var idx = q.o.map(function (_, i) {
+      return i;
+    });
+    var si = shuf(idx);
+    var so = si.map(function (i) {
+      return q.o[i];
+    });
+    var sw = q.wx ? si.map(function (i) {
+      return q.wx[i];
+    }) : null;
+    var na = so.indexOf(ct);
     return Object.assign({}, q, {
       o: so,
-      a: so.indexOf(ct)
+      a: na,
+      wx: sw
     });
   });
 }
@@ -1416,10 +1434,21 @@ function Game(_ref2) {
         });
       }
       var ct = q.o[q.a];
-      var so = shuf(q.o.slice());
+      var idx = q.o.map(function (_, i) {
+        return i;
+      });
+      var si = shuf(idx);
+      var so = si.map(function (i) {
+        return q.o[i];
+      });
+      var sw = q.wx ? si.map(function (i) {
+        return q.wx[i];
+      }) : null;
+      var na = so.indexOf(ct);
       return Object.assign({}, q, {
         o: so,
-        a: so.indexOf(ct)
+        a: na,
+        wx: sw
       });
     });
     setQs(built);
@@ -4064,15 +4093,15 @@ function Game(_ref2) {
       }
     }, "\u23F8\uFE0F"), /*#__PURE__*/React.createElement("div", {
       style: {
-        fontSize: 18,
+        fontSize: 18 + fz,
         fontWeight: 800,
         color: fg,
         marginBottom: 8
       }
     }, "Paused"), /*#__PURE__*/React.createElement("div", {
       style: {
-        fontSize: 12,
-        color: "#888",
+        fontSize: 12 + fz,
+        color: TC.muted,
         marginBottom: 20
       }
     }, "Timer stopped at ", tl, "s"), /*#__PURE__*/React.createElement("button", {
@@ -4133,6 +4162,37 @@ function Game(_ref2) {
       }
     }), /*#__PURE__*/React.createElement("button", {
       onClick: function () {
+        adjustFont(-2);
+      },
+      style: {
+        fontSize: 10,
+        color: TC.muted,
+        padding: "1px 4px",
+        border: "1px solid " + TC.cbr,
+        borderRadius: 4,
+        flexShrink: 0
+      }
+    }, "A-"), /*#__PURE__*/React.createElement("button", {
+      onClick: function () {
+        adjustFont(2);
+      },
+      style: {
+        fontSize: 12,
+        color: TC.muted,
+        padding: "1px 4px",
+        border: "1px solid " + TC.cbr,
+        borderRadius: 4,
+        flexShrink: 0
+      }
+    }, "A+"), /*#__PURE__*/React.createElement("button", {
+      onClick: toggleTheme,
+      style: {
+        fontSize: 13,
+        padding: "1px 4px",
+        flexShrink: 0
+      }
+    }, isDark ? "\u2600\uFE0F" : "\u{1F319}"), /*#__PURE__*/React.createElement("button", {
+      onClick: function () {
         toggleFlag(q.id);
       },
       style: {
@@ -4192,7 +4252,7 @@ function Game(_ref2) {
     }))), gm === "SECTION_SIM" && simTimer != null && /*#__PURE__*/React.createElement("div", {
       style: {
         textAlign: "center",
-        fontSize: 14,
+        fontSize: 14 + fz,
         fontWeight: 800,
         maxWidth: 640,
         margin: "2px auto",
@@ -4201,7 +4261,7 @@ function Game(_ref2) {
     }, "\u23F1", " ", Math.floor(simTimer / 60), ":", (simTimer % 60 < 10 ? "0" : "") + simTimer % 60, " remaining"), tl != null && /*#__PURE__*/React.createElement("div", {
       style: {
         textAlign: "center",
-        fontSize: 16,
+        fontSize: 16 + fz,
         fontWeight: 800,
         maxWidth: 640,
         margin: "2px auto",
@@ -4241,14 +4301,14 @@ function Game(_ref2) {
         gap: 3,
         padding: "3px 10px",
         borderRadius: 14,
-        fontSize: 9,
+        fontSize: 9 + fz,
         fontWeight: 600,
         color: "#fff",
         background: cat.color
       }
     }, cat.icon, " ", cat.name), /*#__PURE__*/React.createElement("span", {
       style: {
-        fontSize: 8,
+        fontSize: 8 + fz,
         color: TC.dim
       }
     }, ["", "Easy", "Med", "Hard"][q.diff || 1]), isMatch && /*#__PURE__*/React.createElement("span", {
@@ -4258,14 +4318,14 @@ function Game(_ref2) {
       }
     }, "Matching"), q.pass && /*#__PURE__*/React.createElement("span", {
       style: {
-        fontSize: 8,
+        fontSize: 8 + fz,
         color: "#9b5de5"
       }
     }, "Passage"), (q.tags || []).slice(0, 2).map(function (t) {
       return /*#__PURE__*/React.createElement("span", {
         key: t,
         style: {
-          fontSize: 8,
+          fontSize: 8 + fz,
           padding: "1px 6px",
           borderRadius: 10,
           background: "rgba(255,255,255,.05)",
@@ -4279,7 +4339,16 @@ function Game(_ref2) {
         padding: "0 14px 8px"
       }
     }, /*#__PURE__*/React.createElement("div", {
-      className: "passage-box"
+      style: {
+        padding: 14,
+        background: "rgba(102,126,234,0.06)",
+        border: "1px solid rgba(102,126,234,0.15)",
+        borderRadius: 10,
+        marginBottom: 14,
+        fontSize: 12 + fz,
+        lineHeight: 1.7,
+        color: TC.muted
+      }
     }, passageData.text)), /*#__PURE__*/React.createElement("div", {
       style: {
         maxWidth: 640,
@@ -4294,7 +4363,30 @@ function Game(_ref2) {
         lineHeight: 1.5,
         margin: 0
       }
-    }, q.q)), isMatch && !sr && /*#__PURE__*/React.createElement("div", {
+    }, q.fmt ? /*#__PURE__*/React.createElement("span", {
+      style: {
+        display: "inline-block",
+        padding: "1px 6px",
+        borderRadius: 4,
+        fontSize: 9 + fz,
+        fontWeight: 800,
+        marginRight: 6,
+        verticalAlign: "middle",
+        background: q.fmt === "except" ? "rgba(248,113,113,.15)" : q.fmt === "twostep" ? "rgba(102,126,234,.15)" : "rgba(74,222,128,.15)",
+        color: q.fmt === "except" ? "#f87171" : q.fmt === "twostep" ? "#667eea" : "#4ade80"
+      }
+    }, q.fmt === "except" ? "EXCEPT" : q.fmt === "twostep" ? "2-STEP" : "DATA") : null, q.q.split(/(EXCEPT|NOT|LEAST)/).map(function (part, i) {
+      return /(EXCEPT|NOT|LEAST)/.test(part) ? /*#__PURE__*/React.createElement("span", {
+        key: i,
+        style: {
+          color: "#f87171",
+          fontWeight: 900,
+          textDecoration: "underline"
+        }
+      }, part) : /*#__PURE__*/React.createElement("span", {
+        key: i
+      }, part);
+    }))), isMatch && !sr && /*#__PURE__*/React.createElement("div", {
       style: {
         maxWidth: 640,
         margin: "0 auto",
@@ -4324,7 +4416,7 @@ function Game(_ref2) {
         style: {
           padding: "10px",
           borderRadius: 8,
-          fontSize: 11,
+          fontSize: 11 + fz,
           textAlign: "left",
           border: "1.5px solid " + (selected ? "#667eea" : done ? "rgba(74,222,128,.3)" : "rgba(255,255,255,.1)"),
           background: selected ? "rgba(102,126,234,.15)" : done ? "rgba(74,222,128,.08)" : "rgba(255,255,255,.04)",
@@ -4352,7 +4444,7 @@ function Game(_ref2) {
         style: {
           padding: "10px",
           borderRadius: 8,
-          fontSize: 11,
+          fontSize: 11 + fz,
           textAlign: "left",
           border: "1.5px solid " + (used ? "rgba(255,255,255,.05)" : "rgba(255,255,255,.1)"),
           background: used ? "rgba(255,255,255,.02)" : "rgba(255,255,255,.04)",
@@ -4375,13 +4467,13 @@ function Game(_ref2) {
       return r.correct;
     }) ? /*#__PURE__*/React.createElement("span", {
       style: {
-        fontSize: 13,
+        fontSize: 13 + fz,
         fontWeight: 700,
         color: "#4ade80"
       }
     }, "\u2705", " All correct!") : /*#__PURE__*/React.createElement("span", {
       style: {
-        fontSize: 13,
+        fontSize: 13 + fz,
         fontWeight: 700,
         color: "#f87171"
       }
@@ -4395,7 +4487,7 @@ function Game(_ref2) {
       return /*#__PURE__*/React.createElement("div", {
         key: i,
         style: {
-          fontSize: 11,
+          fontSize: 11 + fz,
           padding: "4px 0",
           color: r.correct ? "#4ade80" : "#f87171"
         }
@@ -4410,7 +4502,7 @@ function Game(_ref2) {
       }
     }, /*#__PURE__*/React.createElement("p", {
       style: {
-        fontSize: 12,
+        fontSize: 12 + fz,
         color: TC.muted,
         lineHeight: 1.8
       }
@@ -4420,7 +4512,7 @@ function Game(_ref2) {
         background: "rgba(255,200,50,.08)",
         borderRadius: 8,
         borderLeft: "3px solid #ffc832",
-        fontSize: 11,
+        fontSize: 11 + fz,
         color: "#ffd866",
         marginBottom: 8,
         lineHeight: 1.5,
@@ -4480,22 +4572,23 @@ function Game(_ref2) {
         disabled: sr || awaitConf || isEliminated
       }, /*#__PURE__*/React.createElement("span", {
         style: {
-          width: 20,
-          height: 20,
+          width: 20 + fz,
+          height: 20 + fz,
           borderRadius: 5,
           background: TC.sbg,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          fontSize: 9,
+          fontSize: 9 + fz,
           fontWeight: 700,
           color: TC.muted,
           flexShrink: 0
         }
       }, String.fromCharCode(65 + i)), /*#__PURE__*/React.createElement("span", {
         style: {
-          fontSize: 12,
+          fontSize: 12 + fz,
           lineHeight: 1.5,
+          color: fg,
           textDecoration: isEliminated ? "line-through" : "none"
         }
       }, opt));
@@ -4512,11 +4605,10 @@ function Game(_ref2) {
         background: "rgba(255,200,50,.1)",
         border: "1px solid rgba(255,200,50,.25)",
         borderRadius: 10,
-        fontSize: 12,
+        fontSize: 12 + fz,
         fontWeight: 600,
         color: "#ffc832",
-        whiteSpace: "nowrap",
-        color: "#ffc832"
+        whiteSpace: "nowrap"
       }
     }, "\u{1F4A1}", " 50/50")), !isMatch && sel !== null && !sr && !awaitConf && /*#__PURE__*/React.createElement("div", {
       style: {
@@ -4536,19 +4628,22 @@ function Game(_ref2) {
         background: "rgba(255,200,50,.1)",
         border: "1px solid rgba(255,200,50,.25)",
         borderRadius: 8,
-        fontSize: 10,
+        fontSize: 10 + fz,
         fontWeight: 600,
         color: "#ffc832"
       }
     }, "\u{1F4A1}", " 50/50")), /*#__PURE__*/React.createElement("div", {
       style: {
-        fontSize: 11,
+        fontSize: 11 + fz,
         color: TC.muted,
         marginBottom: 6,
         textAlign: "center"
       }
     }, "How confident? (submits answer)"), /*#__PURE__*/React.createElement("div", {
-      className: "conf-bar"
+      className: "conf-bar",
+      style: {
+        fontSize: 11 + fz
+      }
     }, /*#__PURE__*/React.createElement("button", {
       className: "conf-btn",
       onClick: function () {
@@ -4583,13 +4678,13 @@ function Game(_ref2) {
       }
     }, sel === q.a ? /*#__PURE__*/React.createElement("span", {
       style: {
-        fontSize: 13,
+        fontSize: 13 + fz,
         fontWeight: 700,
         color: "#4ade80"
       }
     }, "\u2705", " Correct!", hintUsed ? " (hint used, 50% XP)" : "") : /*#__PURE__*/React.createElement("span", {
       style: {
-        fontSize: 13,
+        fontSize: 13 + fz,
         fontWeight: 700,
         color: "#f87171"
       }
@@ -4600,7 +4695,7 @@ function Game(_ref2) {
         border: "1px solid rgba(74,222,128,.25)",
         borderRadius: 8,
         marginBottom: 8,
-        fontSize: 12,
+        fontSize: 12 + fz,
         fontWeight: 700,
         color: "#4ade80"
       }
@@ -4615,7 +4710,7 @@ function Game(_ref2) {
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
-        fontSize: 13,
+        fontSize: 13 + fz,
         color: "#fbbf24",
         fontWeight: 600,
         marginBottom: 6
@@ -4636,18 +4731,48 @@ function Game(_ref2) {
       }
     }, /*#__PURE__*/React.createElement("p", {
       style: {
-        fontSize: 12,
+        fontSize: 12 + fz,
         color: TC.muted,
         lineHeight: 1.8,
         margin: 0
       }
-    }, q.ex)), q.mn && /*#__PURE__*/React.createElement("div", {
+    }, q.ex)), q.wx && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: 8
+      }
+    }, q.o.map(function (opt, i) {
+      if (i === q.a || !q.wx[i]) return null;
+      var isUserPick = i === sel;
+      return /*#__PURE__*/React.createElement("div", {
+        key: i,
+        style: {
+          padding: "8px 12px",
+          background: isUserPick ? "rgba(248,113,113,.08)" : "rgba(255,255,255,.02)",
+          border: "1px solid " + (isUserPick ? "rgba(248,113,113,.2)" : TC.cbr),
+          borderRadius: 8,
+          marginBottom: 4
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 11 + fz,
+          color: isUserPick ? "#f87171" : TC.dim,
+          fontWeight: isUserPick ? 700 : 600,
+          marginBottom: 3
+        }
+      }, isUserPick ? "\u274C Your answer: " : "\u2717 ", String.fromCharCode(65 + i) + ". ", opt), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 11 + fz,
+          color: TC.muted,
+          lineHeight: 1.6
+        }
+      }, q.wx[i]));
+    })), q.mn && /*#__PURE__*/React.createElement("div", {
       style: {
         padding: "8px 12px",
         background: "rgba(255,200,50,.08)",
         borderRadius: 8,
         borderLeft: "3px solid #ffc832",
-        fontSize: 11,
+        fontSize: 11 + fz,
         color: "#ffd866",
         marginBottom: 8,
         lineHeight: 1.5,
@@ -4980,7 +5105,7 @@ const S = {
     background: "linear-gradient(135deg,#667eea,#764ba2)",
     color: "#fff",
     borderRadius: 10,
-    fontSize: 13,
+    fontSize: 13 + fz,
     fontWeight: 700,
     letterSpacing: 1
   },
