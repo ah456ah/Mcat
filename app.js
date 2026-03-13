@@ -1929,7 +1929,10 @@ function Game(_ref2) {
       }
     }, "No concept card for this tag yet."), /*#__PURE__*/React.createElement("button", {
       onClick: launchAfterCard,
-      style: S.btn
+      style: {
+        ...S.btn,
+        fontSize: 13 + fz
+      }
     }, "\u{1F3AF}", " Ready to Quiz")));
   }
 
@@ -2022,7 +2025,8 @@ function Game(_ref2) {
         startGame("TAG_PRACTICE", [], openCard);
       },
       style: Object.assign({}, S.btn, {
-        marginTop: 14
+        marginTop: 14,
+        fontSize: 13 + fz
       })
     }, "\u{1F3AF}", " Quiz This Topic")) : Object.entries(cardCats).map(function (e) {
       return /*#__PURE__*/React.createElement("div", {
@@ -4045,7 +4049,10 @@ function Game(_ref2) {
         }, c.name));
       })));
     }), /*#__PURE__*/React.createElement("button", {
-      style: S.btn,
+      style: {
+        ...S.btn,
+        fontSize: 13 + fz
+      },
       onClick: function () {
         startGame(gm, selCats);
       }
@@ -4108,7 +4115,10 @@ function Game(_ref2) {
       onClick: function () {
         setPaused(false);
       },
-      style: S.btn
+      style: {
+        ...S.btn,
+        fontSize: 13 + fz
+      }
     }, "Resume"))));
     return /*#__PURE__*/React.createElement("div", {
       style: Object.assign({}, S.c, {
@@ -4520,7 +4530,10 @@ function Game(_ref2) {
       }
     }, "\u{1F4A1}", " ", q.mn), /*#__PURE__*/React.createElement("button", {
       onClick: nextQ,
-      style: S.btn
+      style: {
+        ...S.btn,
+        fontSize: 13 + fz
+      }
     }, answeredCount >= totalCount ? "See Results" : "Next")), !isMatch && /*#__PURE__*/React.createElement("div", {
       style: {
         maxWidth: 640,
@@ -4780,7 +4793,10 @@ function Game(_ref2) {
       }
     }, "\u{1F4A1}", " ", q.mn), /*#__PURE__*/React.createElement("button", {
       onClick: nextQ,
-      style: S.btn
+      style: {
+        ...S.btn,
+        fontSize: 13 + fz
+      }
     }, answeredCount >= totalCount ? "See Results" : "Next"))));
   }
 
@@ -4975,7 +4991,8 @@ function Game(_ref2) {
     }, /*#__PURE__*/React.createElement("button", {
       style: Object.assign({}, S.btn, {
         width: "auto",
-        padding: "11px 18px"
+        padding: "11px 18px",
+        fontSize: 13 + fz
       }),
       onClick: function () {
         startGame(gm, selCats, selTag);
@@ -5105,7 +5122,7 @@ const S = {
     background: "linear-gradient(135deg,#667eea,#764ba2)",
     color: "#fff",
     borderRadius: 10,
-    fontSize: 13 + fz,
+    fontSize: 13,
     fontWeight: 700,
     letterSpacing: 1
   },
