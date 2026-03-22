@@ -2696,7 +2696,7 @@ function Game(_ref2) {
         color: TC.dim,
         letterSpacing: 2
       }
-    }, "v12 ", "\u2022", " SIMS ", "\u2022", " MISTAKES ", "\u2022", " INTERLEAVE")), dayStreak >= 1 && /*#__PURE__*/React.createElement("div", {
+    }, "v12 ", "\u2022", " MODULES ", "\u2022", " POE ", "\u2022", " PATTERNS")), dayStreak >= 1 && /*#__PURE__*/React.createElement("div", {
       style: {
         marginBottom: 12,
         padding: "10px 14px",
@@ -3016,7 +3016,7 @@ function Game(_ref2) {
         border: "1px solid rgba(251,191,36,.25)",
         color: "#fbbf24"
       }
-    }, "\u{1F3AF}", " Weak topics")), function () {
+    }, "\u{1F3AF}", " Weak topics"), function () {
       // Count POE mistakes
       var poeCount = 0;
       Object.keys(data.questionStats || {}).forEach(function (qid) {
@@ -3027,10 +3027,10 @@ function Game(_ref2) {
         onClick: function () { startGame("POE_TRAINER", []); },
         style: { padding: "6px 10px", borderRadius: 8, fontSize: 10, fontWeight: 600, background: "rgba(248,113,113,.08)", border: "1px solid rgba(248,113,113,.2)", color: "#f87171" }
       }, "\u2702\uFE0F ", poeCount, " POE mistakes") : null;
-    }(), /*#__PURE__*/React.createElement("button", {
+    }(), daysSinceCars >= 2 ? /*#__PURE__*/React.createElement("button", {
       onClick: function () { startGame("CARS_SPEED", []); },
       style: { padding: "6px 10px", borderRadius: 8, fontSize: 10, fontWeight: 600, background: "rgba(155,93,229,.08)", border: "1px solid rgba(155,93,229,.2)", color: "#9b5de5" }
-    }, "\u{1F4D6}\u23F1\uFE0F CARS Speed")),
+    }, "\u{1F4D6}\u23F1 Speed Read") : null)),
     // Error Pattern Notification Card
     function () {
       var hpats = getErrorPatterns(data);
