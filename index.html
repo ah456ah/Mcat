@@ -14,14 +14,13 @@ html,body,#root{min-height:100%;width:100%;background:#0f0f14;color:#e8e6e3;over
 body{font-family:'SF Mono','Menlo','Fira Code',monospace;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
 button{font-family:inherit;-webkit-tap-highlight-color:transparent;cursor:pointer;outline:none;border:none;background:none;color:inherit}
 button:active{opacity:.85}
-::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:2px}
-.passage-box{padding:14px;background:rgba(102,126,234,0.06);border:1px solid rgba(102,126,234,0.15);border-radius:10px;margin-bottom:14px;font-size:12px;line-height:1.7;color:#bbb}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:rgba(128,128,128,.3);border-radius:2px}
 .conf-bar{display:flex;gap:6px;margin:10px 0}
-.conf-btn{flex:1;padding:10px 6px;border-radius:8px;font-size:inherit;font-weight:600;text-align:center;border:1.5px solid rgba(255,255,255,.1);background:rgba(255,255,255,.03)}
-.conf-btn:active{border-color:#667eea;background:rgba(102,126,234,.15)}
+.conf-btn{flex:1;padding:10px 6px;border-radius:8px;font-size:inherit;font-weight:600;text-align:center;border:1.5px solid var(--conf-border,rgba(255,255,255,.1));background:var(--conf-bg,rgba(255,255,255,.03));color:var(--conf-color,#e8e6e3)}
+.conf-btn:active{border-color:var(--conf-active-border,#667eea);background:var(--conf-active-bg,rgba(102,126,234,.15))}
 table{font-size:inherit}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-@keyframes fG{0%,100%{background:#0f0f14}50%{background:#0a2e0a}}
+@keyframes fG{0%,100%{background:transparent}50%{background:rgba(74,222,128,.08)}}
 @keyframes sS{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
 @keyframes pu{0%,100%{opacity:1}50%{opacity:.5}}
 @keyframes sU{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
@@ -29,6 +28,7 @@ table{font-size:inherit}
 @keyframes fI{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
 @keyframes gI{from{transform:scale(0);opacity:0}to{transform:scale(1);opacity:1}}
 </style>
+<script>try{var k=Object.keys(localStorage).find(function(k){return k.match(/^\d{4,}$/)});if(k){var d=JSON.parse(localStorage.getItem(k));if(d&&d.theme==="light"){document.documentElement.style.background="#fafafa";document.body&&(document.body.style.background="#fafafa")}}}catch(e){}</script>
 </head>
 <body>
 <div id="root"><div style="display:flex;align-items:center;justify-content:center;min-height:100vh"><div style="text-align:center"><div style="font-size:48px;animation:pulse 1.5s infinite">&#x1F9EC;</div><div style="font-size:12px;color:#555;margin-top:10px">Loading...</div></div></div></div>

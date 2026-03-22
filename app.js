@@ -1292,6 +1292,25 @@ function Game(_ref2) {
     dim: isDark ? "#555" : "#999",
     card: isDark ? "rgba(255,255,255,.04)" : "rgba(0,0,0,.04)"
   };
+  document.body.style.background = bg;
+  var metaTC = document.querySelector("meta[name=theme-color]"); if(metaTC) metaTC.content = bg;
+  document.body.style.color = fg;
+  document.documentElement.style.background = bg;
+  document.body.style.setProperty("--conf-border", isDark ? "rgba(255,255,255,.1)" : "rgba(0,0,0,.12)");
+  document.body.style.setProperty("--conf-bg", isDark ? "rgba(255,255,255,.03)" : "rgba(0,0,0,.03)");
+  document.body.style.setProperty("--conf-color", fg);
+  document.body.style.setProperty("--conf-active-border", "#667eea");
+  document.body.style.setProperty("--conf-active-bg", "rgba(102,126,234,.15)");
+  var TS = {
+    sv: Object.assign({}, S.sv, {color: fg}),
+    sl: Object.assign({}, S.sl, {color: TC.dim}),
+    stt: Object.assign({}, S.stt, {color: TC.dim}),
+    bk: Object.assign({}, S.bk, {color: TC.muted}),
+    dv: Object.assign({}, S.dv, {background: TC.cbr}),
+    sln: Object.assign({}, S.sln, {background: TC.cbr}),
+    sb: Object.assign({}, S.sb, {background: TC.card, border: "1px solid " + TC.cbr}),
+    mc: Object.assign({}, S.mc, {background: TC.card, border: "1px solid " + TC.cbr, color: fg})
+  };
   function startGame(mode, cats, tag) {
     var pool;
     if (MODES[mode].smart) {
@@ -1867,7 +1886,7 @@ function Game(_ref2) {
       style: S.i
     }, /*#__PURE__*/React.createElement("button", {
       style: {
-        ...S.bk,
+        ...TS.bk,
         color: TC.muted
       },
       onClick: function () {
@@ -1887,13 +1906,13 @@ function Game(_ref2) {
       style: {
         fontSize: 20,
         fontWeight: 800,
-        color: "#fff",
+        color: fg,
         margin: "8px 0 4px"
       }
     }, cardTag), /*#__PURE__*/React.createElement("p", {
       style: {
         fontSize: 11,
-        color: "#888"
+        color: TC.muted
       }
     }, "Review these key concepts before quizzing")), cardData ? /*#__PURE__*/React.createElement("div", {
       style: {
@@ -1925,7 +1944,7 @@ function Game(_ref2) {
       style: {
         padding: 20,
         textAlign: "center",
-        color: "#555"
+        color: TC.dim
       }
     }, "No concept card for this tag yet."), /*#__PURE__*/React.createElement("button", {
       onClick: launchAfterCard,
@@ -1954,7 +1973,7 @@ function Game(_ref2) {
       style: S.i
     }, /*#__PURE__*/React.createElement("button", {
       style: {
-        ...S.bk,
+        ...TS.bk,
         color: TC.muted
       },
       onClick: function () {
@@ -2038,17 +2057,17 @@ function Game(_ref2) {
         style: S.sh
       }, /*#__PURE__*/React.createElement("span", {
         style: {
-          ...S.sln,
+          ...TS.sln,
           background: TC.sbg
         }
       }), /*#__PURE__*/React.createElement("span", {
         style: {
-          ...S.stt,
+          ...TS.stt,
           color: TC.dim
         }
       }, e[0].toUpperCase()), /*#__PURE__*/React.createElement("span", {
         style: {
-          ...S.sln,
+          ...TS.sln,
           background: TC.sbg
         }
       })), /*#__PURE__*/React.createElement("div", {
@@ -2199,7 +2218,7 @@ function Game(_ref2) {
         cy: "28",
         r: "24",
         fill: "none",
-        stroke: "rgba(255,255,255,.08)",
+        stroke: isDark ? "rgba(255,255,255,.08)" : "rgba(0,0,0,.08)",
         strokeWidth: "4"
       }), /*#__PURE__*/React.createElement("circle", {
         cx: "28",
@@ -2227,7 +2246,7 @@ function Game(_ref2) {
           justifyContent: "center",
           fontSize: 10,
           fontWeight: 800,
-          color: hitGoal ? "#4ade80" : "#fff"
+          color: hitGoal ? "#4ade80" : fg
         }
       }, wpct, "%")), /*#__PURE__*/React.createElement("div", {
         style: {
@@ -2237,12 +2256,12 @@ function Game(_ref2) {
         style: {
           fontSize: 11,
           fontWeight: 700,
-          color: hitGoal ? "#4ade80" : "#fff"
+          color: hitGoal ? "#4ade80" : fg
         }
       }, hitGoal ? "\u{1F389} Goal hit!" : "Weekly: " + wq + "/" + wg + " Qs"), /*#__PURE__*/React.createElement("div", {
         style: {
           fontSize: 9,
-          color: "#666",
+          color: TC.dim,
           marginTop: 2
         }
       }, "Today: ", stToday, "min ", "\u2022", " Week: ", stWeek)), /*#__PURE__*/React.createElement("button", {
@@ -2267,7 +2286,7 @@ function Game(_ref2) {
       }, "Edit"));
     }(), /*#__PURE__*/React.createElement("div", {
       style: {
-        ...S.sb,
+        ...TS.sb,
         background: TC.sbg,
         border: "1px solid " + TC.cbr
       }
@@ -2275,63 +2294,63 @@ function Game(_ref2) {
       style: S.si
     }, /*#__PURE__*/React.createElement("span", {
       style: {
-        ...S.sv,
+        ...TS.sv,
         color: fg
       }
     }, rank.b, " ", rank.name), /*#__PURE__*/React.createElement("span", {
       style: {
-        ...S.sl,
+        ...TS.sl,
         color: TC.dim
       }
     }, "Rank")), /*#__PURE__*/React.createElement("div", {
       style: {
-        ...S.dv,
+        ...TS.dv,
         background: TC.sbg
       }
     }), /*#__PURE__*/React.createElement("div", {
       style: S.si
     }, /*#__PURE__*/React.createElement("span", {
       style: {
-        ...S.sv,
+        ...TS.sv,
         color: fg
       }
     }, data.xp), /*#__PURE__*/React.createElement("span", {
       style: {
-        ...S.sl,
+        ...TS.sl,
         color: TC.dim
       }
     }, "XP")), /*#__PURE__*/React.createElement("div", {
       style: {
-        ...S.dv,
+        ...TS.dv,
         background: TC.sbg
       }
     }), /*#__PURE__*/React.createElement("div", {
       style: S.si
     }, /*#__PURE__*/React.createElement("span", {
       style: {
-        ...S.sv,
+        ...TS.sv,
         color: fg
       }
     }, acc, "%"), /*#__PURE__*/React.createElement("span", {
       style: {
-        ...S.sl,
+        ...TS.sl,
         color: TC.dim
       }
     }, "Accuracy")), /*#__PURE__*/React.createElement("div", {
       style: {
-        ...S.dv,
+        ...TS.dv,
         background: TC.sbg
       }
     }), /*#__PURE__*/React.createElement("div", {
       style: S.si
     }, /*#__PURE__*/React.createElement("span", {
       style: {
-        ...S.sv,
+        ...TS.sv,
         color: fg
       }
     }, data.totalAnswered), /*#__PURE__*/React.createElement("span", {
       style: {
-        ...S.sl,
+        ...TS.sl,
         color: TC.dim
       }
     }, "Answered"))), nr && /*#__PURE__*/React.createElement("div", {
@@ -2357,7 +2376,7 @@ function Game(_ref2) {
     })), /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 10,
-        color: "#555"
+        color: TC.dim
       }
     }, nr.min - data.xp, " XP to ", nr.b, " ", nr.name)), dueC > 0 && /*#__PURE__*/React.createElement("button", {
       onClick: function () {
@@ -2532,17 +2551,17 @@ function Game(_ref2) {
       style: S.sh
     }, /*#__PURE__*/React.createElement("span", {
       style: {
-        ...S.sln,
+        ...TS.sln,
         background: TC.sbg
       }
     }), /*#__PURE__*/React.createElement("span", {
       style: {
-        ...S.stt,
+        ...TS.stt,
         color: TC.dim
       }
     }, "MASTERY"), /*#__PURE__*/React.createElement("span", {
       style: {
-        ...S.sln,
+        ...TS.sln,
         background: TC.sbg
       }
     })), /*#__PURE__*/React.createElement("div", {
@@ -2616,17 +2635,17 @@ function Game(_ref2) {
       }
     }, /*#__PURE__*/React.createElement("span", {
       style: {
-        ...S.sln,
+        ...TS.sln,
         background: TC.sbg
       }
     }), /*#__PURE__*/React.createElement("span", {
       style: {
-        ...S.stt,
+        ...TS.stt,
         color: TC.dim
       }
     }, "GAME MODES"), /*#__PURE__*/React.createElement("span", {
       style: {
-        ...S.sln,
+        ...TS.sln,
         background: TC.sbg
       }
     })), /*#__PURE__*/React.createElement("div", {
@@ -2640,7 +2659,7 @@ function Game(_ref2) {
       return /*#__PURE__*/React.createElement("button", {
         key: k,
         style: {
-          ...S.mc,
+          ...TS.mc,
           background: TC.card,
           border: "1px solid " + TC.cbr
         },
@@ -2664,24 +2683,24 @@ function Game(_ref2) {
       }, MODES[k].name), /*#__PURE__*/React.createElement("span", {
         style: {
           fontSize: 10,
-          color: "#666"
+          color: TC.dim
         }
       }, MODES[k].desc)));
     })), /*#__PURE__*/React.createElement("div", {
       style: S.sh
     }, /*#__PURE__*/React.createElement("span", {
       style: {
-        ...S.sln,
+        ...TS.sln,
         background: TC.sbg
       }
     }), /*#__PURE__*/React.createElement("span", {
       style: {
-        ...S.stt,
+        ...TS.stt,
         color: TC.dim
       }
     }, "SMART PRACTICE"), /*#__PURE__*/React.createElement("span", {
       style: {
-        ...S.sln,
+        ...TS.sln,
         background: TC.sbg
       }
     })), /*#__PURE__*/React.createElement("div", {
@@ -2736,7 +2755,7 @@ function Game(_ref2) {
     }].map(function (x) {
       return /*#__PURE__*/React.createElement("button", {
         key: x.k,
-        style: Object.assign({}, S.mc, {
+        style: Object.assign({}, TS.mc, {
           background: TC.card,
           border: "1px solid " + TC.cbr,
           opacity: x.n ? 1 : .4
@@ -2801,7 +2820,7 @@ function Game(_ref2) {
     }, /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 9,
-        color: "#444"
+        color: TC.dim
       }
     }, QS.length, " Qs ", "\u2022", " ", ALL_TAGS.length, " tags ", "\u2022", " ", newC, " unseen"))));
   }
@@ -2824,7 +2843,7 @@ function Game(_ref2) {
       style: S.i
     }, /*#__PURE__*/React.createElement("button", {
       style: {
-        ...S.bk,
+        ...TS.bk,
         color: TC.muted
       },
       onClick: function () {
@@ -2870,13 +2889,13 @@ function Game(_ref2) {
         correct: 0
       };
       var pct = info.seen > 0 ? Math.round(info.correct / info.seen * 100) : null;
-      var c = pct === null ? "#555" : pct >= 80 ? "#4ade80" : pct >= 60 ? "#fbbf24" : "#f87171";
+      var c = pct === null ? TC.dim : pct >= 80 ? "#4ade80" : pct >= 60 ? "#fbbf24" : "#f87171";
       var tier = getTagTier(data, tag);
       var stars = tier.tier >= 3 ? "\u2B50\u2B50\u2B50" : tier.tier >= 2 ? "\u2B50\u2B50" : tier.tier >= 1 ? "\u2B50" : "";
       var hasCard = typeof CARDS !== "undefined" && !!CARDS[tag];
       var trend = getTagTrend(data, tag);
       var trendIcon = trend === "up" ? "\u2191" : trend === "down" ? "\u2193" : trend === "flat" ? "\u2192" : "";
-      var trendColor = trend === "up" ? "#4ade80" : trend === "down" ? "#f87171" : "#888";
+      var trendColor = trend === "up" ? "#4ade80" : trend === "down" ? "#f87171" : TC.muted;
       var isHY = hySet.indexOf(tag) >= 0;
       return /*#__PURE__*/React.createElement("button", {
         key: tag,
@@ -2890,8 +2909,8 @@ function Game(_ref2) {
           borderRadius: 16,
           fontSize: 11,
           fontWeight: 600,
-          border: "1px solid " + (isHY ? "rgba(255,200,50,.3)" : "rgba(255,255,255,.1)"),
-          background: isHY ? "rgba(255,200,50,.06)" : "rgba(255,255,255,.04)",
+          border: "1px solid " + (isHY ? "rgba(255,200,50,.3)" : TC.cbr),
+          background: isHY ? "rgba(255,200,50,.06)" : TC.card,
           color: fg
         }
       }, isHY && /*#__PURE__*/React.createElement("span", {
@@ -2938,7 +2957,7 @@ function Game(_ref2) {
       style: S.i
     }, /*#__PURE__*/React.createElement("button", {
       style: {
-        ...S.bk,
+        ...TS.bk,
         color: TC.muted
       },
       onClick: function () {
@@ -2966,7 +2985,7 @@ function Game(_ref2) {
       }
     }, secs.map(function (sec) {
       var a = getSectionAcc(data, sec);
-      var c = a >= 80 ? "#4ade80" : a >= 60 ? "#fbbf24" : a !== null ? "#f87171" : "#555";
+      var c = a >= 80 ? "#4ade80" : a >= 60 ? "#fbbf24" : a !== null ? "#f87171" : TC.dim;
       return /*#__PURE__*/React.createElement("button", {
         key: sec,
         onClick: function () {
@@ -3033,7 +3052,7 @@ function Game(_ref2) {
       style: S.i
     }, /*#__PURE__*/React.createElement("button", {
       style: {
-        ...S.bk,
+        ...TS.bk,
         color: TC.muted
       },
       onClick: function () {
@@ -3095,7 +3114,7 @@ function Game(_ref2) {
     }, "pKa"), /*#__PURE__*/React.createElement("th", {
       style: thStyle
     }, "Notes"))), /*#__PURE__*/React.createElement("tbody", null, R.aminoAcids.map(function (aa, i) {
-      var tc2 = aa.type === "Positive" ? "#4ade80" : aa.type === "Negative" ? "#f87171" : aa.type === "Polar" ? "#60a5fa" : "#888";
+      var tc2 = aa.type === "Positive" ? "#4ade80" : aa.type === "Negative" ? "#f87171" : aa.type === "Polar" ? "#60a5fa" : TC.muted;
       return /*#__PURE__*/React.createElement("tr", {
         key: i
       }, /*#__PURE__*/React.createElement("td", {
@@ -3309,7 +3328,7 @@ function Game(_ref2) {
       style: S.i
     }, /*#__PURE__*/React.createElement("button", {
       style: {
-        ...S.bk,
+        ...TS.bk,
         color: TC.muted
       },
       onClick: function () {
@@ -3422,34 +3441,34 @@ function Game(_ref2) {
       style: {
         fontSize: 14,
         fontWeight: 800,
-        color: "#fff"
+        color: fg
       }
     }, getStudyToday(data), "m"), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 8,
-        color: "#555"
+        color: TC.dim
       }
     }, "Today")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 14,
         fontWeight: 800,
-        color: "#fff"
+        color: fg
       }
     }, fmtTime(getStudyWeek(data))), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 8,
-        color: "#555"
+        color: TC.dim
       }
     }, "This Week")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 14,
         fontWeight: 800,
-        color: "#fff"
+        color: fg
       }
     }, fmtTime(getStudyTotal(data))), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 8,
-        color: "#555"
+        color: TC.dim
       }
     }, "Total")))), trend.length > 1 && /*#__PURE__*/React.createElement("div", {
       style: {
@@ -3542,7 +3561,7 @@ function Game(_ref2) {
         style: {
           fontSize: 12,
           fontWeight: 800,
-          color: c.pct != null ? c.pct >= 80 ? "#4ade80" : c.pct >= 60 ? "#fbbf24" : "#f87171" : "#555"
+          color: c.pct != null ? c.pct >= 80 ? "#4ade80" : c.pct >= 60 ? "#fbbf24" : "#f87171" : TC.dim
         }
       }, c.pct != null ? c.pct + "%" : "\u2014")), /*#__PURE__*/React.createElement("div", {
         style: {
@@ -3593,7 +3612,7 @@ function Game(_ref2) {
       style: {
         fontSize: 18,
         fontWeight: 800,
-        color: "#fff"
+        color: fg
       }
     }, fmtTime(getStudyWeek(data)))), Object.entries(CATS).map(function (e) {
       var k = e[0],
@@ -3657,7 +3676,7 @@ function Game(_ref2) {
           top: 0,
           width: 1,
           height: 4,
-          background: "rgba(255,255,255,.3)"
+          background: isDark ? "rgba(255,255,255,.3)" : "rgba(0,0,0,.2)"
         }
       }), /*#__PURE__*/React.createElement("div", {
         style: {
@@ -3675,7 +3694,7 @@ function Game(_ref2) {
       }, t.count, " Qs ", "\u2022", " 95s target (white line)"));
     }).filter(Boolean), !Object.keys(ct).length && /*#__PURE__*/React.createElement("div", {
       style: {
-        color: "#555",
+        color: TC.dim,
         fontSize: 12,
         textAlign: "center",
         padding: 30
@@ -3691,7 +3710,7 @@ function Game(_ref2) {
       style: {
         padding: 20,
         textAlign: "center",
-        color: "#555",
+        color: TC.dim,
         fontSize: 12
       }
     }, "Answer at least 50 questions to see a score prediction.", "\n", "Currently: ", data.totalAnswered, "/50") : /*#__PURE__*/React.createElement("div", null, ["Bio/Biochem", "Chem/Phys", "Psych/Soc", "CARS"].map(function (sec) {
@@ -3722,7 +3741,7 @@ function Game(_ref2) {
         style: {
           fontSize: 12,
           fontWeight: 700,
-          color: "#fff"
+          color: fg
         }
       }, sec), /*#__PURE__*/React.createElement("div", {
         style: {
@@ -3743,7 +3762,7 @@ function Game(_ref2) {
       }, a !== null ? a + "%" : "--"), p && /*#__PURE__*/React.createElement("div", {
         style: {
           fontSize: 10,
-          color: "#888"
+          color: TC.muted
         }
       }, p.low, "-", p.high))));
     }), function () {
@@ -3760,25 +3779,25 @@ function Game(_ref2) {
       }, /*#__PURE__*/React.createElement("div", {
         style: {
           fontSize: 10,
-          color: "#888",
+          color: TC.muted,
           marginBottom: 4
         }
       }, "Estimated Total Score"), /*#__PURE__*/React.createElement("div", {
         style: {
           fontSize: 28,
           fontWeight: 900,
-          color: "#fff"
+          color: fg
         }
       }, tp, /*#__PURE__*/React.createElement("span", {
         style: {
           fontSize: 14,
-          color: "#555"
+          color: TC.dim
         }
       }, "/528"))) : null;
     }(), /*#__PURE__*/React.createElement("p", {
       style: {
         fontSize: 9,
-        color: "#555",
+        color: TC.dim,
         marginTop: 10,
         textAlign: "center",
         lineHeight: 1.4
@@ -3800,8 +3819,8 @@ function Game(_ref2) {
         key: b.id,
         style: {
           padding: 10,
-          background: b.done ? "rgba(74,222,128,.06)" : "rgba(255,255,255,.02)",
-          border: "1px solid " + (b.done ? "rgba(74,222,128,.2)" : "rgba(255,255,255,.06)"),
+          background: b.done ? "rgba(74,222,128,.06)" : TC.sbg,
+          border: "1px solid " + (b.done ? "rgba(74,222,128,.2)" : TC.cbr),
           borderRadius: 10,
           opacity: b.done ? 1 : .5
         }
@@ -3814,12 +3833,12 @@ function Game(_ref2) {
         style: {
           fontSize: 11,
           fontWeight: 700,
-          color: b.done ? "#4ade80" : "#555"
+          color: b.done ? "#4ade80" : TC.dim
         }
       }, b.name), /*#__PURE__*/React.createElement("div", {
         style: {
           fontSize: 9,
-          color: b.done ? "#888" : "#444",
+          color: b.done ? TC.muted : TC.dim,
           marginTop: 2
         }
       }, b.desc), b.done && /*#__PURE__*/React.createElement("div", {
@@ -3904,7 +3923,7 @@ function Game(_ref2) {
       }, co, "/", t));
     })), sTab === "history" && /*#__PURE__*/React.createElement("div", null, !rec.length ? /*#__PURE__*/React.createElement("div", {
       style: {
-        color: "#555",
+        color: TC.dim,
         fontSize: 12,
         textAlign: "center",
         padding: 30
@@ -3982,7 +4001,7 @@ function Game(_ref2) {
       style: S.i
     }, /*#__PURE__*/React.createElement("button", {
       style: {
-        ...S.bk,
+        ...TS.bk,
         color: TC.muted
       },
       onClick: function () {
@@ -4338,7 +4357,7 @@ function Game(_ref2) {
           fontSize: 8 + fz,
           padding: "1px 6px",
           borderRadius: 10,
-          background: "rgba(255,255,255,.05)",
+          background: TC.sbg,
           color: TC.dim
         }
       }, t);
@@ -4428,10 +4447,10 @@ function Game(_ref2) {
           borderRadius: 8,
           fontSize: 11 + fz,
           textAlign: "left",
-          border: "1.5px solid " + (selected ? "#667eea" : done ? "rgba(74,222,128,.3)" : "rgba(255,255,255,.1)"),
-          background: selected ? "rgba(102,126,234,.15)" : done ? "rgba(74,222,128,.08)" : "rgba(255,255,255,.04)",
+          border: "1.5px solid " + (selected ? "#667eea" : done ? "rgba(74,222,128,.3)" : TC.cbr),
+          background: selected ? "rgba(102,126,234,.15)" : done ? "rgba(74,222,128,.08)" : TC.card,
           opacity: done ? .5 : 1,
-          color: "#fff",
+          color: fg,
           fontWeight: 600
         }
       }, p[0]);
@@ -4456,10 +4475,10 @@ function Game(_ref2) {
           borderRadius: 8,
           fontSize: 11 + fz,
           textAlign: "left",
-          border: "1.5px solid " + (used ? "rgba(255,255,255,.05)" : "rgba(255,255,255,.1)"),
-          background: used ? "rgba(255,255,255,.02)" : "rgba(255,255,255,.04)",
+          border: "1.5px solid " + (used ? TC.cbr : TC.cbr),
+          background: used ? TC.sbg : TC.card,
           opacity: used ? .4 : 1,
-          color: used ? "#666" : "#ccc"
+          color: used ? TC.dim : TC.muted
         }
       }, r);
     })))), isMatch && sr && /*#__PURE__*/React.createElement("div", {
@@ -4760,7 +4779,7 @@ function Game(_ref2) {
         key: i,
         style: {
           padding: "8px 12px",
-          background: isUserPick ? "rgba(248,113,113,.08)" : "rgba(255,255,255,.02)",
+          background: isUserPick ? "rgba(248,113,113,.08)" : TC.sbg,
           border: "1px solid " + (isUserPick ? "rgba(248,113,113,.2)" : TC.cbr),
           borderRadius: 8,
           marginBottom: 4
@@ -4926,8 +4945,8 @@ function Game(_ref2) {
         key: i,
         style: {
           padding: 9,
-          background: "rgba(255,255,255,.04)",
-          border: "1px solid rgba(255,255,255,.06)",
+          background: TC.card,
+          border: "1px solid " + TC.cbr,
           borderRadius: 8,
           marginBottom: 5
         }
@@ -5003,12 +5022,12 @@ function Game(_ref2) {
       },
       style: {
         padding: "11px 18px",
-        background: "rgba(255,255,255,.06)",
-        border: "1px solid rgba(255,255,255,.1)",
+        background: TC.sbg,
+        border: "1px solid " + TC.cbr,
         borderRadius: 10,
         fontSize: 12,
         fontWeight: 700,
-        color: "#aaa"
+        color: TC.muted
       }
     }, "Home"))));
   }
