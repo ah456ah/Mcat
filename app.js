@@ -1440,6 +1440,7 @@ function Game(_ref2) {
   var metaTC = document.querySelector("meta[name=theme-color]"); if(metaTC) metaTC.content = bg;
   document.body.style.color = fg;
   document.documentElement.style.background = bg;
+  var rootEl = document.getElementById("root"); if (rootEl) rootEl.style.background = bg;
   document.body.style.setProperty("--conf-border", isDark ? "rgba(255,255,255,.1)" : "rgba(0,0,0,.12)");
   document.body.style.setProperty("--conf-bg", isDark ? "rgba(255,255,255,.03)" : "rgba(0,0,0,.03)");
   document.body.style.setProperty("--conf-color", fg);
@@ -2183,7 +2184,7 @@ function Game(_ref2) {
       cardCats[sec].push(tag);
     });
     return /*#__PURE__*/React.createElement("div", {
-      style: S.c
+      style: {...S.c, background: bg, color: fg}
     }, /*#__PURE__*/React.createElement("div", {
       style: S.i
     }, /*#__PURE__*/React.createElement("button", {
@@ -2770,7 +2771,23 @@ function Game(_ref2) {
         fontWeight: 700,
         color: "#4ade80"
       }
-    }, "\u{1F4CB}", " Reference"), /*#__PURE__*/React.createElement("button", { onClick: function() { setScr("mistakes"); }, style: { flex: 1, padding: "12px 8px", background: TC.card, border: "1px solid " + TC.cbr, borderRadius: 10, textAlign: "center", fontSize: 12 + fz, fontWeight: 600, color: fg } }, "\u{1F4D3}", " Mistakes", getMistakeLog(data).length > 0 ? " (" + getMistakeLog(data).length + ")" : ""))), /*#__PURE__*/React.createElement("div", {
+    }, "\u{1F4CB}", " Reference")), /*#__PURE__*/React.createElement("button", {
+      onClick: function () { setScr("mistakes"); },
+      style: {
+        flex: 1,
+        padding: 12,
+        background: "rgba(248,113,113,.06)",
+        border: "1px solid rgba(248,113,113,.15)",
+        borderRadius: 12,
+        textAlign: "center"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 12,
+        fontWeight: 700,
+        color: "#f87171"
+      }
+    }, "\u{1F4D3}", " Mistakes", getMistakeLog(data).length > 0 ? " (" + getMistakeLog(data).length + ")" : ""))), /*#__PURE__*/React.createElement("div", {
       style: {
         marginBottom: 14
       }
@@ -3067,7 +3084,7 @@ function Game(_ref2) {
       return a.localeCompare(b);
     });
     return /*#__PURE__*/React.createElement("div", {
-      style: S.c
+      style: {...S.c, background: bg, color: fg}
     }, /*#__PURE__*/React.createElement("div", {
       style: S.i
     }, /*#__PURE__*/React.createElement("button", {
@@ -3610,7 +3627,7 @@ function Game(_ref2) {
       return b.done;
     }).length;
     return /*#__PURE__*/React.createElement("div", {
-      style: S.c
+      style: {...S.c, background: bg, color: fg}
     }, /*#__PURE__*/React.createElement(SB, null), /*#__PURE__*/React.createElement("div", {
       style: S.i
     }, /*#__PURE__*/React.createElement("button", {
@@ -4357,7 +4374,7 @@ function Game(_ref2) {
       }, e[1]));
     });
     return /*#__PURE__*/React.createElement("div", {
-      style: S.c
+      style: {...S.c, background: bg, color: fg}
     }, /*#__PURE__*/React.createElement(SB, null), /*#__PURE__*/React.createElement("div", {
       style: S.i
     }, /*#__PURE__*/React.createElement("button", {
