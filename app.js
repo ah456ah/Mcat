@@ -181,7 +181,7 @@ const MODES = {
   INTERLEAVED: {
     name: "Interleaved",
     icon: "\u{1F500}",
-    desc: "Random mix, all topics",
+    desc: "Weakest topics, mixed",
     time: null,
     smart: true
   },
@@ -223,7 +223,7 @@ const MODES = {
   SECTION_SIM: {
     name: "Section Sim",
     icon: "\u{1F3AF}",
-    desc: "20 Qs, 30 min, one MCAT section",
+    desc: "Full section, timed, no feedback",
     time: null,
     smart: true
   },
@@ -368,7 +368,11 @@ const DD = {
   weeklyGoal: 100,
   weeklyProgress: {},
   theme: "dark",
-  fontSize: 0
+  fontSize: 0,
+  thinkFirst: false,
+  elimUsed: 0,
+  simHistory: [],
+  mistakeLog: []
 };
 function getCatAcc(d, cat) {
   var qs = QS.filter(function (q) {
@@ -432,41 +436,50 @@ function getSectionAcc(data, sec) {
 }
 function predictScore(pct) {
   if (pct === null) return null;
-  if (pct >= 90) return {
-    low: 130,
-    high: 132
-  };
-  if (pct >= 80) return {
-    low: 127,
-    high: 129
-  };
-  if (pct >= 70) return {
-    low: 125,
-    high: 127
-  };
-  if (pct >= 60) return {
-    low: 123,
-    high: 125
-  };
-  return {
-    low: 118,
-    high: 122
-  };
+  // Refined mapping with confidence intervals
+  if (pct >= 92) return { low: 131, high: 132 };
+  if (pct >= 85) return { low: 129, high: 131 };
+  if (pct >= 78) return { low: 127, high: 129 };
+  if (pct >= 72) return { low: 125, high: 127 };
+  if (pct >= 65) return { low: 123, high: 125 };
+  if (pct >= 55) return { low: 121, high: 123 };
+  return { low: 118, high: 121 };
 }
 function getTotalPredicted(data) {
   var secs = ["Bio/Biochem", "Chem/Phys", "Psych/Soc", "CARS"];
-  var total = 0,
-    count = 0;
+  var total = 0, count = 0, lo = 0, hi = 0;
   secs.forEach(function (s) {
-    var a = getSectionAcc(data, s);
+    var a = getSectionAccEMA(data, s);
     if (a !== null) {
       var p = predictScore(a);
+      lo += p.low; hi += p.high;
       total += (p.low + p.high) / 2;
       count++;
     }
   });
   if (count < 4) return null;
-  return Math.round(total);
+  return { mid: Math.round(total), low: lo, high: hi };
+}
+function getSectionAccEMA(data, sec) {
+  // Exponential moving average: weight recent performance more heavily
+  var secCats = Object.keys(CATS).filter(function(k){return CATS[k].sec === sec;});
+  var qs2 = QS.filter(function(q){return secCats.indexOf(q.cat) >= 0;});
+  // Get all answered questions with timestamps, sorted by recency
+  var answered = [];
+  qs2.forEach(function(q) {
+    var st = data.questionStats[q.id];
+    if (st && st.seen > 0) answered.push({ correct: st.correct, seen: st.seen, last: st.lastSeen || 0 });
+  });
+  if (answered.length === 0) return null;
+  // Weight recent questions more: last 20 get weight 2, rest get weight 1
+  answered.sort(function(a,b){return b.last - a.last;});
+  var wCorrect = 0, wTotal = 0;
+  answered.forEach(function(a, i) {
+    var w = i < 20 ? 2 : 1;
+    wCorrect += (a.correct / a.seen) * w;
+    wTotal += w;
+  });
+  return Math.round((wCorrect / wTotal) * 100);
 }
 
 // === STUDY TIME ===
@@ -495,6 +508,84 @@ function getStudyTotal(data) {
     total += v;
   });
   return total;
+}
+
+// === MISTAKE & ERROR PATTERN ANALYSIS ===
+function getMistakeLog(data) { return (data.mistakeLog || []).slice(-200); }
+function getErrorPatterns(data) {
+  var log = getMistakeLog(data);
+  if (log.length < 5) return [];
+  var patterns = [];
+  // Pattern 1: Concept confusion - pairs of tags that co-occur in mistakes
+  var tagPairs = {};
+  log.forEach(function(m) {
+    var tags = m.tags || [];
+    for (var i = 0; i < tags.length; i++) {
+      for (var j = i+1; j < tags.length; j++) {
+        var key = [tags[i],tags[j]].sort().join('|');
+        tagPairs[key] = (tagPairs[key]||0) + 1;
+      }
+    }
+  });
+  Object.keys(tagPairs).forEach(function(k) {
+    if (tagPairs[k] >= 3) {
+      var parts = k.split('|');
+      patterns.push({type:'confusion', tags: parts, count: tagPairs[k], advice: 'You have confused ' + parts[0] + ' and ' + parts[1] + ' concepts ' + tagPairs[k] + ' times. Review how these topics differ.'});
+    }
+  });
+  // Pattern 2: Passage misreading - lower accuracy on passage vs standalone
+  var passWrong = log.filter(function(m){return m.isPassage;}).length;
+  var passTotal = log.length > 0 ? log.filter(function(m){return m.isPassage;}).length : 0;
+  var standWrong = log.filter(function(m){return !m.isPassage;}).length;
+  if (passWrong > standWrong * 1.5 && passWrong >= 5) {
+    patterns.push({type:'passage', count: passWrong, advice: 'You miss more passage-based questions (' + passWrong + ') than standalone. Practice reading passages more carefully before answering.'});
+  }
+  // Pattern 3: Category weaknesses
+  var catMistakes = {};
+  log.forEach(function(m) { catMistakes[m.cat] = (catMistakes[m.cat]||0) + 1; });
+  Object.keys(catMistakes).sort(function(a,b){return catMistakes[b]-catMistakes[a];}).slice(0,3).forEach(function(c) {
+    if (catMistakes[c] >= 4) {
+      patterns.push({type:'category', cat: c, count: catMistakes[c], advice: (CATS[c]||{}).name + ': ' + catMistakes[c] + ' mistakes. This is a weak area — prioritize review.'});
+    }
+  });
+  // Pattern 4: Overconfidence (from blind spots data)
+  var blindCount = getBlindSpotCount(data);
+  if (blindCount >= 3) {
+    patterns.push({type:'overconfidence', count: blindCount, advice: blindCount + ' blind spots detected (confident but wrong). Use elimination strategy and double-check answers you feel sure about.'});
+  }
+  return patterns.sort(function(a,b){return b.count - a.count;}).slice(0,5);
+}
+function getRecentAccuracy(data, section, n) {
+  // Get accuracy from last n sessions for a section
+  var hist = (data.sessionHistory || []).slice(-50);
+  var secHist = hist.filter(function(h) {
+    if (section === 'all') return true;
+    return h.mode && h.total > 0;
+  }).slice(-n);
+  return secHist.map(function(h) { return h.total > 0 ? Math.round(h.correct / h.total * 100) : null; }).filter(function(x){return x !== null;});
+}
+function buildSparkline(values, width, height, color) {
+  if (!values || values.length < 2) return '';
+  var min = Math.min.apply(null, values);
+  var max = Math.max.apply(null, values);
+  var range = max - min || 1;
+  var step = width / (values.length - 1);
+  var points = values.map(function(v, i) {
+    return Math.round(i * step) + ',' + Math.round(height - ((v - min) / range) * (height - 4) - 2);
+  }).join(' ');
+  return '<svg width="' + width + '" height="' + height + '" style="display:inline-block;vertical-align:middle"><polyline points="' + points + '" fill="none" stroke="' + color + '" stroke-width="1.5" stroke-linecap="round"/></svg>';
+}
+function buildHeatmap(studyTime, days) {
+  var cells = [];
+  var now = new Date();
+  for (var i = days - 1; i >= 0; i--) {
+    var d = new Date(now);
+    d.setDate(d.getDate() - i);
+    var key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    var mins = Math.round(((studyTime || {})[key] || 0) / 60);
+    cells.push({ key: key, mins: mins, day: d.getDate(), dow: d.getDay() });
+  }
+  return cells;
 }
 function fmtTime(secs) {
   var h = Math.floor(secs / 3600);
@@ -668,7 +759,7 @@ function exportStats(data) {
     lines.push(s + ": " + (a !== null ? a + "%" : "--") + (p ? " (est " + p.low + "-" + p.high + ")" : ""));
   });
   var tp = getTotalPredicted(data);
-  if (tp) lines.push("Estimated total: ~" + tp + "/528");
+  if (tp) lines.push("Estimated total: " + (typeof tp === "object" ? tp.low + "-" + tp.high : "~" + tp) + "/528");
   lines.push("");
   lines.push("Weak areas:");
   Object.keys(CATS).map(function (k) {
@@ -738,11 +829,25 @@ function getSmartPool(mode, data, selTag) {
       msg: "Play more!"
     };
   }
-  if (mode === "INTERLEAVED") return {
-    pool: QS.filter(function (q) {
-      return q.cat !== "CARS";
-    })
-  };
+  if (mode === "INTERLEAVED") {
+    // Pick 3-4 weakest categories (by accuracy) for deliberate interleaving
+    var catAccs = Object.keys(CATEGORIES).filter(function (c) { return c !== "CARS"; }).map(function (c) {
+      var a = getCatAcc(data, c);
+      return { cat: c, pct: a.pct !== null ? a.pct : 50, seen: a.seen };
+    }).sort(function (a, b) {
+      // Prioritize: lowest accuracy first, then least-seen
+      if (a.pct !== b.pct) return a.pct - b.pct;
+      return a.seen - b.seen;
+    });
+    // Take weakest 4 categories (or all if fewer)
+    var weakCats = catAccs.slice(0, Math.min(4, catAccs.length)).map(function (x) { return x.cat; });
+    // If user has < 10 total answers, include all categories for exposure
+    if ((data.totalAnswered || 0) < 10) {
+      weakCats = catAccs.map(function (x) { return x.cat; });
+    }
+    var intPool = QS.filter(function (q) { return weakCats.indexOf(q.cat) >= 0; });
+    return intPool.length ? { pool: intPool } : { pool: QS.filter(function (q) { return q.cat !== "CARS"; }) };
+  }
   if (mode === "TAG_PRACTICE") {
     if (!selTag) return {
       msg: "Select a tag"
@@ -820,6 +925,7 @@ function getSmartPool(mode, data, selTag) {
   };
 }
 // Group passage questions together (like real MCAT), standalone Qs fill gaps between passage blocks
+// Smart interleaving: spaces same-category standalone questions at least 2 apart
 function groupByPassage(questions) {
   var passageGroups = {};
   var standalone = [];
@@ -831,21 +937,55 @@ function groupByPassage(questions) {
       standalone.push(q);
     }
   });
-  // Build final order: shuffle passage groups, interleave standalone between them
-  var groupKeys = shuf(Object.keys(passageGroups));
+  // Sort standalone by category-alternating order (interleave categories)
+  var byCat = {};
+  standalone.forEach(function (q) {
+    if (!byCat[q.cat]) byCat[q.cat] = [];
+    byCat[q.cat].push(q);
+  });
+  var catKeys = shuf(Object.keys(byCat));
+  var interleavedStandalone = [];
+  var maxLen = Math.max.apply(null, catKeys.map(function (k) { return byCat[k].length; }).concat([0]));
+  for (var r = 0; r < maxLen; r++) {
+    catKeys.forEach(function (k) {
+      if (r < byCat[k].length) interleavedStandalone.push(byCat[k][r]);
+    });
+  }
+  standalone = interleavedStandalone;
+  // Also try to alternate passage group categories
+  var groupKeys = Object.keys(passageGroups);
+  var gpCats = {};
+  groupKeys.forEach(function (k) { gpCats[k] = passageGroups[k][0].cat; });
+  // Sort passage groups so adjacent groups differ in category when possible
+  groupKeys = shuf(groupKeys);
+  for (var j = 1; j < groupKeys.length; j++) {
+    if (gpCats[groupKeys[j]] === gpCats[groupKeys[j - 1]]) {
+      // Find a swap candidate further ahead with a different category
+      for (var k = j + 1; k < groupKeys.length; k++) {
+        if (gpCats[groupKeys[k]] !== gpCats[groupKeys[j - 1]]) {
+          var tmp = groupKeys[j];
+          groupKeys[j] = groupKeys[k];
+          groupKeys[k] = tmp;
+          break;
+        }
+      }
+    }
+  }
+  // Build final order: interleave standalone between passage groups
   var result = [];
   var si = 0;
   groupKeys.forEach(function (key, gi) {
-    // Add 1-2 standalone questions between passage groups (if available)
     if (gi > 0 && si < standalone.length) {
       result.push(standalone[si++]);
+      // Add a second standalone between groups if categories match
+      if (si < standalone.length && gi > 0 && gpCats[groupKeys[gi]] === gpCats[groupKeys[gi - 1]]) {
+        result.push(standalone[si++]);
+      }
     }
-    // Add all questions from this passage in their original order
     passageGroups[key].forEach(function (q) {
       result.push(q);
     });
   });
-  // Append remaining standalone questions at end
   while (si < standalone.length) {
     result.push(standalone[si++]);
   }
@@ -1198,6 +1338,8 @@ function Game(_ref2) {
   // NEW STATE: hint, pause, navigator, timing
   const [hintUsed, setHintUsed] = useState(false);
   const [eliminated, setEliminated] = useState([]);
+  const [revealed, setRevealed] = useState(false);
+  const [passOpen, setPassOpen] = useState(true);
   const [paused, setPaused] = useState(false);
   const [qAnswered, setQAnswered] = useState({});
   const tr = useRef(null);
@@ -1254,6 +1396,8 @@ function Game(_ref2) {
   const [thinkDelay, setThinkDelay] = useState(0);
   const [showConceptCard, setShowConceptCard] = useState(null);
   const [simSection, setSimSection] = useState(null);
+  const [simNavOpen, setSimNavOpen] = useState(false);
+  const [simAnswers, setSimAnswers] = useState({});
   const [simTimer, setSimTimer] = useState(null);
   const [openCard, setOpenCard] = useState(null);
   const [refTab, setRefTab] = useState("aa");
@@ -1363,6 +1507,8 @@ function Game(_ref2) {
     setMatchResults([]);
     setHintUsed(false);
     setEliminated([]);
+    setRevealed(false);
+    setPassOpen(true);
     setPaused(false);
     setQAnswered({});
     setTL(MODES[mode].time || null);
@@ -1395,6 +1541,8 @@ function Game(_ref2) {
     setMatchResults([]);
     setHintUsed(false);
     setEliminated([]);
+    setRevealed(false);
+    setPassOpen(true);
     setPaused(false);
     setQAnswered({});
     setTL(null);
@@ -1422,11 +1570,16 @@ function Game(_ref2) {
       return !q.pass;
     }));
     var picked = [];
-    // Add complete passages until we approach 14 passage Qs
+    // Scale question count: target real MCAT count (59 for science, 53 for CARS)
+    // but cap at available questions
+    var realTarget = sec === "CARS" ? 53 : 59;
+    var targetCount = Math.min(realTarget, pool.length, 40); // cap at 40 for practical sessions
+    var passTarget = Math.round(targetCount * 0.7);
+    // Add complete passages until we approach passage target
     passageKeys.forEach(function (key) {
       if (picked.filter(function (q) {
         return q.pass;
-      }).length < 14) {
+      }).length < passTarget) {
         passageMap[key].forEach(function (q) {
           picked.push(q);
         });
@@ -1434,10 +1587,10 @@ function Game(_ref2) {
     });
     // Fill remaining with standalone
     var si = 0;
-    while (picked.length < 20 && si < standQs.length) {
+    while (picked.length < targetCount && si < standQs.length) {
       picked.push(standQs[si++]);
     }
-    picked = picked.slice(0, 20);
+    picked = picked.slice(0, targetCount);
     // Group passage Qs together, standalone between passage blocks
     var grouped = groupByPassage(picked);
     var built = grouped.map(function (q) {
@@ -1488,12 +1641,16 @@ function Game(_ref2) {
     setMatchResults([]);
     setHintUsed(false);
     setEliminated([]);
+    setRevealed(false);
+    setPassOpen(true);
     setPaused(false);
     setQAnswered({});
     setTL(null);
     setThinkDelay(0);
     setSimSection(sec);
-    setSimTimer(1800);
+    setSimTimer(Math.round(targetCount * (sec === "CARS" ? 102 : 97)));
+    setSimAnswers({});
+    setSimNavOpen(false);
     qStartRef.current = Date.now();
     setScr("play");
   }
@@ -1513,9 +1670,28 @@ function Game(_ref2) {
   useEffect(function () {
     if (simTimer === 0 && gm === "SECTION_SIM" && scr === "play") fin();
   }, [simTimer]);
+  function toggleEliminate(idx) {
+    if (sr || awaitConf || paused) return;
+    var q = qs[qi];
+    if (!q || q.type === "match") return;
+    setEliminated(function (prev) {
+      if (prev.indexOf(idx) >= 0) {
+        return prev.filter(function (x) { return x !== idx; });
+      } else {
+        return prev.concat([idx]);
+      }
+    });
+    // If we eliminated the currently selected answer, deselect it
+    if (sel === idx) setSel(null);
+    // Track elimination usage
+    setData(function (d) {
+      return Object.assign({}, d, { elimUsed: (d.elimUsed || 0) + 1 });
+    });
+  }
   function handleAnswer(idx) {
     if (sr || awaitConf || paused) return;
     setSel(idx);
+    try { if (navigator.vibrate) navigator.vibrate(10); } catch(e) {}
   }
   function lockIn() {
     if (sel === null || sr || awaitConf || paused) return;
@@ -1541,6 +1717,29 @@ function Game(_ref2) {
     var actualIdx = sel !== null ? sel : -1;
     var correct = actualIdx === q.a;
     var elapsed = Math.round((Date.now() - qStartRef.current) / 1000);
+    // SECTION SIM: no immediate feedback, record answer and advance
+    if (gm === "SECTION_SIM") {
+      setQAnswered(function (p) { var n = Object.assign({}, p); n[qi] = true; return n; });
+      setSimAnswers(function (p) { var n = Object.assign({}, p); n[qi] = { sel: actualIdx, correct: correct, elapsed: elapsed, qId: q.id }; return n; });
+      setST(function (t) { return t + 1; });
+      if (correct) { setSC(function (c) { return c + 1; }); }
+      else { setWrong(function (w) { return w.concat([q]); }); }
+      // Update question stats silently
+      setData(function (d) {
+        var st = Object.assign({}, d.questionStats);
+        var p = st[q.id] || { seen: 0, correct: 0, box: 1, nextReview: 0, streak: 0, confHistory: [] };
+        st[q.id] = Object.assign({}, p, { seen: p.seen + 1, correct: p.correct + (correct ? 1 : 0), lastSeen: Date.now(), streak: correct ? (p.streak || 0) + 1 : 0 });
+        var ct = Object.assign({}, d.catTiming || {}); var cc = ct[q.cat] || { total: 0, count: 0 }; ct[q.cat] = { total: cc.total + elapsed, count: cc.count + 1 };
+        var stm = addStudySeconds(d, elapsed);
+        return Object.assign({}, d, { totalCorrect: d.totalCorrect + (correct ? 1 : 0), totalAnswered: d.totalAnswered + 1, questionStats: st, catTiming: ct, studyTime: stm });
+      });
+      // Auto-advance to next unanswered question
+      setSel(null); setEliminated([]); setRevealed(false); setPassOpen(true); setHintUsed(false); setConf(null); setAwaitConf(false);
+      var nextIdx = -1;
+      for (var ni = qi + 1; ni < qs.length; ni++) { if (!qAnswered[ni]) { nextIdx = ni; break; } }
+      if (nextIdx >= 0) { setQI(nextIdx); qStartRef.current = Date.now(); }
+      return;
+    }
     // Think delay: wrong answers get 4s delay before explanation shows
     if (!correct) {
       setThinkDelay(4);
@@ -1592,6 +1791,12 @@ function Game(_ref2) {
       setStreak(0);
       setWrong(function (w) {
         return w.concat([q]);
+      });
+      // Record in mistake log
+      setData(function(d) {
+        var ml = (d.mistakeLog || []).slice(-199);
+        ml.push({ qId: q.id, cat: q.cat, tags: q.tags || [], date: Date.now(), isPassage: !!q.pass, wrongPick: actualIdx, correctAns: q.a });
+        return Object.assign({}, d, { mistakeLog: ml });
       });
       setShake(true);
       setTimeout(function () {
@@ -1753,11 +1958,12 @@ function Game(_ref2) {
   function goToQ(idx) {
     if (idx < 0 || idx >= qs.length || idx === qi) return;
     setQI(idx);
-    setSel(null);
-    setSR(!!qAnswered[idx]);
+    setSel(gm === "SECTION_SIM" && simAnswers[idx] ? simAnswers[idx].sel : null);
+    setSR(gm === "SECTION_SIM" ? false : !!qAnswered[idx]);
     setHintUsed(false);
     setEliminated([]);
-    setConf(null);
+    setRevealed(false);
+    setPassOpen(true);
     setAwaitConf(false);
     setMatchSel(null);
     setMatchDone([]);
@@ -1798,6 +2004,15 @@ function Game(_ref2) {
     dirtyRef.current = true;
     setData(function (d) {
       return Object.assign({}, d, {
+        simHistory: gm === "SECTION_SIM" ? (d.simHistory || []).concat([{
+          date: Date.now(),
+          section: simSection,
+          correct: sCorrect,
+          total: sTotal,
+          pct: sTotal > 0 ? Math.round(sCorrect / sTotal * 100) : 0,
+          timeUsed: simTimer !== null ? 1800 - simTimer : null,
+          answers: simAnswers
+        }]) : (d.simHistory || []),
         sessionHistory: d.sessionHistory.concat([{
           date: Date.now(),
           mode: gm,
@@ -2141,7 +2356,19 @@ function Game(_ref2) {
         fontSize: 16,
         padding: "2px 6px"
       }
-    }, isDark ? "\u2600\uFE0F" : "\u{1F319}")), /*#__PURE__*/React.createElement("div", {
+    }, isDark ? "\u2600\uFE0F" : "\u{1F319}"), /*#__PURE__*/React.createElement("button", {
+      onClick: function () {
+        setData(function (d) { return Object.assign({}, d, { thinkFirst: !d.thinkFirst }); });
+      },
+      style: {
+        fontSize: 10,
+        color: data.thinkFirst ? "#667eea" : TC.muted,
+        padding: "2px 6px",
+        border: "1px solid " + (data.thinkFirst ? "rgba(102,126,234,.5)" : TC.cbr),
+        borderRadius: 6,
+        background: data.thinkFirst ? "rgba(102,126,234,.1)" : "transparent"
+      }
+    }, "\u{1F914}", data.thinkFirst ? " ON" : " OFF")), /*#__PURE__*/React.createElement("div", {
       style: {
         textAlign: "center",
         marginBottom: 20
@@ -2163,7 +2390,7 @@ function Game(_ref2) {
         color: TC.dim,
         letterSpacing: 2
       }
-    }, "v11 FINAL ", "\u2022", " SIMS ", "\u2022", " REFS ", "\u2022", " THEMES")), dayStreak >= 1 && /*#__PURE__*/React.createElement("div", {
+    }, "v12 ", "\u2022", " SIMS ", "\u2022", " MISTAKES ", "\u2022", " INTERLEAVE")), dayStreak >= 1 && /*#__PURE__*/React.createElement("div", {
       style: {
         textAlign: "center",
         marginBottom: 12,
@@ -2543,7 +2770,7 @@ function Game(_ref2) {
         fontWeight: 700,
         color: "#4ade80"
       }
-    }, "\u{1F4CB}", " Reference"))), /*#__PURE__*/React.createElement("div", {
+    }, "\u{1F4CB}", " Reference"), /*#__PURE__*/React.createElement("button", { onClick: function() { setScr("mistakes"); }, style: { flex: 1, padding: "12px 8px", background: TC.card, border: "1px solid " + TC.cbr, borderRadius: 10, textAlign: "center", fontSize: 12 + fz, fontWeight: 600, color: fg } }, "\u{1F4D3}", " Mistakes", getMistakeLog(data).length > 0 ? " (" + getMistakeLog(data).length + ")" : ""))), /*#__PURE__*/React.createElement("div", {
       style: {
         marginBottom: 14
       }
@@ -2630,6 +2857,8 @@ function Game(_ref2) {
         marginTop: 2
       }
     }, "5 mixed questions ", "\u2022", " perfect for on-the-go")), /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: 10, fontWeight: 700, color: TC.dim, letterSpacing: 1.5, marginBottom: 6, marginTop: 4, textTransform: "uppercase" }
+    }, "Practice Modes"), /*#__PURE__*/React.createElement("div", {
       style: {
         ...S.sh
       }
@@ -2743,7 +2972,7 @@ function Game(_ref2) {
     }, {
       k: "INTERLEAVED",
       n: 1,
-      l: "Random all-topic mix"
+      l: "Weakest topics, mixed"
     }, {
       k: "CARS_MODE",
       n: carsC,
@@ -2977,7 +3206,7 @@ function Game(_ref2) {
         marginBottom: 14,
         lineHeight: 1.5
       }
-    }, "20 questions ", "\u2022", " 30 minutes ", "\u2022", " ~70% passage-based ", "\u2022", " No going back"), /*#__PURE__*/React.createElement("div", {
+    }, "Scaled to your question bank ", "\u2022", " Section timer ", "\u2022", " Free navigation ", "\u2022", " No feedback until submit"), /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         flexDirection: "column",
@@ -3010,7 +3239,13 @@ function Game(_ref2) {
           fontWeight: 700,
           color: fg
         }
-      }, sec), /*#__PURE__*/React.createElement("span", {
+      }, sec, " (", function() {
+          var secCats2 = Object.keys(CATS).filter(function(k){return CATS[k].sec===sec;});
+          var cnt = QS.filter(function(q){return secCats2.indexOf(q.cat)>=0;}).length;
+          var target = Math.min(sec==="CARS"?53:59, cnt, 40);
+          var mins = Math.round(target * (sec==="CARS"?102:97) / 60);
+          return target + " Qs, " + mins + " min";
+        }(), ")"), /*#__PURE__*/React.createElement("span", {
         style: {
           fontSize: 12,
           fontWeight: 800,
@@ -3021,7 +3256,59 @@ function Game(_ref2) {
   }
 
   // === REFERENCE SHEETS ===
-  if (scr === "reference") {
+  if (scr === "mistakes") {
+    var mLog = getMistakeLog(data);
+    var patterns = getErrorPatterns(data);
+    var grouped = {};
+    mLog.slice().reverse().forEach(function(m) {
+      var tagKey = (m.tags || []).slice(0,2).join(', ') || m.cat;
+      if (!grouped[tagKey]) grouped[tagKey] = [];
+      grouped[tagKey].push(m);
+    });
+    return /*#__PURE__*/React.createElement("div", { style: { ...S.c, background: bg, color: fg } },
+      /*#__PURE__*/React.createElement(SB, null),
+      /*#__PURE__*/React.createElement("div", { style: S.i },
+        /*#__PURE__*/React.createElement("button", { style: { ...TS.bk, color: TC.muted }, onClick: function() { setScr("home"); } }, "< Back"),
+        /*#__PURE__*/React.createElement("h2", { style: { fontSize: 18, fontWeight: 800, color: fg, margin: "0 0 4px" } }, "\u{1F4D3} Mistake Journal"),
+        /*#__PURE__*/React.createElement("p", { style: { fontSize: 11, color: TC.muted, marginBottom: 14, lineHeight: 1.5 } }, mLog.length, " mistakes logged \u2022 ", Object.keys(grouped).length, " concept areas"),
+        patterns.length > 0 && /*#__PURE__*/React.createElement("div", { style: { marginBottom: 16, padding: 12, background: "rgba(248,113,113,.08)", border: "1px solid rgba(248,113,113,.2)", borderRadius: 10 } },
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: "#f87171", marginBottom: 8 } }, "\u{1F6A8} Error Patterns Detected"),
+          patterns.map(function(p, pi) {
+            return /*#__PURE__*/React.createElement("div", { key: pi, style: { fontSize: 11 + fz, color: TC.muted, padding: "4px 0", borderBottom: pi < patterns.length-1 ? "1px solid " + TC.cbr : "none", lineHeight: 1.5 } }, "\u2022 ", p.advice);
+          })
+        ),
+        mLog.length === 0 && /*#__PURE__*/React.createElement("div", { style: { textAlign: "center", padding: 40, color: TC.muted } },
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: 32 } }, "\u2728"),
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: 13, marginTop: 8 } }, "No mistakes yet \u2014 keep practicing!")
+        ),
+        Object.keys(grouped).map(function(gk) {
+          var items = grouped[gk];
+          return /*#__PURE__*/React.createElement("div", { key: gk, style: { marginBottom: 12 } },
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: 12 + fz, fontWeight: 700, color: fg, padding: "6px 0", borderBottom: "1px solid " + TC.cbr } }, gk, " (", items.length, ")"),
+            items.slice(0, 5).map(function(m, mi) {
+              var q = QS.find(function(x){return x.id === m.qId;});
+              if (!q) return null;
+              var dStr = new Date(m.date).toLocaleDateString();
+              return /*#__PURE__*/React.createElement("div", { key: mi, style: { padding: "8px 0", borderBottom: "1px solid " + TC.cbr, fontSize: 11 + fz } },
+                /*#__PURE__*/React.createElement("div", { style: { color: fg, lineHeight: 1.5, marginBottom: 4 } }, q.q.substring(0, 120), q.q.length > 120 ? "..." : ""),
+                /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 8, fontSize: 10 + fz, color: TC.muted } },
+                  /*#__PURE__*/React.createElement("span", { style: { color: "#f87171" } }, "\u2717 ", q.o[m.wrongPick] ? q.o[m.wrongPick].substring(0, 40) + "..." : "N/A"),
+                  /*#__PURE__*/React.createElement("span", { style: { color: "#4ade80" } }, "\u2713 ", q.o[m.correctAns] ? q.o[m.correctAns].substring(0, 40) + "..." : "")
+                ),
+                /*#__PURE__*/React.createElement("div", { style: { fontSize: 9, color: TC.dim, marginTop: 2 } }, dStr),
+                /*#__PURE__*/React.createElement("button", {
+                  onClick: function() { startGame("TAG_PRACTICE", [], (q.tags||[])[0]); },
+                  style: { fontSize: 10, color: "#667eea", marginTop: 4, textDecoration: "underline", background: "none", border: "none", padding: 0, cursor: "pointer" }
+                }, "\u{1F501} Retry this topic")
+              );
+            }),
+            items.length > 5 && /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: TC.dim, padding: "4px 0" } }, "+" + (items.length - 5) + " more")
+          );
+        })
+      )
+    );
+  }
+    if (scr === "reference") {
     var R = typeof REFS !== "undefined" ? REFS : {};
     var tStyle = {
       fontSize: 10 + fz,
@@ -3351,7 +3638,7 @@ function Game(_ref2) {
         borderRadius: 10,
         flexWrap: "wrap"
       }
-    }, [["overview", "Overview"], ["topics", "Topics"], ["pacing", "Pacing"], ["score", "Score"], ["badges", "Badges"], ["calibration", "Calibr."], ["history", "History"]].map(function (e) {
+    }, [["overview", "Overview"], ["topics", "Topics"], ["pacing", "Pacing"], ["score", "Score"], ["sims", "Sims"], ["badges", "Badges"], ["calibration", "Calibr."], ["history", "History"]].map(function (e) {
       return /*#__PURE__*/React.createElement("button", {
         key: e[0],
         onClick: function () {
@@ -3368,7 +3655,7 @@ function Game(_ref2) {
           minWidth: 0
         }
       }, e[1]);
-    })), sTab === "overview" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    })), sTab === "overview" && /*#__PURE__*/React.createElement("div", null, data.totalAnswered === 0 && /*#__PURE__*/React.createElement("div", { style: { textAlign: "center", padding: 20, marginBottom: 14, background: "rgba(102,126,234,.06)", borderRadius: 12, border: "1px solid rgba(102,126,234,.12)" } }, /*#__PURE__*/React.createElement("div", { style: { fontSize: 24 } }, "\u{1F4CA}"), /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: TC.muted, marginTop: 4 } }, "Answer some questions to see your stats here!")), /*#__PURE__*/React.createElement("div", {
       style: {
         display: "grid",
         gridTemplateColumns: "1fr 1fr 1fr",
@@ -3531,7 +3818,49 @@ function Game(_ref2) {
         color: "#667eea",
         marginBottom: 8
       }
-    }, "\u{1F4CB}", " Copy Stats to Clipboard")), sTab === "topics" && /*#__PURE__*/React.createElement("div", {
+    }, "\u{1F4CB}", " Copy Stats to Clipboard"), /*#__PURE__*/React.createElement("div", {
+      style: { marginTop: 14, padding: 12, background: TC.card, borderRadius: 10, border: "1px solid " + TC.cbr }
+    }, /*#__PURE__*/React.createElement("div", { style: { fontSize: 12 + fz, fontWeight: 700, color: fg, marginBottom: 8 } }, "\u{1F4C8} Accuracy Trends (last 10 sessions)"),
+      ["Bio/Biochem", "Chem/Phys", "Psych/Soc", "CARS"].map(function(sec) {
+        var secCats = Object.keys(CATS).filter(function(k){return CATS[k].sec === sec;});
+        var hist = (data.sessionHistory || []).slice(-20);
+        var vals = [];
+        hist.forEach(function(h) { if (h.total > 0) vals.push(Math.round(h.correct / h.total * 100)); });
+        vals = vals.slice(-10);
+        var trend = vals.length >= 2 ? (vals[vals.length-1] > vals[0] + 5 ? "\u2191" : vals[vals.length-1] < vals[0] - 5 ? "\u2193" : "\u2192") : "";
+        var tColor = trend === "\u2191" ? "#4ade80" : trend === "\u2193" ? "#f87171" : TC.muted;
+        var sparkColor = trend === "\u2191" ? "#4ade80" : trend === "\u2193" ? "#f87171" : "#667eea";
+        var svg = vals.length >= 2 ? buildSparkline(vals, 80, 20, sparkColor) : "";
+        var latest = vals.length > 0 ? vals[vals.length-1] + "%" : "N/A";
+        return /*#__PURE__*/React.createElement("div", { key: sec, style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 0", fontSize: 11 + fz } },
+          /*#__PURE__*/React.createElement("span", { style: { color: TC.muted, minWidth: 90 } }, sec),
+          /*#__PURE__*/React.createElement("span", { dangerouslySetInnerHTML: { __html: svg } }),
+          /*#__PURE__*/React.createElement("span", { style: { color: tColor, fontWeight: 700, minWidth: 40, textAlign: "right" } }, latest, " ", trend)
+        );
+      })
+    ), /*#__PURE__*/React.createElement("div", {
+      style: { marginTop: 14, padding: 12, background: TC.card, borderRadius: 10, border: "1px solid " + TC.cbr }
+    }, /*#__PURE__*/React.createElement("div", { style: { fontSize: 12 + fz, fontWeight: 700, color: fg, marginBottom: 8 } }, "\u{1F5D3} Study Heatmap (last 30 days)"),
+      /*#__PURE__*/React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 2 } },
+        buildHeatmap(data.studyTime, 30).map(function(c) {
+          var intensity = c.mins === 0 ? 0 : c.mins < 10 ? 1 : c.mins < 30 ? 2 : c.mins < 60 ? 3 : 4;
+          var colors = [TC.sbg, "rgba(102,126,234,.2)", "rgba(102,126,234,.4)", "rgba(102,126,234,.65)", "rgba(102,126,234,.9)"];
+          return /*#__PURE__*/React.createElement("div", {
+            key: c.key,
+            title: c.key + ": " + c.mins + " min",
+            style: { width: 14, height: 14, borderRadius: 2, background: colors[intensity], fontSize: 7, display: "flex", alignItems: "center", justifyContent: "center", color: intensity >= 3 ? "#fff" : TC.dim }
+          }, c.day);
+        })
+      ),
+      /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 6, marginTop: 6, fontSize: 9, color: TC.dim, alignItems: "center" } },
+        /*#__PURE__*/React.createElement("span", null, "Less"),
+        [0,1,2,3,4].map(function(i) {
+          var colors = [TC.sbg, "rgba(102,126,234,.2)", "rgba(102,126,234,.4)", "rgba(102,126,234,.65)", "rgba(102,126,234,.9)"];
+          return /*#__PURE__*/React.createElement("div", { key: i, style: { width: 10, height: 10, borderRadius: 2, background: colors[i] } });
+        }),
+        /*#__PURE__*/React.createElement("span", null, "More")
+      )
+    )), sTab === "topics" && /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         flexDirection: "column",
@@ -3713,7 +4042,7 @@ function Game(_ref2) {
         color: TC.dim,
         fontSize: 12
       }
-    }, "Answer at least 50 questions to see a score prediction.", "\n", "Currently: ", data.totalAnswered, "/50") : /*#__PURE__*/React.createElement("div", null, ["Bio/Biochem", "Chem/Phys", "Psych/Soc", "CARS"].map(function (sec) {
+    }, "Answer at least 50 questions to see a score prediction. Prediction improves with more data and weights recent performance more heavily.", "\n", "Currently: ", data.totalAnswered, "/50") : /*#__PURE__*/React.createElement("div", null, ["Bio/Biochem", "Chem/Phys", "Psych/Soc", "CARS"].map(function (sec) {
       var a = getSectionAcc(data, sec);
       var p = predictScore(a);
       var cats = Object.keys(CATS).filter(function (k) {
@@ -3788,7 +4117,7 @@ function Game(_ref2) {
           fontWeight: 900,
           color: fg
         }
-      }, tp, /*#__PURE__*/React.createElement("span", {
+      }, typeof tp === "object" ? tp.low + "-" + tp.high : tp, /*#__PURE__*/React.createElement("span", {
         style: {
           fontSize: 14,
           color: TC.dim
@@ -3802,7 +4131,39 @@ function Game(_ref2) {
         textAlign: "center",
         lineHeight: 1.4
       }
-    }, "Disclaimer: This is a rough estimate based on practice accuracy. Real MCAT scores depend on many factors including passage interpretation, timing, and test-day performance."))), sTab === "badges" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
+    }, "Disclaimer: This is a rough estimate based on practice accuracy. Real MCAT scores depend on many factors including passage interpretation, timing, and test-day performance."))), sTab === "sims" && /*#__PURE__*/React.createElement("div", null,
+      /*#__PURE__*/React.createElement("p", { style: { fontSize: 12 + fz, fontWeight: 700, color: fg, marginBottom: 8 } }, "\u{1F3AF} Section Simulation History"),
+      (data.simHistory || []).length === 0 ? /*#__PURE__*/React.createElement("div", { style: { textAlign: "center", padding: 20, color: TC.muted, fontSize: 12 } }, "No section sims completed yet. Try one from the home screen!") :
+      /*#__PURE__*/React.createElement("div", null,
+        (data.simHistory || []).slice().reverse().slice(0, 20).map(function(sim, si) {
+          var dStr = new Date(sim.date).toLocaleDateString();
+          var pct = sim.pct || 0;
+          var pc = pct >= 80 ? "#4ade80" : pct >= 60 ? "#fbbf24" : "#f87171";
+          var p = predictScore(pct);
+          var timeStr = sim.timeUsed != null ? Math.floor(sim.timeUsed / 60) + "m " + (sim.timeUsed % 60) + "s" : "N/A";
+          return /*#__PURE__*/React.createElement("div", { key: si, style: { padding: "10px 0", borderBottom: "1px solid " + TC.cbr, fontSize: 11 + fz } },
+            /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between" } },
+              /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, color: fg } }, sim.section || "Unknown"),
+              /*#__PURE__*/React.createElement("span", { style: { color: TC.dim, fontSize: 10 } }, dStr)
+            ),
+            /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 12, marginTop: 4, color: TC.muted } },
+              /*#__PURE__*/React.createElement("span", null, sim.correct, "/", sim.total, " (", /*#__PURE__*/React.createElement("span", { style: { color: pc, fontWeight: 700 } }, pct, "%"), ")"),
+              /*#__PURE__*/React.createElement("span", null, "\u23F1 ", timeStr),
+              p && /*#__PURE__*/React.createElement("span", null, "Est: ", p.low, "-", p.high)
+            )
+          );
+        }),
+        (data.simHistory || []).length >= 3 && /*#__PURE__*/React.createElement("div", { style: { marginTop: 12, padding: 10, background: TC.card, borderRadius: 8 } },
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: fg, marginBottom: 4 } }, "\u{1F4C8} Score Trend"),
+          function() {
+            var vals = (data.simHistory || []).map(function(s){return s.pct || 0;});
+            if (vals.length < 2) return null;
+            var svg = buildSparkline(vals, 200, 30, "#667eea");
+            return /*#__PURE__*/React.createElement("span", { dangerouslySetInnerHTML: { __html: svg } });
+          }()
+        )
+      )
+    ), sTab === "badges" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
       style: {
         fontSize: 11,
         color: "#999",
@@ -4261,7 +4622,10 @@ function Game(_ref2) {
     }, qs.map(function (_, i) {
       var isAnswered = !!qAnswered[i];
       var isCurrent = i === qi;
-      var canJump = gm !== "SECTION_SIM" && (!isAnswered || isCurrent);
+      var canJump = gm === "SECTION_SIM" ? true : (!isAnswered || isCurrent);
+      var isFlaggedQ = (data.flagged || []).indexOf(qs[i].id) >= 0;
+      var dotBg = isAnswered && isFlaggedQ ? "#ff9933" : isAnswered ? "#4ade80" : isCurrent ? "#667eea" : TC.sbg;
+      var dotSize = gm === "SECTION_SIM" ? (isCurrent ? 18 : 14) : (isCurrent ? 12 : 8);
       return /*#__PURE__*/React.createElement("button", {
         key: i,
         onClick: function () {
@@ -4269,15 +4633,20 @@ function Game(_ref2) {
         },
         disabled: !canJump,
         style: {
-          width: isCurrent ? 12 : 8,
-          height: isCurrent ? 12 : 8,
-          borderRadius: "50%",
+          width: dotSize,
+          height: dotSize,
+          borderRadius: gm === "SECTION_SIM" ? 4 : "50%",
           border: isCurrent ? "2px solid #667eea" : "none",
-          background: isAnswered ? "#4ade80" : isCurrent ? "#667eea" : TC.sbg,
+          background: dotBg,
           transition: "all .15s",
-          opacity: canJump || isCurrent ? 1 : .4
+          opacity: canJump || isCurrent ? 1 : .4,
+          fontSize: gm === "SECTION_SIM" ? 7 : 0,
+          color: isAnswered ? "#000" : TC.muted,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center"
         }
-      });
+      }, gm === "SECTION_SIM" ? String(i + 1) : null);
     }))), gm === "SECTION_SIM" && simTimer != null && /*#__PURE__*/React.createElement("div", {
       style: {
         textAlign: "center",
@@ -4287,7 +4656,34 @@ function Game(_ref2) {
         margin: "2px auto",
         color: simTimer < 300 ? "#ff4444" : simTimer < 600 ? "#fbbf24" : "#88ff88"
       }
-    }, "\u23F1", " ", Math.floor(simTimer / 60), ":", (simTimer % 60 < 10 ? "0" : "") + simTimer % 60, " remaining"), tl != null && /*#__PURE__*/React.createElement("div", {
+    }, "\u23F1", " ", Math.floor(simTimer / 60), ":", (simTimer % 60 < 10 ? "0" : "") + simTimer % 60, " remaining"), /*#__PURE__*/React.createElement("div", {
+      style: { display: "flex", gap: 8, justifyContent: "center", marginTop: 8 }
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: function () { setSimNavOpen(!simNavOpen); },
+      style: { padding: "6px 14px", fontSize: 11 + fz, fontWeight: 600, background: "rgba(102,126,234,.1)", border: "1px solid rgba(102,126,234,.3)", borderRadius: 8, color: "#667eea" }
+    }, simNavOpen ? "Hide Nav" : "\u{1F5C2} Question Nav"), /*#__PURE__*/React.createElement("button", {
+      onClick: function () {
+        var unanswered = qs.filter(function(_, i) { return !qAnswered[i]; }).length;
+        if (unanswered > 0 && !confirm("You have " + unanswered + " unanswered question(s). Submit anyway?")) return;
+        fin();
+      },
+      style: { padding: "6px 14px", fontSize: 11 + fz, fontWeight: 600, background: "rgba(74,222,128,.1)", border: "1px solid rgba(74,222,128,.3)", borderRadius: 8, color: "#4ade80" }
+    }, "\u2705 Submit Section")), simNavOpen && /*#__PURE__*/React.createElement("div", {
+      style: { display: "flex", flexWrap: "wrap", gap: 4, justifyContent: "center", marginTop: 8, padding: "8px 12px", background: TC.card, borderRadius: 10, border: "1px solid " + TC.cbr }
+    }, qs.map(function(_, i) {
+      var isAns = !!qAnswered[i];
+      var isFlag = (data.flagged || []).indexOf(qs[i].id) >= 0;
+      var isCur = i === qi;
+      var nbg = isAns && isFlag ? "#ff9933" : isAns ? "#4ade80" : isCur ? "#667eea" : TC.sbg;
+      var nfg = isAns ? "#000" : isCur ? "#fff" : TC.muted;
+      return /*#__PURE__*/React.createElement("button", {
+        key: "nav" + i,
+        onClick: function() { goToQ(i); setSimNavOpen(false); },
+        style: { width: 28, height: 28, borderRadius: 6, background: nbg, color: nfg, fontSize: 10, fontWeight: 700, border: isCur ? "2px solid #667eea" : "1px solid " + TC.cbr, display: "flex", alignItems: "center", justifyContent: "center" }
+      }, i + 1);
+    }), /*#__PURE__*/React.createElement("div", {
+      style: { width: "100%", display: "flex", gap: 12, justifyContent: "center", marginTop: 6, fontSize: 9, color: TC.muted }
+    }, /*#__PURE__*/React.createElement("span", null, "\u{1F7E2} Answered"), /*#__PURE__*/React.createElement("span", null, "\u{1F7E0} Flagged"), /*#__PURE__*/React.createElement("span", null, "\u26AA Unanswered"))), tl != null && /*#__PURE__*/React.createElement("div", {
       style: {
         textAlign: "center",
         fontSize: 16 + fz,
@@ -4367,16 +4763,38 @@ function Game(_ref2) {
         margin: "0 auto",
         padding: "0 14px 8px"
       }
-    }, /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: function() { setPassOpen(!passOpen); },
       style: {
-        padding: 14,
+        width: "100%",
+        padding: "8px 14px",
         background: "rgba(102,126,234,0.06)",
         border: "1px solid rgba(102,126,234,0.15)",
-        borderRadius: 10,
+        borderRadius: passOpen ? "10px 10px 0 0" : 10,
+        textAlign: "left",
+        fontSize: 11 + fz,
+        fontWeight: 600,
+        color: "#667eea",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        cursor: "pointer"
+      }
+    }, /*#__PURE__*/React.createElement("span", null, "\u{1F4C4} Passage"), /*#__PURE__*/React.createElement("span", { style: { fontSize: 10, color: TC.muted } }, passOpen ? "\u25B2 Collapse" : "\u25BC Expand")), passOpen && /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: 14,
+        paddingTop: 10,
+        background: "rgba(102,126,234,0.06)",
+        border: "1px solid rgba(102,126,234,0.15)",
+        borderTop: "none",
+        borderRadius: "0 0 10px 10px",
         marginBottom: 14,
         fontSize: 12 + fz,
         lineHeight: 1.7,
-        color: TC.muted
+        color: TC.muted,
+        maxHeight: 300,
+        overflowY: "auto",
+        WebkitOverflowScrolling: "touch"
       }
     }, passageData.text)), /*#__PURE__*/React.createElement("div", {
       style: {
@@ -4553,7 +4971,33 @@ function Game(_ref2) {
         ...S.btn,
         fontSize: 13 + fz
       }
-    }, answeredCount >= totalCount ? "See Results" : "Next")), !isMatch && /*#__PURE__*/React.createElement("div", {
+    }, answeredCount >= totalCount ? "See Results" : "Next")), !isMatch && (data.thinkFirst && !revealed && !sr && sel === null ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        maxWidth: 640,
+        margin: "0 auto",
+        padding: "0 14px",
+        textAlign: "center"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12 + fz,
+        color: TC.muted,
+        marginBottom: 10,
+        fontStyle: "italic"
+      }
+    }, "Think about your answer first..."), /*#__PURE__*/React.createElement("button", {
+      onClick: function () { setRevealed(true); },
+      style: {
+        padding: "14px 32px",
+        background: "rgba(102,126,234,.12)",
+        border: "1.5px solid rgba(102,126,234,.4)",
+        borderRadius: 12,
+        fontSize: 14 + fz,
+        fontWeight: 600,
+        color: "#667eea",
+        cursor: "pointer"
+      }
+    }, "\u{1F914} Reveal Answers")) : /*#__PURE__*/React.createElement("div", {
       style: {
         maxWidth: 640,
         margin: "0 auto",
@@ -4582,49 +5026,80 @@ function Game(_ref2) {
         bg2 = "rgba(102,126,234,.08)";
         bc2 = "rgba(102,126,234,.5)";
       } else if (isEliminated) {
-        op = 0.2;
+        op = 0.35;
       }
-      return /*#__PURE__*/React.createElement("button", {
+      // Letter circle style: shows strikethrough indicator when eliminated
+      var lcBg = isEliminated && !sr ? "rgba(248,113,113,.18)" : TC.sbg;
+      var lcColor = isEliminated && !sr ? "#f87171" : TC.muted;
+      var lcBorder = !sr && !awaitConf && !isEliminated ? "1px dashed " + TC.cbr : "1px solid transparent";
+      return /*#__PURE__*/React.createElement("div", {
         key: qi + "-" + i,
         style: {
           display: "flex",
           alignItems: "flex-start",
-          gap: 8,
-          padding: "10px 11px",
-          background: bg2,
-          border: "1.5px solid " + bc2,
-          borderRadius: 9,
-          textAlign: "left",
+          gap: 0,
           opacity: op,
           width: "100%"
+        }
+      }, /*#__PURE__*/React.createElement("button", {
+        style: {
+          width: 32 + fz,
+          minHeight: 40 + fz,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+          padding: 0,
+          background: "transparent",
+          cursor: sr || awaitConf ? "default" : "pointer"
         },
-        onClick: function () {
-          if (!isEliminated) handleAnswer(i);
+        onClick: function (e) {
+          e.stopPropagation();
+          if (!sr && !awaitConf) toggleEliminate(i);
         },
-        disabled: sr || awaitConf || isEliminated
+        "aria-label": isEliminated ? "Restore option " + String.fromCharCode(65 + i) : "Eliminate option " + String.fromCharCode(65 + i)
       }, /*#__PURE__*/React.createElement("span", {
         style: {
-          width: 20 + fz,
-          height: 20 + fz,
+          width: 22 + fz,
+          height: 22 + fz,
           borderRadius: 5,
-          background: TC.sbg,
+          background: lcBg,
+          border: lcBorder,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           fontSize: 9 + fz,
           fontWeight: 700,
-          color: TC.muted,
-          flexShrink: 0
+          color: lcColor,
+          position: "relative"
         }
-      }, String.fromCharCode(65 + i)), /*#__PURE__*/React.createElement("span", {
+      }, isEliminated && !sr ? "\u2715" : String.fromCharCode(65 + i))), /*#__PURE__*/React.createElement("button", {
+        style: {
+          flex: 1,
+          display: "flex",
+          alignItems: "flex-start",
+          padding: "12px 11px 12px 4px",
+          minHeight: 48,
+          background: bg2,
+          border: "1.5px solid " + bc2,
+          borderRadius: 9,
+          textAlign: "left",
+          width: "100%"
+        },
+        onClick: function () {
+          handleAnswer(i);
+        },
+        disabled: sr || awaitConf
+      }, /*#__PURE__*/React.createElement("span", {
         style: {
           fontSize: 12 + fz,
           lineHeight: 1.5,
           color: fg,
-          textDecoration: isEliminated ? "line-through" : "none"
+          textDecoration: isEliminated ? "line-through" : "none",
+          opacity: isEliminated && !sr ? 0.6 : 1
         }
-      }, opt));
-    })), !isMatch && !sr && !awaitConf && sel === null && !hintUsed && eliminated.length === 0 && /*#__PURE__*/React.createElement("div", {
+      }, opt)));
+    }))), !isMatch && !sr && !awaitConf && sel === null && !hintUsed && (!data.thinkFirst || revealed) && /*#__PURE__*/React.createElement("div", {
       style: {
         maxWidth: 640,
         margin: "8px auto 0",
@@ -4649,7 +5124,7 @@ function Game(_ref2) {
         padding: "0 14px",
         animation: "sU .2s"
       }
-    }, !hintUsed && eliminated.length === 0 && /*#__PURE__*/React.createElement("div", {
+    }, !hintUsed && /*#__PURE__*/React.createElement("div", {
       style: {
         marginBottom: 8
       }
@@ -4912,12 +5387,38 @@ function Game(_ref2) {
         fontSize: 10,
         color: TC.muted
       }
-    }, "Section: ", simSection), simUsed && /*#__PURE__*/React.createElement("div", {
+    }, "Section: ", simSection), simUsed != null && /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 10,
         color: TC.muted
       }
-    }, "Time used: ", Math.floor(simUsed / 60), "m ", simUsed % 60, "s of 30:00"), function () {
+    }, "Time used: ", Math.floor(simUsed / 60), "m ", simUsed % 60, "s"), /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: 10, color: TC.muted }
+    }, "Avg time/question: ", sTotal > 0 ? Math.round(simUsed / sTotal) + "s" : "N/A", " (MCAT target: ~95s)"), function() {
+      // Per-topic breakdown
+      var topicAcc = {};
+      qs.forEach(function(q, i) {
+        var sa = simAnswers[i];
+        if (!sa) return;
+        var cat = CATS[q.cat] ? CATS[q.cat].name : q.cat;
+        if (!topicAcc[cat]) topicAcc[cat] = { correct: 0, total: 0 };
+        topicAcc[cat].total++;
+        if (sa.correct) topicAcc[cat].correct++;
+      });
+      var topics = Object.keys(topicAcc);
+      if (topics.length === 0) return null;
+      return /*#__PURE__*/React.createElement("div", { style: { marginTop: 8 } },
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: fg, marginBottom: 4 } }, "By Topic:"),
+        topics.map(function(t) {
+          var x = topicAcc[t];
+          var p = Math.round(x.correct / x.total * 100);
+          var c = p >= 80 ? "#4ade80" : p >= 60 ? "#fbbf24" : "#f87171";
+          return /*#__PURE__*/React.createElement("div", { key: t, style: { display: "flex", justifyContent: "space-between", fontSize: 10, color: TC.muted, padding: "2px 0" } },
+            /*#__PURE__*/React.createElement("span", null, t),
+            /*#__PURE__*/React.createElement("span", { style: { color: c, fontWeight: 700 } }, x.correct + "/" + x.total + " (" + p + "%)"));
+        })
+      );
+    }(), function () {
       var p2 = predictScore(pct);
       return p2 ? /*#__PURE__*/React.createElement("div", {
         style: {
