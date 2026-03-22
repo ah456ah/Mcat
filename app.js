@@ -1982,7 +1982,7 @@ function Game(_ref2) {
         streak: correct ? (p.streak || 0) + 1 : 0,
         confHistory: ch,
         eliminatedCorrect: (p.eliminatedCorrect || 0) + (didElimCorrect ? 1 : 0),
-        lastEliminations: eliminated.length > 0 ? eliminated.slice() : undefined
+        lastEliminations: eliminated.length > 0 ? eliminated.slice() : null
       });
       var cal = Object.assign({}, d.calibration || DD.calibration);
       if (confidence && cal[confidence]) cal[confidence] = {
@@ -2696,7 +2696,7 @@ function Game(_ref2) {
         color: TC.dim,
         letterSpacing: 2
       }
-    }, "v12 ", "\u2022", " MODULES ", "\u2022", " POE ", "\u2022", " PATTERNS")), dayStreak >= 1 && /*#__PURE__*/React.createElement("div", {
+    }, "v12.0.1 ", "\u2022", " MODULES ", "\u2022", " POE ", "\u2022", " PATTERNS")), dayStreak >= 1 && /*#__PURE__*/React.createElement("div", {
       style: {
         marginBottom: 12,
         padding: "10px 14px",
