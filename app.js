@@ -435,7 +435,16 @@ const DD = {
   mistakeLog: [],
   moduleProgress: {},
   freeRecallEnabled: false,
-  freeRecallCount: 0
+  freeRecallCount: 0,
+  flashcardStats: {},
+  customCards: [],
+  savedMnemonics: [],
+  notes: {},
+  insights: [],
+  dailyChallengeDate: "",
+  dailyChallengeId: "",
+  dailyChallengeDone: false,
+  badges: []
 };
 function getCatAcc(d, cat) {
   var qs = QS.filter(function (q) {
@@ -1505,6 +1514,79 @@ async function callTeachAI(messages, systemPrompt) {
   }
 }
 
+
+// === V17: RATE LIMITER ===
+var _aiCallTimestamps = [];
+function checkRateLimit() {
+  var now = Date.now();
+  _aiCallTimestamps = _aiCallTimestamps.filter(function(ts) { return now - ts < 30000; });
+  if (_aiCallTimestamps.length >= 3) return false;
+  _aiCallTimestamps.push(now);
+  return true;
+}
+
+// === V17: AI STATUS TRACKING ===
+var _aiStatus = "unknown"; // "ok", "no_key", "error", "unknown"
+function getAiStatus() { return _aiStatus; }
+
+// === V17: RATE-LIMITED + STATUS-TRACKED AI CALL WRAPPER ===
+async function callAI(messages, systemPrompt) {
+  if (!getApiKey()) { _aiStatus = "no_key"; return "\u26A0\uFE0F No API key set. Go to Tools \u2192 Settings to add your Anthropic API key."; }
+  if (!checkRateLimit()) { return "\u23F3 Please wait a moment \u2014 too many requests. Try again in a few seconds."; }
+  try {
+    var result = await callTeachAI(messages, systemPrompt);
+    _aiStatus = result.startsWith("\u26A0") ? "error" : "ok";
+    return result;
+  } catch(e) {
+    _aiStatus = "error";
+    return "\u26A0\uFE0F AI error: " + (e.message || "Unknown error");
+  }
+}
+
+// === V17: NO-KEY CARD COMPONENT ===
+function noKeyCard(TC, fg, fz, setScr, setActiveTab) {
+  return React.createElement("div", { style: { padding: "16px", background: "rgba(251,146,60,.06)", border: "1px solid rgba(251,146,60,.2)", borderRadius: 12, textAlign: "center" } },
+    React.createElement("div", { style: { fontSize: 24, marginBottom: 6 } }, "\u{1F916}"),
+    React.createElement("div", { style: { fontSize: 12 + (fz||0), fontWeight: 700, color: fg, marginBottom: 4 } }, "AI Features Available"),
+    React.createElement("div", { style: { fontSize: 10, color: TC.muted, marginBottom: 10, lineHeight: 1.5 } }, "Add your Anthropic API key to unlock AI explanations, tutoring, and personalized analysis."),
+    React.createElement("button", { onClick: function() { if (setActiveTab) setActiveTab("tools"); setScr("settings_screen"); }, style: { padding: "8px 16px", background: "linear-gradient(135deg,#667eea,#764ba2)", borderRadius: 8, color: "#fff", fontSize: 11, fontWeight: 700, border: "none" } }, "\u{1F527} Set Up AI")
+  );
+}
+
+// === V17: AI RESPONSE CARD STYLE ===
+function aiCard(content, TC, fg, fz, isDark, opts) {
+  opts = opts || {};
+  return React.createElement("div", { style: { padding: "12px 14px", background: isDark ? "rgba(102,126,234,.06)" : "rgba(102,126,234,.04)", border: "1px solid " + (isDark ? "rgba(102,126,234,.2)" : "rgba(102,126,234,.15)"), borderRadius: 10, marginTop: opts.mt || 8, fontSize: 11 + (fz||0), lineHeight: 1.7, color: TC.muted } },
+    React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, marginBottom: 6 } },
+      React.createElement("span", { style: { fontSize: 14 } }, "\u{1F916}"),
+      React.createElement("span", { style: { fontSize: 9, fontWeight: 700, color: "#667eea", letterSpacing: 1, textTransform: "uppercase" } }, opts.title || "AI Explanation")
+    ),
+    React.createElement("div", { style: { whiteSpace: "pre-wrap" } }, typeof content === "string" ? renderMdGlobal(content, fg) : content)
+  );
+}
+
+// === V17: GLOBAL MARKDOWN RENDERER (accessible outside Game) ===
+function renderMdGlobal(t, fg) {
+  if (!t) return t;
+  var p = [];
+  t.split(/(\*\*[^*]+\*\*)/g).forEach(function(s, i) {
+    if (s.startsWith("**") && s.endsWith("**")) {
+      p.push(React.createElement("strong", { key: i, style: { fontWeight: 700, color: fg || "#e8e6e3" } }, s.slice(2, -2)));
+    } else {
+      p.push(s);
+    }
+  });
+  return p;
+}
+
+// === V17: PULSING DOT LOADER ===
+function aiLoader(text) {
+  return React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, padding: "10px 14px" } },
+    React.createElement("span", { className: "ai-dots" }),
+    React.createElement("span", { style: { fontSize: 11, color: "#667eea", fontWeight: 600 } }, text || "Thinking...")
+  );
+}
+
 function buildTeachSystemPrompt(tag, questionContext) {
   var base = "You are an expert MCAT tutor embedded in a study app called MCAT Quest. Your student is studying for the MCAT and needs help understanding concepts. Be concise but thorough. Use simple analogies. Bold key terms with **term**. Keep responses under 300 words unless the student asks for more detail. Always relate concepts back to how they'd appear on the MCAT. Do not use bullet points for short answers. When you explain a concept, end with a brief 'MCAT tip' that highlights the most testable aspect.";
   if (tag) base += "\n\nThe student is currently studying the topic: " + tag + ".";
@@ -1753,7 +1835,7 @@ function Game(_ref2) {
   const qStartRef = useRef(Date.now());
   const dirtyRef = useRef(false);
 
-  // Cloud save debounce - ONLY when user has actually interacted (dirty)
+    // Cloud save debounce - ONLY when user has actually interacted (dirty)
   useEffect(function () {
     if (!dirtyRef.current) return;
     var t = setTimeout(function () {
@@ -1867,6 +1949,48 @@ function Game(_ref2) {
   const [coachLoading, setCoachLoading] = useState(false);
   const [coachText, setCoachText] = useState(null);
   const [coachDate, setCoachDate] = useState("");
+  // === V17: AI CACHE + STATE ===
+  const [aiExplainCache, setAiExplainCache] = useState({}); // {qId: response}
+  const [aiPatternAnalysis, setAiPatternAnalysis] = useState(null);
+  const [aiPatternLoading, setAiPatternLoading] = useState(false);
+  const [aiResultExplains, setAiResultExplains] = useState({}); // {qId: {loading, text}}
+  const [aiModuleExplains, setAiModuleExplains] = useState({}); // {key: {loading, text}}
+  const [aiCardChats, setAiCardChats] = useState({}); // {topic: [{role,content}]}
+  const [aiCardInput, setAiCardInput] = useState("");
+  const [aiCardLoading, setAiCardLoading] = useState(false);
+  // === V18: FLASHCARD STATE ===
+  const [fcCards, setFcCards] = useState([]);
+  const [fcIndex, setFcIndex] = useState(0);
+  const [fcFlipped, setFcFlipped] = useState(false);
+  const [fcResults, setFcResults] = useState({ reviewed: 0, newLearned: 0, again: 0 });
+  const [fcTopic, setFcTopic] = useState(null);
+  const [fcAddMode, setFcAddMode] = useState(false);
+  const [fcNewFront, setFcNewFront] = useState("");
+  const [fcNewBack, setFcNewBack] = useState("");
+  // === V18: NOTES STATE ===
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [notesTopic, setNotesTopic] = useState("");
+  const [notesText, setNotesText] = useState("");
+  // === V19: SIM GRID + BRIEFING STATE ===
+  const [simGridOpen, setSimGridOpen] = useState(false);
+  const [simBriefing, setSimBriefing] = useState(null);
+    // === V18: MNEMONIC STATE ===
+  const [mnGenConcept, setMnGenConcept] = useState("");
+  const [mnGenResult, setMnGenResult] = useState(null);
+  const [mnGenLoading, setMnGenLoading] = useState(false);
+  // === V18: RECALL STATE ===
+  const [recallText, setRecallText] = useState("");
+  const [recallRevealed, setRecallRevealed] = useState(false);
+  const [recallAttempts, setRecallAttempts] = useState(0);
+  const [recallSkips, setRecallSkips] = useState(0);
+  // === V16: TAB NAVIGATION ===
+  const [activeTab, setActiveTab] = useState("home");
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [studySubTab, setStudySubTab] = useState("cards");
+  const [studySearch, setStudySearch] = useState("");
+  const [statsPanel, setStatsPanel] = useState("dashboard");
+  const [userName, setUserName] = useState(initialData.userName || "");
+  const prevScrRef = useRef("home");
   var theme = data.theme || "dark";
   var fz = data.fontSize || 0;
   function toggleTheme() {
@@ -1922,6 +2046,37 @@ function Game(_ref2) {
     sb: Object.assign({}, S.sb, {background: TC.card, border: "1px solid " + TC.cbr}),
     mc: Object.assign({}, S.mc, {background: TC.card, border: "1px solid " + TC.cbr, color: fg})
   };
+
+  // === V16: RENDER TAB BAR VIA PORTAL ===
+  var showTabBar = scr !== "play" && scr !== "results";
+  useEffect(function() {
+    var container = document.getElementById("tab-bar-root");
+    if (!container) return;
+    if (showTabBar) {
+      ReactDOM.render(
+        React.createElement(TabBar, { activeTab: activeTab, setActiveTab: setActiveTab, setScr: setScr, isDark: isDark, fg: fg }),
+        container
+      );
+    } else {
+      ReactDOM.render(React.createElement("div"), container);
+    }
+  }, [scr, activeTab, isDark]);
+
+  // V16: Add bottom padding for tab bar clearance
+  useEffect(function() {
+    document.body.style.paddingBottom = showTabBar ? "56px" : "0";
+    return function() { document.body.style.paddingBottom = "0"; };
+  }, [showTabBar]);
+
+  // V16: Sync tab with screen changes
+  useEffect(function() {
+    if (scr === "home") setActiveTab("home");
+    else if (scr === "study_hub" || scr === "study_cards" || scr === "module" || scr === "flashcard_session" || scr === "flashcard_done") setActiveTab("study");
+    else if (scr === "practice_grid" || scr === "select_cats" || scr === "select_tag" || scr === "section_pick") setActiveTab("practice");
+    else if (scr === "stats") setActiveTab("stats");
+    else if (scr === "tools_hub" || scr === "settings_screen" || scr === "formulas" || scr === "teach" || scr === "mistakes" || scr === "reference") setActiveTab("tools");
+  }, [scr]);
+
   function startGame(mode, cats, tag) {
     var pool;
     if (MODES[mode].smart) {
@@ -3039,7 +3194,28 @@ function Game(_ref2) {
                 style: { display: "block", width: "100%", textAlign: "left", padding: "10px 12px", marginBottom: 6, borderRadius: 8, fontSize: 12 + fz, lineHeight: 1.5, color: showResult ? (isCorrect ? "#4ade80" : (isSel && !isCorrect ? "#f87171" : TC.muted)) : (isSel ? "#667eea" : TC.muted), background: showResult ? (isCorrect ? "rgba(74,222,128,.1)" : (isSel && !isCorrect ? "rgba(248,113,113,.1)" : "transparent")) : (isSel ? "rgba(102,126,234,.12)" : "transparent"), border: "1px solid " + (showResult ? (isCorrect ? "rgba(74,222,128,.3)" : (isSel && !isCorrect ? "rgba(248,113,113,.3)" : TC.cbr)) : (isSel ? "rgba(102,126,234,.4)" : TC.cbr)), fontWeight: isSel || (showResult && isCorrect) ? 600 : 400 }
               }, String.fromCharCode(65 + oi) + ". " + opt);
             }),
-            moduleCheckDone ? /*#__PURE__*/React.createElement("div", { style: { marginTop: 10, padding: "10px 12px", background: "rgba(102,126,234,.06)", borderRadius: 8, fontSize: 11 + fz, color: TC.muted, lineHeight: 1.7 } }, checkQ.ex) : null
+            moduleCheckDone ? /*#__PURE__*/React.createElement("div", { style: { marginTop: 10, padding: "10px 12px", background: "rgba(102,126,234,.06)", borderRadius: 8, fontSize: 11 + fz, color: TC.muted, lineHeight: 1.7 } }, checkQ.ex) : null,
+            // V17: AI Explain for wrong module check answers
+            moduleCheckDone && moduleCheckSel !== checkQ.a ? (function() {
+              var mKey = moduleTag + "_" + moduleStep;
+              var cached = aiModuleExplains[mKey];
+              if (cached && cached.text) { return aiCard(cached.text, TC, fg, fz, isDark, { title: "AI EXPLANATION", mt: 8 }); }
+              if (cached && cached.loading) { return aiLoader("Explaining..."); }
+              if (!getApiKey()) { return React.createElement("div", { style: { marginTop: 8 } }, noKeyCard(TC, fg, fz, setScr, setActiveTab)); }
+              return React.createElement("button", {
+                onClick: function() {
+                  setAiModuleExplains(function(p) { var n = Object.assign({}, p); n[mKey] = { loading: true, text: null }; return n; });
+                  var wrongAns = checkQ.o[moduleCheckSel] || "unknown";
+                  var correctAns = checkQ.o[checkQ.a] || "unknown";
+                  var msg = "Module: " + moduleTag + "\\nQuestion: " + checkQ.q + "\\nMy answer: " + wrongAns + "\\nCorrect: " + correctAns + (checkQ.ex ? "\\nExplanation: " + checkQ.ex : "");
+                  var sysP = "You are an MCAT tutor. The student got a module check question wrong. In 2-3 sentences, explain their specific error and why the correct answer is right. End with **MCAT Tip:** for the key concept. Use **bold** for terms.";
+                  callAI([{role:"user", content: msg}], sysP).then(function(reply) {
+                    setAiModuleExplains(function(p) { var n = Object.assign({}, p); n[mKey] = { loading: false, text: reply }; return n; });
+                  });
+                },
+                style: { display: "flex", alignItems: "center", gap: 4, marginTop: 8, padding: "5px 10px", background: isDark ? "rgba(102,126,234,.08)" : "rgba(102,126,234,.06)", border: "1px solid rgba(102,126,234,.2)", borderRadius: 6, fontSize: 10 + fz, color: "#667eea", fontWeight: 600 }
+              }, "\u{1F916} Explain My Mistake");
+            })() : null
           ) : null,
           // Navigation buttons
           /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 10, marginTop: 16, marginBottom: 20 } },
@@ -3077,6 +3253,7 @@ function Game(_ref2) {
 
   // === STUDY CARDS BROWSER ===
   if (scr === "study_cards") {
+    // V16: back goes to study hub
     var cardTags = typeof CARDS !== "undefined" ? Object.keys(CARDS).sort() : [];
     var cardCats = {};
     cardTags.forEach(function (tag) {
@@ -3190,7 +3367,18 @@ function Game(_ref2) {
         marginTop: 14,
         fontSize: 13 + fz
       })
-    }, "\u{1F3AF}", " Quiz This Topic")) : Object.entries(cardCats).map(function (e) {
+    }, "\u{1F3AF}", " Quiz This Topic"),
+    // V17: AI Ask about this topic
+    React.createElement("button", {
+      onClick: function () {
+        setTeachTag(openCard);
+        setTeachQContext(null);
+        setTeachMessages([]);
+        setTeachInput("");
+        setScr("teach");
+      },
+      style: { display: "block", width: "100%", padding: 12, marginTop: 8, background: isDark ? "rgba(102,126,234,.08)" : "rgba(102,126,234,.05)", border: "1.5px solid rgba(102,126,234,.25)", borderRadius: 10, fontSize: 13 + fz, fontWeight: 700, color: "#667eea", textAlign: "center" }
+    }, "\u{1F916} Ask AI About This")) : Object.entries(cardCats).map(function (e) {
       return /*#__PURE__*/React.createElement("div", {
         key: e[0],
         style: {
@@ -3241,6 +3429,7 @@ function Game(_ref2) {
 
   // === AI TEACH SCREEN ===
   if (scr === "teach") {
+    // V16: back goes to tools hub
     var teachScrollRef = React.createRef();
     function renderMarkdown(txt) {
       if (!txt) return txt;
@@ -3268,6 +3457,7 @@ function Game(_ref2) {
           React.createElement("button", { style: { ...TS.bk, color: TC.muted, flexShrink: 0 }, onClick: function() { setScr("home"); } }, "< Back"),
           React.createElement("div", { style: { flex: 1 } }),
           React.createElement("span", { style: { fontSize: 11, color: TC.dim } }, "\u{1F9D1}\u200D\u{1F3EB} AI Tutor"),
+          teachMessages.length > 0 ? React.createElement("button", { onClick: function() { setTeachMessages([]); setTeachTag(null); setTeachQContext(null); setTeachInput(""); }, style: { fontSize: 9, padding: "4px 8px", background: "rgba(248,113,113,.08)", border: "1px solid rgba(248,113,113,.2)", borderRadius: 6, color: "#f87171", fontWeight: 600, flexShrink: 0 } }, "\u{1F504} New Topic") : null,
           React.createElement("button", { onClick: function() {
             var current = getApiKey();
             var masked = current ? current.substring(0, 8) + "..." + current.slice(-4) : "(not set)";
@@ -3319,14 +3509,15 @@ function Game(_ref2) {
             var isUser = m.role === "user";
             return React.createElement("div", { key: i, style: { alignSelf: isUser ? "flex-end" : "flex-start", maxWidth: "88%", padding: "10px 14px", borderRadius: isUser ? "14px 14px 4px 14px" : "14px 14px 14px 4px", background: isUser ? "rgba(102,126,234,.15)" : TC.card, border: "1px solid " + (isUser ? "rgba(102,126,234,.25)" : TC.cbr), fontSize: 12 + fz, lineHeight: 1.65, color: isUser ? fg : TC.muted, whiteSpace: "pre-wrap" } }, isUser ? m.content : renderMarkdown(m.content));
           }),
-          teachLoading ? React.createElement("div", { style: { alignSelf: "flex-start", padding: "10px 14px", borderRadius: "14px 14px 14px 4px", background: TC.card, border: "1px solid " + TC.cbr, fontSize: 12 + fz, color: TC.dim } }, React.createElement("span", { style: { animation: "pu 1.2s infinite" } }, "\u{1F9D1}\u200D\u{1F3EB} Thinking...")) : null
+          teachLoading ? React.createElement("div", { style: { alignSelf: "flex-start", padding: "10px 14px", borderRadius: "14px 14px 14px 4px", background: TC.card, border: "1px solid " + TC.cbr, fontSize: 12 + fz, color: TC.dim } }, React.createElement("span", { className: "ai-dots", style: { marginRight: 8 } }), React.createElement("span", { style: { color: "#667eea", fontWeight: 600 } }, "Thinking...")) : null
         ),
         // Quick action buttons (after conversation started)
         !teachLoading && teachMessages.length >= 2 ? React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 } },
+          React.createElement("button", { onClick: function() { sendTeachMessage("Explain this like I'm 5 years old."); }, style: { padding: "6px 10px", borderRadius: 16, fontSize: 10 + fz, border: "1px solid rgba(102,126,234,.25)", background: "rgba(102,126,234,.08)", color: "#667eea", fontWeight: 600 } }, "\u{1F476} ELI5"),
+          React.createElement("button", { onClick: function() { sendTeachMessage("What's the MCAT trap here? What do test-writers want me to get wrong?"); }, style: { padding: "6px 10px", borderRadius: 16, fontSize: 10 + fz, border: "1px solid rgba(102,126,234,.25)", background: "rgba(102,126,234,.08)", color: "#667eea", fontWeight: 600 } }, "\u26A0\uFE0F MCAT Trap"),
+          React.createElement("button", { onClick: function() { sendTeachMessage("Give me a memorable mnemonic or memory trick for this."); }, style: { padding: "6px 10px", borderRadius: 16, fontSize: 10 + fz, border: "1px solid rgba(102,126,234,.25)", background: "rgba(102,126,234,.08)", color: "#667eea", fontWeight: 600 } }, "\u{1F4A1} Mnemonic"),
           React.createElement("button", { onClick: function() { sendTeachMessage("Give me a practice problem to test my understanding."); }, style: { padding: "6px 10px", borderRadius: 16, fontSize: 10 + fz, border: "1px solid rgba(102,126,234,.25)", background: "rgba(102,126,234,.08)", color: "#667eea", fontWeight: 600 } }, "\u{1F3AF} Quiz Me"),
-          React.createElement("button", { onClick: function() { sendTeachMessage("Can you explain that with a simple analogy?"); }, style: { padding: "6px 10px", borderRadius: 16, fontSize: 10 + fz, border: "1px solid rgba(102,126,234,.25)", background: "rgba(102,126,234,.08)", color: "#667eea", fontWeight: 600 } }, "\u{1F4A1} Simplify"),
-          React.createElement("button", { onClick: function() { sendTeachMessage("What's the most common MCAT trap related to this concept?"); }, style: { padding: "6px 10px", borderRadius: 16, fontSize: 10 + fz, border: "1px solid rgba(102,126,234,.25)", background: "rgba(102,126,234,.08)", color: "#667eea", fontWeight: 600 } }, "\u26A0\uFE0F MCAT Traps"),
-          React.createElement("button", { onClick: function() { sendTeachMessage("How does this connect to other MCAT topics?"); }, style: { padding: "6px 10px", borderRadius: 16, fontSize: 10 + fz, border: "1px solid rgba(102,126,234,.25)", background: "rgba(102,126,234,.08)", color: "#667eea", fontWeight: 600 } }, "\u{1F517} Connections")
+          React.createElement("button", { onClick: function() { sendTeachMessage("How does this connect to other MCAT topics?"); }, style: { padding: "6px 10px", borderRadius: 16, fontSize: 10 + fz, border: "1px solid rgba(102,126,234,.25)", background: "rgba(102,126,234,.08)", color: "#667eea", fontWeight: 600 } }, "\u{1F517} Connect")
         ) : null,
         // Input bar (fixed at bottom)
         React.createElement("div", { style: { position: "fixed", bottom: 0, left: 0, right: 0, padding: "10px 14px", paddingBottom: "calc(10px + env(safe-area-inset-bottom))", background: bg, borderTop: "1px solid " + TC.cbr, zIndex: 100 } },
@@ -3389,6 +3580,7 @@ function Game(_ref2) {
 
   // === FORMULA REFERENCE ===
   if (scr === "formulas") {
+    // V16: back goes to tools hub
     var allFormulas = typeof REF_FORMULAS !== "undefined" ? REF_FORMULAS : {};
     var fSearch = formulaSearch.toLowerCase();
     return React.createElement("div", { style: { ...S.c, background: bg, color: fg } },
@@ -3431,58 +3623,90 @@ function Game(_ref2) {
       style: {
         ...S.c,
         background: bg,
-        color: fg
-      }
+        color: fg,
+        paddingBottom: 80
+      },
+      className: "screen-fade"
     }, /*#__PURE__*/React.createElement(SB, null), /*#__PURE__*/React.createElement("div", {
       style: S.i
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        justifyContent: "flex-end",
-        gap: 6,
-        marginBottom: 4
-      }
-    }, /*#__PURE__*/React.createElement("button", {
-      onClick: function () {
-        adjustFont(-2);
-      },
-      style: {
-        fontSize: 12,
-        color: TC.muted,
-        padding: "2px 6px",
-        border: "1px solid " + TC.cbr,
-        borderRadius: 6
-      }
-    }, "A-"), /*#__PURE__*/React.createElement("button", {
-      onClick: function () {
-        adjustFont(2);
-      },
-      style: {
-        fontSize: 14,
-        color: TC.muted,
-        padding: "2px 6px",
-        border: "1px solid " + TC.cbr,
-        borderRadius: 6
-      }
-    }, "A+"), /*#__PURE__*/React.createElement("button", {
-      onClick: toggleTheme,
-      style: {
-        fontSize: 16,
-        padding: "2px 6px"
-      }
-    }, isDark ? "\u2600\uFE0F" : "\u{1F319}"), /*#__PURE__*/React.createElement("button", {
-      onClick: function () {
-        setData(function (d) { return Object.assign({}, d, { thinkFirst: !d.thinkFirst }); });
-      },
-      style: {
-        fontSize: 10,
-        color: data.thinkFirst ? "#667eea" : TC.muted,
-        padding: "2px 6px",
-        border: "1px solid " + (data.thinkFirst ? "rgba(102,126,234,.5)" : TC.cbr),
-        borderRadius: 6,
-        background: data.thinkFirst ? "rgba(102,126,234,.1)" : "transparent"
-      }
-    }, "\u{1F4DD}", data.thinkFirst ? " Recall ON" : " Recall")), /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement("div", { style: { marginBottom: 16 } },
+      React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 2 } },
+        React.createElement("div", { style: { fontSize: 16 + fz, fontWeight: 800, color: fg } }, getGreeting(data.userName)),
+        React.createElement("div", { title: _aiStatus === "ok" ? "AI connected" : _aiStatus === "no_key" ? "No API key" : _aiStatus === "error" ? "AI error" : "AI unknown", style: { width: 8, height: 8, borderRadius: 4, background: _aiStatus === "ok" ? "#4ade80" : !getApiKey() ? "#f87171" : _aiStatus === "error" ? "#fbbf24" : TC.dim, flexShrink: 0, boxShadow: _aiStatus === "ok" ? "0 0 6px rgba(74,222,128,.4)" : "none" } })
+      ),
+      React.createElement("div", { style: { fontSize: 10, color: TC.dim } }, new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })),
+      dayStreak >= 1 ? React.createElement("span", { style: { fontSize: 10, color: "#ff9933", fontWeight: 700, marginLeft: 0, display: "block", marginTop: 4 } }, "\u{1F525} " + dayStreak + "-day streak" + (dayStreak >= 3 ? " (+10% XP)" : "")) : null
+    ),
+    // V20: Daily Challenge
+    (function() {
+      var dc = getDailyChallenge(data);
+      if (!dc) return null;
+      var q = QS.find(function(x) { return x.id === dc.id; });
+      if (!q) return null;
+      if (dc.done) return React.createElement("div", { style: { padding: "10px 14px", marginBottom: 10, background: "rgba(74,222,128,.06)", border: "1px solid rgba(74,222,128,.2)", borderRadius: 10, display: "flex", alignItems: "center", gap: 8 } },
+        React.createElement("span", { style: { fontSize: 18 } }, "\u2705"),
+        React.createElement("span", { style: { fontSize: 11 + fz, color: "#4ade80", fontWeight: 600 } }, "Daily Challenge Complete! +50 XP")
+      );
+      return React.createElement("button", { onClick: function() {
+        dirtyRef.current = true;
+        setData(function(d) { return Object.assign({}, d, { dailyChallengeDate: todayStr(), dailyChallengeId: dc.id }); });
+        startGame("MARATHON", [], (q.tags||[])[0]);
+      }, style: { display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "12px 14px", marginBottom: 10, background: "linear-gradient(135deg, rgba(255,200,50,.08), rgba(255,150,50,.06))", border: "1.5px solid rgba(255,200,50,.25)", borderRadius: 12, textAlign: "left" } },
+        React.createElement("span", { style: { fontSize: 24 } }, "\u{1F3C6}"),
+        React.createElement("div", { style: { flex: 1 } },
+          React.createElement("div", { style: { fontSize: 12 + fz, fontWeight: 700, color: "#fbbf24" } }, "Daily Challenge"),
+          React.createElement("div", { style: { fontSize: 10, color: TC.muted } }, q.q.substring(0, 60) + "..."),
+          React.createElement("div", { style: { fontSize: 9, color: "#fbbf24", fontWeight: 600, marginTop: 2 } }, "+50 XP bonus")
+        )
+      );
+    })(),
+    // Quick-start buttons row
+    React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 14, overflowX: "auto" } },
+      React.createElement("button", { onClick: function() { startGame("QUICK_5", []); }, style: { flex: "0 0 auto", padding: "10px 14px", background: "linear-gradient(135deg,rgba(102,126,234,.1),rgba(118,75,162,.1))", border: "1px solid rgba(102,126,234,.2)", borderRadius: 10, textAlign: "center" } },
+        React.createElement("div", { style: { fontSize: 16 } }, "\u26A1"),
+        React.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: "#667eea", marginTop: 2 } }, "Quick 5")
+      ),
+      dueC > 0 ? React.createElement("button", { onClick: function() { startGame("SPACED_REVIEW", []); }, style: { flex: "0 0 auto", padding: "10px 14px", background: "rgba(74,222,128,.06)", border: "1px solid rgba(74,222,128,.2)", borderRadius: 10, textAlign: "center" } },
+        React.createElement("div", { style: { fontSize: 16 } }, "\u{1F9E0}"),
+        React.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: "#4ade80", marginTop: 2 } }, dueC + " Due")
+      ) : null,
+      React.createElement("button", { onClick: function() { var modes = Object.keys(MODES); var rk = modes[Math.floor(Math.random()*modes.length)]; if (MODES[rk].smart) startGame(rk, []); else startGame(rk, Object.keys(CATS)); }, style: { flex: "0 0 auto", padding: "10px 14px", background: "rgba(251,146,60,.06)", border: "1px solid rgba(251,146,60,.2)", borderRadius: 10, textAlign: "center" } },
+        React.createElement("div", { style: { fontSize: 16 } }, "\u{1F3B2}"),
+        React.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: "#fb923c", marginTop: 2 } }, "Surprise")
+      )
+    ),
+    // V19: Performance Insights
+    (function() {
+      var insights = generateInsights(data);
+      if (insights.length === 0) return null;
+      return React.createElement("div", { style: { marginBottom: 14 } },
+        insights.map(function(ins, ii) {
+          return React.createElement("div", { key: ii, style: { display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", marginBottom: 4, background: ins.type === "positive" ? "rgba(74,222,128,.05)" : ins.type === "warning" ? "rgba(248,113,113,.05)" : "rgba(102,126,234,.05)", border: "1px solid " + (ins.type === "positive" ? "rgba(74,222,128,.15)" : ins.type === "warning" ? "rgba(248,113,113,.15)" : "rgba(102,126,234,.15)"), borderRadius: 8 } },
+            React.createElement("span", { style: { fontSize: 14, flexShrink: 0 } }, ins.icon),
+            React.createElement("span", { style: { fontSize: 10 + fz, color: TC.muted, flex: 1, lineHeight: 1.4 } }, ins.text)
+          );
+        })
+      );
+    })(),
+    // Weekly progress ring
+    (function() {
+      var weeklyQs = getWeeklyQsAnswered(data);
+      var goal = data.weeklyGoal || 100;
+      var pct = Math.min(Math.round(weeklyQs / goal * 100), 100);
+      return React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 14, padding: "12px 14px", background: TC.card, border: "1px solid " + TC.cbr, borderRadius: 12, marginBottom: 14 } },
+        React.createElement(ProgressRing, { pct: pct, size: 56, stroke: 5, color: pct >= 100 ? "#4ade80" : "#667eea", trackColor: isDark ? "rgba(255,255,255,.06)" : "rgba(0,0,0,.06)" },
+          React.createElement("span", { style: { fontSize: 14, fontWeight: 800, color: pct >= 100 ? "#4ade80" : "#667eea" } }, pct + "%")
+        ),
+        React.createElement("div", { style: { flex: 1 } },
+          React.createElement("div", { style: { fontSize: 12 + fz, fontWeight: 700, color: fg } }, "Weekly Goal"),
+          React.createElement("div", { style: { fontSize: 10, color: TC.muted } }, weeklyQs + " / " + goal + " questions this week"),
+          React.createElement("div", { style: { height: 4, background: isDark ? "rgba(255,255,255,.06)" : "rgba(0,0,0,.06)", borderRadius: 2, marginTop: 4, overflow: "hidden" } },
+            React.createElement("div", { style: { height: "100%", width: pct + "%", background: pct >= 100 ? "#4ade80" : "linear-gradient(90deg,#667eea,#764ba2)", borderRadius: 2, transition: "width .3s" } })
+          )
+        )
+      );
+    })(),
+    /*#__PURE__*/React.createElement("div", {
       style: {
         textAlign: "center",
         marginBottom: 20
@@ -3504,7 +3728,7 @@ function Game(_ref2) {
         color: TC.dim,
         letterSpacing: 2
       }
-    }, "v15.0.0 ", "\u2022", " AI TUTOR ", "\u2022", " SECTION SIM")), dayStreak >= 1 && /*#__PURE__*/React.createElement("div", {
+    }, "v20.0.0 ", "\u2022", " AI TUTOR ", "\u2022", " SECTION SIM")), dayStreak >= 1 && /*#__PURE__*/React.createElement("div", {
       style: {
         marginBottom: 12,
         padding: "10px 14px",
@@ -3994,7 +4218,7 @@ function Game(_ref2) {
     }(),
     /*#__PURE__*/React.createElement("button", {
       onClick: function () {
-        setScr("study_cards");
+        setActiveTab("study"); setScr("study_hub");
       },
       style: {
         width: "100%",
@@ -4388,7 +4612,7 @@ function Game(_ref2) {
         marginBottom: 14,
         lineHeight: 1.5
       }
-    }, "Scaled to your question bank ", "\u2022", " Section timer ", "\u2022", " Free navigation ", "\u2022", " No feedback until submit"), /*#__PURE__*/React.createElement("div", {
+    }, "MCAT-realistic simulation \u2022 Timed \u2022 Free navigation \u2022 No feedback until submit"), /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         flexDirection: "column",
@@ -4397,6 +4621,9 @@ function Game(_ref2) {
     }, secs.map(function (sec) {
       var a = getSectionAcc(data, sec);
       var c = a >= 80 ? "#4ade80" : a >= 60 ? "#fbbf24" : a !== null ? "#f87171" : TC.dim;
+      var cfg = typeof SIM_CONFIG !== "undefined" ? SIM_CONFIG[sec] : null;
+      var secCatsCount = QS.filter(function(q) { return Object.keys(CATS).filter(function(k){return CATS[k].sec===sec;}).indexOf(q.cat)>=0; }).length;
+      var scaledTime = cfg && secCatsCount > 0 ? Math.round(cfg.realTime * secCatsCount / cfg.realQs) : 30;
       return /*#__PURE__*/React.createElement("button", {
         key: sec,
         onClick: function () {
@@ -4439,6 +4666,7 @@ function Game(_ref2) {
 
   // === REFERENCE SHEETS ===
   if (scr === "mistakes") {
+    // V16: back goes to tools hub
     var mLog = getMistakeLog(data);
     var patterns = getErrorPatterns(data);
     var grouped = {};
@@ -4483,6 +4711,43 @@ function Game(_ref2) {
             style: { flex: 1, padding: "10px", borderRadius: 10, fontSize: 12, fontWeight: 700, background: "rgba(248,113,113,.08)", border: "1px solid rgba(248,113,113,.2)", color: "#f87171" }
           }, "\u{1F480} Hard Questions")
         ) : null,
+        // V17: AI Pattern Analysis button
+        mLog.length >= 5 ? (function() {
+          if (aiPatternAnalysis) {
+            return React.createElement("div", { style: { marginBottom: 14 } },
+              aiCard(aiPatternAnalysis, TC, fg, fz, isDark, { title: "AI MISTAKE ANALYSIS", mt: 0 }),
+              React.createElement("button", { onClick: function() { setAiPatternAnalysis(null); }, style: { fontSize: 10, color: TC.dim, marginTop: 4, padding: "3px 8px", border: "1px solid " + TC.cbr, borderRadius: 4, background: "transparent" } }, "\u{1F504} Re-analyze")
+            );
+          }
+          if (aiPatternLoading) {
+            return React.createElement("div", { style: { marginBottom: 14, padding: "16px", background: isDark ? "rgba(102,126,234,.06)" : "rgba(102,126,234,.04)", border: "1px solid rgba(102,126,234,.15)", borderRadius: 12, textAlign: "center" } },
+              aiLoader("Analyzing your mistake patterns...")
+            );
+          }
+          if (!getApiKey()) {
+            return React.createElement("div", { style: { marginBottom: 14 } }, noKeyCard(TC, fg, fz, setScr, setActiveTab));
+          }
+          return React.createElement("button", {
+            onClick: function() {
+              setAiPatternLoading(true);
+              var recent = mLog.slice(-20);
+              var mistakeDetails = recent.map(function(m, idx) {
+                var q = QS.find(function(x) { return x.id === m.qId; });
+                if (!q) return "Q" + (idx+1) + ": [data unavailable]";
+                return "Q" + (idx+1) + ": " + q.q.substring(0, 80) + "... | Cat: " + m.cat + " | Tags: " + (m.tags||[]).join(", ") + " | Wrong: " + (q.o[m.wrongPick]||"").substring(0, 50) + " | Correct: " + (q.o[m.correctAns]||"").substring(0, 50) + (m.whyReason ? " | Self-report: " + m.whyReason : "");
+              }).join("\n");
+              var sysP = "You are an expert MCAT tutor analyzing a student's mistake patterns. Review their last " + recent.length + " mistakes and provide a structured analysis. Format your response with exactly 3 sections using **bold** headers: **Pattern 1: [name]** — describe the pattern and give 2 concrete examples from their mistakes. **Pattern 2: [name]** — same format. **Pattern 3: [name]** — same format. Then add **Conceptual Gaps:** — the underlying knowledge gaps driving these patterns. Finally **Study Plan:** — 3 specific, actionable study steps (not generic advice). Keep total under 400 words. Use **bold** for key terms.";
+              callAI([{role:"user", content: "Here are my last " + recent.length + " MCAT mistakes:\n" + mistakeDetails}], sysP).then(function(reply) {
+                setAiPatternLoading(false);
+                setAiPatternAnalysis(reply);
+              });
+            },
+            style: { display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", padding: "12px 16px", marginBottom: 14, background: "linear-gradient(135deg, rgba(102,126,234,.08), rgba(118,75,162,.06))", border: "1.5px solid rgba(102,126,234,.25)", borderRadius: 12 }
+          },
+            React.createElement("span", { style: { fontSize: 18 } }, "\u{1F9E0}"),
+            React.createElement("span", { style: { fontSize: 13 + fz, fontWeight: 700, color: "#667eea" } }, "Analyze My Patterns")
+          );
+        })() : null,
         // Self-reported error breakdown
         function () {
           var reasons = {};
@@ -4525,7 +4790,18 @@ function Game(_ref2) {
                 /*#__PURE__*/React.createElement("button", {
                   onClick: function() { startGame("TAG_PRACTICE", [], (q.tags||[])[0]); },
                   style: { fontSize: 10, color: "#667eea", marginTop: 4, textDecoration: "underline", background: "none", border: "none", padding: 0, cursor: "pointer" }
-                }, "\u{1F501} Retry this topic")
+                }, "\u{1F501} Retry this topic"),
+                // V17: AI Explain button on mistake entries
+                getApiKey() ? React.createElement("button", {
+                  onClick: function() {
+                    setTeachTag((q.tags||[])[0] || q.cat);
+                    setTeachQContext({ stem: q.q, picked: q.o[m.wrongPick] || "unknown", correct: q.o[m.correctAns] || "unknown", explanation: q.ex || "" });
+                    setTeachMessages([]);
+                    setTeachInput("");
+                    setScr("teach");
+                  },
+                  style: { fontSize: 10, color: "#667eea", marginTop: 4, marginLeft: 8, padding: "3px 8px", background: "rgba(102,126,234,.06)", border: "1px solid rgba(102,126,234,.2)", borderRadius: 5, fontWeight: 600 }
+                }, "\u{1F916} Ask AI") : null
               );
             }),
             items.length > 5 && /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: TC.dim, padding: "4px 0" } }, "+" + (items.length - 5) + " more")
@@ -5157,6 +5433,32 @@ function Game(_ref2) {
       )
     )),
     // === INSIGHTS TAB ===
+    // V19: Accuracy Trend Chart (before insights tab)
+    sTab === "overview" && data.sessionHistory && data.sessionHistory.length >= 3 ? React.createElement("div", { style: { marginTop: 14, padding: "12px", background: TC.card, border: "1px solid " + TC.cbr, borderRadius: 12 } },
+      React.createElement("div", { style: { fontSize: 12 + fz, fontWeight: 700, color: fg, marginBottom: 8 } }, "\u{1F4C8} Accuracy Trend (last 20 sessions)"),
+      (function() {
+        var sessions = (data.sessionHistory || []).slice(-20);
+        var points = sessions.map(function(s, i) { return { y: s.total > 0 ? Math.round(s.correct / s.total * 100) : 0 }; });
+        return svgLineChart(points, 320, 140, null, TC, isDark);
+      })()
+    ) : null,
+    // V19: Study Time Chart
+    sTab === "overview" ? React.createElement("div", { style: { marginTop: 10, padding: "12px", background: TC.card, border: "1px solid " + TC.cbr, borderRadius: 12 } },
+      React.createElement("div", { style: { fontSize: 12 + fz, fontWeight: 700, color: fg, marginBottom: 8 } }, "\u{1F4CA} Study Time (14 days)"),
+      (function() {
+        var st = data.studyTime || {};
+        var dailyTarget = Math.round((data.weeklyGoal || 100) / 7 * 1.5);
+        var bars = [];
+        for (var i = 13; i >= 0; i--) {
+          var d = new Date(Date.now() - i * 86400000);
+          var key = d.toISOString().slice(0, 10);
+          var mins = Math.round((st[key] || 0) / 60);
+          var dayLabel = d.toLocaleDateString("en", { weekday: "narrow" });
+          bars.push({ label: dayLabel, value: mins, color: mins >= dailyTarget ? "#4ade80" : "#667eea" });
+        }
+        return svgBarChart(bars, 320, 120, TC, isDark);
+      })()
+    ) : null,
     sTab === "insights" && React.createElement("div", null,
       React.createElement("div", { style: { fontSize: 12 + fz, fontWeight: 700, color: fg, marginBottom: 10 } }, "\u{1F3AF} What To Study Next"),
       React.createElement("p", { style: { fontSize: 10, color: TC.dim, marginBottom: 12, lineHeight: 1.5 } }, "Ranked by impact: weakness \u00D7 MCAT weight \u00D7 question count. These are your highest-ROI study areas."),
@@ -5604,7 +5906,36 @@ function Game(_ref2) {
         textAlign: "center",
         padding: 30
       }
-    }, "Answer some questions to see pacing data")), sTab === "score" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
+    }, "Answer some questions to see pacing data")), sTab === "score" && React.createElement("div", { style: { marginBottom: 14 } },
+      // V19: Enhanced score prediction
+      (function() {
+        var pred = getTotalPredicted(data);
+        if (!pred) return React.createElement("div", { style: { textAlign: "center", padding: 20, color: TC.dim } }, "Answer questions in all 4 sections to see score predictions");
+        var secs = ["Bio/Biochem", "Chem/Phys", "Psych/Soc", "CARS"];
+        return React.createElement("div", null,
+          React.createElement("div", { style: { textAlign: "center", padding: "20px 0", marginBottom: 14 } },
+            React.createElement("div", { style: { fontSize: 42, fontWeight: 900, color: "#667eea" } }, pred.mid),
+            React.createElement("div", { style: { fontSize: 12, color: TC.muted } }, "Estimated Total (" + pred.low + "\u2013" + pred.high + ")"),
+            React.createElement("div", { style: { fontSize: 9, color: TC.dim, marginTop: 4 } }, "Based on " + data.totalAnswered + " questions answered")
+          ),
+          secs.map(function(sec) {
+            var a = getSectionAccEMA(data, sec);
+            var p = a !== null ? predictScore(a) : null;
+            if (!p) return null;
+            var mid = Math.round((p.low + p.high) / 2);
+            var pct = Math.round((mid - 118) / (132 - 118) * 100);
+            var barColor = mid >= 128 ? "#4ade80" : mid >= 125 ? "#fbbf24" : "#f87171";
+            return React.createElement("div", { key: sec, style: { display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: "1px solid " + TC.cbr } },
+              React.createElement("span", { style: { fontSize: 11, color: TC.muted, width: 80, flexShrink: 0 } }, sec),
+              React.createElement("div", { style: { flex: 1, height: 8, background: isDark ? "rgba(255,255,255,.06)" : "rgba(0,0,0,.06)", borderRadius: 4, overflow: "hidden" } },
+                React.createElement("div", { style: { height: "100%", width: pct + "%", background: barColor, borderRadius: 4 } })
+              ),
+              React.createElement("span", { style: { fontSize: 12, fontWeight: 800, color: barColor, width: 50, textAlign: "right" } }, p.low + "\u2013" + p.high)
+            );
+          })
+        );
+      })()
+    ), sTab === "score" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
       style: {
         fontSize: 11,
         color: "#999",
@@ -5793,7 +6124,30 @@ function Game(_ref2) {
           marginTop: 3
         }
       }, "\u2705", " Earned"));
-    }))), sTab === "calibration" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
+    }))), sTab === "calibration" && React.createElement("div", { style: { marginBottom: 14 } },
+      // V19: Visual calibration bars
+      React.createElement("div", { style: { padding: "14px", background: TC.card, border: "1px solid " + TC.cbr, borderRadius: 12, marginBottom: 10 } },
+        React.createElement("div", { style: { fontSize: 12 + fz, fontWeight: 700, color: fg, marginBottom: 10 } }, "\u{1F3AF} Confidence Calibration"),
+        ["high", "med", "low"].map(function(level) {
+          var cal = (data.calibration || {})[level] || { total: 0, correct: 0 };
+          var pct = cal.total > 0 ? Math.round(cal.correct / cal.total * 100) : 0;
+          var expected = level === "high" ? 85 : level === "med" ? 60 : 30;
+          var label = level === "high" ? "High" : level === "med" ? "Medium" : "Low";
+          var gap = pct - expected;
+          return React.createElement("div", { key: level, style: { marginBottom: 10 } },
+            React.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 11, color: TC.muted, marginBottom: 4 } },
+              React.createElement("span", null, label + " Confidence"),
+              React.createElement("span", { style: { fontWeight: 700, color: fg } }, pct + "% correct" + (cal.total > 0 ? " (" + cal.total + " Qs)" : ""))
+            ),
+            React.createElement("div", { style: { display: "flex", gap: 4, height: 16, borderRadius: 4, overflow: "hidden" } },
+              React.createElement("div", { style: { width: pct + "%", background: gap > 10 ? "#4ade80" : gap < -10 ? "#f87171" : "#fbbf24", borderRadius: 4, transition: "width .3s" } }),
+              React.createElement("div", { style: { flex: 1, background: isDark ? "rgba(255,255,255,.04)" : "rgba(0,0,0,.04)" } })
+            ),
+            gap !== 0 && cal.total >= 3 ? React.createElement("div", { style: { fontSize: 9, color: gap > 10 ? "#4ade80" : gap < -10 ? "#f87171" : TC.dim, marginTop: 2 } }, gap > 10 ? "\u2705 Well calibrated!" : gap < -15 ? "\u26A0\uFE0F Overconfident \u2014 you're getting " + Math.abs(gap) + "% fewer right than expected" : gap > 0 ? "\u{1F44D} Close to target" : "Your " + label.toLowerCase() + " instincts are often right \u2014 trust them more!") : null
+          );
+        })
+      )
+    ), sTab === "calibration" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
       style: {
         fontSize: 11,
         color: "#999",
@@ -5930,7 +6284,484 @@ function Game(_ref2) {
   }
 
   // === CAT SELECT ===
-  if (scr === "select_cats") {
+
+  // === V16: TOOLS HUB SCREEN ===
+  if (scr === "tools_hub" || scr === "settings_screen") {
+    if (scr === "settings_screen") {
+      // SETTINGS SCREEN
+      return React.createElement("div", { style: { ...S.c, background: bg, color: fg, paddingBottom: 80 }, className: "screen-fade" },
+        React.createElement("div", { style: S.i },
+          React.createElement("button", { onClick: function() { setScr("tools_hub"); }, style: { ...S.bk, color: TC.muted, fontSize: 11 + fz } }, "\u2190 Tools"),
+          React.createElement("h2", { style: { fontSize: 20 + fz, fontWeight: 800, marginBottom: 16, color: fg } }, "\u2699\uFE0F Settings"),
+
+          // Theme toggle
+          React.createElement("div", { style: { padding: "14px 16px", background: TC.card, border: "1px solid " + TC.cbr, borderRadius: 12, marginBottom: 10 } },
+            React.createElement("div", { style: { fontSize: 12 + fz, fontWeight: 700, marginBottom: 8, color: fg } }, "Theme"),
+            React.createElement("div", { style: { display: "flex", gap: 8 } },
+              React.createElement("button", { onClick: function() { dirtyRef.current = true; setData(function(d) { return Object.assign({}, d, { theme: "dark" }); }); }, style: { flex: 1, padding: "10px", borderRadius: 8, background: !isDark ? "transparent" : "rgba(102,126,234,.15)", border: "1.5px solid " + (!isDark ? TC.cbr : "#667eea"), color: !isDark ? TC.muted : "#667eea", fontWeight: 600, fontSize: 12 + fz } }, "\u{1F319} Dark"),
+              React.createElement("button", { onClick: function() { dirtyRef.current = true; setData(function(d) { return Object.assign({}, d, { theme: "light" }); }); }, style: { flex: 1, padding: "10px", borderRadius: 8, background: isDark ? "transparent" : "rgba(102,126,234,.15)", border: "1.5px solid " + (isDark ? TC.cbr : "#667eea"), color: isDark ? TC.muted : "#667eea", fontWeight: 600, fontSize: 12 + fz } }, "\u2600\uFE0F Light")
+            )
+          ),
+
+          // Font size slider
+          React.createElement("div", { style: { padding: "14px 16px", background: TC.card, border: "1px solid " + TC.cbr, borderRadius: 12, marginBottom: 10 } },
+            React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 } },
+              React.createElement("span", { style: { fontSize: 12 + fz, fontWeight: 700, color: fg } }, "Font Size"),
+              React.createElement("span", { style: { fontSize: 11, color: TC.muted, fontFamily: "monospace" } }, fz > 0 ? "+" + fz : fz)
+            ),
+            React.createElement("input", { type: "range", min: -4, max: 8, step: 1, value: fz, className: "settings-slider", style: { "--slider-bg": isDark ? "rgba(255,255,255,.1)" : "rgba(0,0,0,.1)" }, onChange: function(e) { dirtyRef.current = true; setData(function(d) { return Object.assign({}, d, { fontSize: parseInt(e.target.value) }); }); } }),
+            React.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 9, color: TC.dim, marginTop: 4 } },
+              React.createElement("span", null, "Smaller"),
+              React.createElement("span", null, "Larger")
+            )
+          ),
+
+          // API Key
+          React.createElement("div", { style: { padding: "14px 16px", background: TC.card, border: "1px solid " + TC.cbr, borderRadius: 12, marginBottom: 10 } },
+            React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 } },
+              React.createElement("span", { style: { fontSize: 12 + fz, fontWeight: 700, color: fg } }, "AI API Key"),
+              React.createElement("span", { style: { fontSize: 11, color: getApiKey() ? "#4ade80" : "#f87171" } }, getApiKey() ? "\u2705 Connected" : "\u274C Not set")
+            ),
+            React.createElement("div", { style: { display: "flex", gap: 6 } },
+              React.createElement("input", { type: "password", placeholder: "sk-ant-...", value: getApiKey(), style: { flex: 1, padding: "8px 10px", background: isDark ? "rgba(255,255,255,.05)" : "rgba(0,0,0,.05)", border: "1px solid " + TC.cbr, borderRadius: 6, color: fg, fontSize: 11, fontFamily: "monospace" }, onChange: function(e) { setApiKey(e.target.value); if (e.target.value) { saveApiKeyToCloud(e.target.value, pin, data); } } }),
+              React.createElement("button", { onClick: function() { if (!getApiKey()) { alert("Enter an API key first"); return; } callTeachAI([{role:"user",content:"Say OK"}], "Respond with just OK").then(function(r) { alert(r.indexOf("OK") >= 0 ? "\u2705 Connection successful!" : "\u26A0\uFE0F Unexpected response: " + r.slice(0,50)); }).catch(function() { alert("\u274C Connection failed"); }); }, style: { padding: "8px 12px", background: "rgba(102,126,234,.15)", border: "1px solid rgba(102,126,234,.3)", borderRadius: 6, color: "#667eea", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap" } }, "Test")
+            )
+          ),
+
+          // Study Preferences
+          React.createElement("div", { style: { padding: "14px 16px", background: TC.card, border: "1px solid " + TC.cbr, borderRadius: 12, marginBottom: 10 } },
+            React.createElement("div", { style: { fontSize: 12 + fz, fontWeight: 700, marginBottom: 10, color: fg } }, "Study Preferences"),
+            // Think First / Recall toggle
+            React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 } },
+              React.createElement("div", null,
+                React.createElement("div", { style: { fontSize: 11 + fz, fontWeight: 600, color: fg } }, "Recall Mode"),
+                React.createElement("div", { style: { fontSize: 9, color: TC.dim } }, "Think before seeing answers")
+              ),
+              React.createElement("button", { onClick: function() { dirtyRef.current = true; setData(function(d) { return Object.assign({}, d, { thinkFirst: !d.thinkFirst }); }); }, style: { width: 44, height: 24, borderRadius: 12, background: data.thinkFirst ? "#667eea" : (isDark ? "rgba(255,255,255,.15)" : "rgba(0,0,0,.15)"), border: "none", position: "relative", transition: "background .2s" } },
+                React.createElement("div", { style: { width: 18, height: 18, borderRadius: 9, background: "#fff", position: "absolute", top: 3, left: data.thinkFirst ? 23 : 3, transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,.2)" } })
+              )
+            ),
+            // Free Recall toggle
+            React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 } },
+              React.createElement("div", null,
+                React.createElement("div", { style: { fontSize: 11 + fz, fontWeight: 600, color: fg } }, "Free Recall"),
+                React.createElement("div", { style: { fontSize: 9, color: TC.dim } }, "Write answer before multiple choice")
+              ),
+              React.createElement("button", { onClick: function() { dirtyRef.current = true; setData(function(d) { return Object.assign({}, d, { freeRecallEnabled: !d.freeRecallEnabled }); }); }, style: { width: 44, height: 24, borderRadius: 12, background: data.freeRecallEnabled ? "#667eea" : (isDark ? "rgba(255,255,255,.15)" : "rgba(0,0,0,.15)"), border: "none", position: "relative", transition: "background .2s" } },
+                React.createElement("div", { style: { width: 18, height: 18, borderRadius: 9, background: "#fff", position: "absolute", top: 3, left: data.freeRecallEnabled ? 23 : 3, transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,.2)" } })
+              )
+            ),
+            // Weekly goal
+            React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } },
+              React.createElement("div", null,
+                React.createElement("div", { style: { fontSize: 11 + fz, fontWeight: 600, color: fg } }, "Weekly Question Goal"),
+                React.createElement("div", { style: { fontSize: 9, color: TC.dim } }, "Target questions per week")
+              ),
+              React.createElement("input", { type: "number", min: 10, max: 1000, step: 10, value: data.weeklyGoal || 100, style: { width: 60, padding: "4px 8px", background: isDark ? "rgba(255,255,255,.05)" : "rgba(0,0,0,.05)", border: "1px solid " + TC.cbr, borderRadius: 6, color: fg, fontSize: 12, textAlign: "center", fontFamily: "inherit" }, onChange: function(e) { var v = parseInt(e.target.value) || 100; dirtyRef.current = true; setData(function(d) { return Object.assign({}, d, { weeklyGoal: v }); }); } })
+            )
+          ),
+
+          // User name
+          React.createElement("div", { style: { padding: "14px 16px", background: TC.card, border: "1px solid " + TC.cbr, borderRadius: 12, marginBottom: 10 } },
+            React.createElement("div", { style: { fontSize: 12 + fz, fontWeight: 700, marginBottom: 8, color: fg } }, "Profile"),
+            React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center" } },
+              React.createElement("span", { style: { fontSize: 11, color: TC.muted, whiteSpace: "nowrap" } }, "Name:"),
+              React.createElement("input", { type: "text", placeholder: "Your name", value: data.userName || "", style: { flex: 1, padding: "6px 10px", background: isDark ? "rgba(255,255,255,.05)" : "rgba(0,0,0,.05)", border: "1px solid " + TC.cbr, borderRadius: 6, color: fg, fontSize: 11 }, onChange: function(e) { dirtyRef.current = true; setData(function(d) { return Object.assign({}, d, { userName: e.target.value }); }); } })
+            )
+          ),
+
+          // Data management
+          React.createElement("div", { style: { padding: "14px 16px", background: TC.card, border: "1px solid " + TC.cbr, borderRadius: 12, marginBottom: 10 } },
+            React.createElement("div", { style: { fontSize: 12 + fz, fontWeight: 700, marginBottom: 10, color: fg } }, "Data"),
+            React.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 11, color: TC.muted, marginBottom: 6 } },
+              React.createElement("span", null, "Cloud sync"),
+              React.createElement("span", { style: { color: ss === "saved" ? "#4ade80" : ss === "saving" ? "#fb923c" : ss === "error" ? "#f87171" : TC.dim } }, ss === "saved" ? "\u2705 Synced" : ss === "saving" ? "\u{1F504} Saving..." : ss === "error" ? "\u274C Error" : "\u2022 Idle")
+            ),
+            React.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 11, color: TC.muted, marginBottom: 8 } },
+              React.createElement("span", null, "Total questions answered"),
+              React.createElement("span", { style: { fontWeight: 700, color: fg } }, data.totalAnswered || 0)
+            ),
+            React.createElement("button", { onClick: function() { setSS("saving"); saveToCloud(pin, data).then(function(ok) { setSS(ok ? "saved" : "error"); setTimeout(function() { setSS(""); }, 2000); }); }, style: { width: "100%", padding: "8px", background: "rgba(102,126,234,.1)", border: "1px solid rgba(102,126,234,.2)", borderRadius: 6, color: "#667eea", fontSize: 11, fontWeight: 600, marginBottom: 8 } }, "\u{1F504} Sync Now"),
+            React.createElement("button", { onClick: function() { if (confirm("Reset ALL progress? This cannot be undone.") && confirm("Are you REALLY sure? This deletes everything.")) { dirtyRef.current = true; setData(function() { return Object.assign({}, DD); }); } }, style: { width: "100%", padding: "8px", background: "rgba(248,113,113,.08)", border: "1px solid rgba(248,113,113,.2)", borderRadius: 6, color: "#f87171", fontSize: 11, fontWeight: 600 } }, "\u{1F5D1}\uFE0F Reset All Progress")
+          ),
+
+          // About
+          React.createElement("div", { style: { padding: "14px 16px", background: TC.card, border: "1px solid " + TC.cbr, borderRadius: 12 } },
+            React.createElement("div", { style: { fontSize: 12 + fz, fontWeight: 700, marginBottom: 6, color: fg } }, "About"),
+            React.createElement("div", { style: { fontSize: 11, color: TC.muted, lineHeight: 1.8 } },
+              "Version: v20.0.0", React.createElement("br"),
+              "Questions: " + QS.length, React.createElement("br"),
+              React.createElement("a", { href: "https://github.com/ah456ah/Mcat", target: "_blank", style: { color: "#667eea" } }, "GitHub Repository")
+            )
+          )
+        ),
+        React.createElement(TabBar, { activeTab: activeTab, setActiveTab: setActiveTab, setScr: setScr, isDark: isDark, fg: fg })
+      );
+    }
+
+    // TOOLS HUB
+    var toolItems = [
+      { icon: "\u{1F9EA}", name: "Formula Reference", desc: "Physics, chemistry, and biology formulas", action: function() { setScr("formulas"); } },
+      { icon: "\u{1F916}", name: "AI Tutor", desc: "Ask questions, get explanations", action: function() { setScr("teach"); } },
+      { icon: "\u{1F4DD}", name: "Mistake Journal", desc: "Review your errors and patterns", action: function() { setScr("mistakes"); } },
+      { icon: "\u2699\uFE0F", name: "Settings", desc: "Theme, font, API key, preferences", action: function() { setScr("settings_screen"); } }
+    ];
+    return React.createElement("div", { style: { ...S.c, background: bg, color: fg, paddingBottom: 80 }, className: "screen-fade" },
+      React.createElement("div", { style: S.i },
+        React.createElement("h2", { style: { fontSize: 20 + fz, fontWeight: 800, marginBottom: 16, color: fg } }, "\u{1F527} Tools"),
+        toolItems.map(function(item, idx) {
+          return React.createElement("button", { key: idx, onClick: item.action, style: { display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "14px 16px", marginBottom: 8, background: TC.card, border: "1px solid " + TC.cbr, borderRadius: 12, textAlign: "left" } },
+            React.createElement("span", { style: { fontSize: 24, flexShrink: 0 } }, item.icon),
+            React.createElement("div", { style: { flex: 1 } },
+              React.createElement("div", { style: { fontSize: 13 + fz, fontWeight: 700, color: fg } }, item.name),
+              React.createElement("div", { style: { fontSize: 10, color: TC.muted, marginTop: 2 } }, item.desc)
+            ),
+            React.createElement("span", { style: { fontSize: 14, color: TC.dim } }, "\u203A")
+          );
+        })
+      ),
+      React.createElement(TabBar, { activeTab: activeTab, setActiveTab: setActiveTab, setScr: setScr, isDark: isDark, fg: fg })
+    );
+  }
+
+  // === V16: PRACTICE GRID SCREEN ===
+  if (scr === "practice_grid") {
+    var modeEntries = Object.keys(MODES).map(function(key) {
+      var m = MODES[key];
+      var count = 0;
+      if (m.smart) {
+        var r = getSmartPool(key, data, null);
+        count = r.pool ? r.pool.length : 0;
+      } else {
+        count = QS.length;
+      }
+      return { key: key, mode: m, count: count };
+    });
+    return React.createElement("div", { style: { ...S.c, background: bg, color: fg, paddingBottom: 80 }, className: "screen-fade" },
+      React.createElement("div", { style: S.i },
+        React.createElement("h2", { style: { fontSize: 20 + fz, fontWeight: 800, marginBottom: 4, color: fg } }, "\u{1F3AF} Practice"),
+        React.createElement("p", { style: { fontSize: 10, color: TC.dim, marginBottom: 14 } }, QS.length + " total questions \u2022 " + Object.keys(MODES).length + " modes"),
+        React.createElement("div", { className: "mode-grid", style: { "--card-bg": TC.card, "--card-border": TC.cbr } },
+          modeEntries.map(function(entry) {
+            return React.createElement("button", {
+              key: entry.key,
+              className: "mode-card",
+              onClick: function() {
+                setGM(entry.key);
+                if (entry.key === "TAG_PRACTICE") { setScr("select_tag"); }
+                else if (entry.key === "SECTION_SIM") { setScr("section_pick"); }
+                else if (entry.key === "CARS_MODE" || entry.key === "CARS_SPEED") { startGame(entry.key, ["CARS"]); }
+                else if (MODES[entry.key].smart) { startGame(entry.key, []); }
+                else { setScr("select_cats"); }
+              }
+            },
+              React.createElement("div", { style: { fontSize: 22, marginBottom: 4 } }, entry.mode.icon),
+              React.createElement("div", { style: { fontSize: 12 + fz, fontWeight: 700, color: fg, marginBottom: 2 } }, entry.mode.name),
+              React.createElement("div", { style: { fontSize: 9, color: TC.muted, lineHeight: 1.3, marginBottom: 4 } }, entry.mode.desc),
+              React.createElement("div", { style: { fontSize: 9, fontWeight: 700, color: entry.count > 0 ? "#667eea" : TC.dim } }, entry.count > 0 ? entry.count + " Qs" : "\u2014")
+            );
+          })
+        )
+      ),
+      React.createElement(TabBar, { activeTab: activeTab, setActiveTab: setActiveTab, setScr: setScr, isDark: isDark, fg: fg })
+    );
+  }
+
+  // === V16: STUDY HUB SCREEN ===
+  // === V18: FLASHCARD SESSION SCREEN ===
+  if (scr === "flashcard_session") {
+    var currentCard = fcCards[fcIndex];
+    if (!currentCard) { setScr("flashcard_done"); }
+    return React.createElement("div", { style: { ...S.c, background: bg, color: fg, paddingBottom: 40 }, className: "screen-fade" },
+      React.createElement("div", { style: { maxWidth: 640, margin: "0 auto", padding: "16px 16px 40px", display: "flex", flexDirection: "column", alignItems: "center", minHeight: "100vh" } },
+        // Top bar
+        React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", marginBottom: 16 } },
+          React.createElement("button", { onClick: function() { setScr("study_hub"); setStudySubTab("flashcards"); }, style: { fontSize: 11, color: TC.muted } }, "\u2190 Back"),
+          React.createElement("span", { style: { fontSize: 11, color: TC.dim } }, (fcIndex + 1) + " / " + fcCards.length),
+          React.createElement("span", { style: { fontSize: 10, color: TC.dim } }, fcTopic || "All Due")
+        ),
+        // Progress bar
+        React.createElement("div", { style: { width: "100%", height: 4, background: TC.sbg, borderRadius: 2, marginBottom: 24, overflow: "hidden" } },
+          React.createElement("div", { style: { height: "100%", width: ((fcIndex / Math.max(fcCards.length, 1)) * 100) + "%", background: "linear-gradient(90deg,#667eea,#764ba2)", borderRadius: 2, transition: "width .3s" } })
+        ),
+        // Flip card
+        currentCard ? React.createElement("div", { onClick: function() { setFcFlipped(!fcFlipped); }, className: "fc-container", style: { width: "100%", maxWidth: 400, height: 260, perspective: 1000, cursor: "pointer", marginBottom: 24 } },
+          React.createElement("div", { className: "fc-inner" + (fcFlipped ? " fc-flipped" : ""), style: { position: "relative", width: "100%", height: "100%", transformStyle: "preserve-3d", transition: "transform 0.3s ease" } },
+            // Front
+            React.createElement("div", { className: "fc-face fc-front", style: { position: "absolute", width: "100%", height: "100%", backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "24px 20px", background: isDark ? "rgba(102,126,234,.08)" : "rgba(102,126,234,.04)", border: "2px solid rgba(102,126,234,.25)", borderRadius: 16, textAlign: "center" } },
+              React.createElement("div", { style: { fontSize: 9, color: TC.dim, marginBottom: 8, letterSpacing: 1 } }, currentCard.source === "wrong" ? "\u274C FROM MISTAKES" : currentCard.source === "custom" ? "\u2B50 CUSTOM" : "\u{1F4DA} " + (currentCard.topic || "")),
+              React.createElement("div", { style: { fontSize: 15 + fz, fontWeight: 700, color: fg, lineHeight: 1.5 } }, currentCard.front),
+              React.createElement("div", { style: { fontSize: 10, color: TC.dim, marginTop: 12 } }, "Tap to flip")
+            ),
+            // Back
+            React.createElement("div", { className: "fc-face fc-back", style: { position: "absolute", width: "100%", height: "100%", backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden", transform: "rotateY(180deg)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "24px 20px", background: isDark ? "rgba(74,222,128,.06)" : "rgba(74,222,128,.04)", border: "2px solid rgba(74,222,128,.25)", borderRadius: 16, textAlign: "center", overflowY: "auto" } },
+              React.createElement("div", { style: { fontSize: 13 + fz, color: fg, lineHeight: 1.7, whiteSpace: "pre-wrap" } }, currentCard.back),
+              React.createElement("div", { style: { fontSize: 10, color: TC.dim, marginTop: 12 } }, "Rate your recall below")
+            )
+          )
+        ) : null,
+        // Rating buttons (show only when flipped)
+        fcFlipped && currentCard ? React.createElement("div", { style: { display: "flex", gap: 10, width: "100%", maxWidth: 400 } },
+          React.createElement("button", { onClick: function() {
+            dirtyRef.current = true;
+            setData(function(d) { return Object.assign({}, d, { flashcardStats: rateFlashcard(d, currentCard.id, 0) }); });
+            setFcResults(function(r) { return Object.assign({}, r, { reviewed: r.reviewed + 1, again: r.again + 1 }); });
+            setFcFlipped(false); setFcIndex(fcIndex + 1);
+          }, style: { flex: 1, padding: "14px 8px", borderRadius: 10, background: "rgba(248,113,113,.08)", border: "1.5px solid rgba(248,113,113,.25)", fontSize: 13 + fz, fontWeight: 700, color: "#f87171", textAlign: "center" } }, "\u274C Again"),
+          React.createElement("button", { onClick: function() {
+            dirtyRef.current = true;
+            setData(function(d) { return Object.assign({}, d, { flashcardStats: rateFlashcard(d, currentCard.id, 1) }); });
+            setFcResults(function(r) { return Object.assign({}, r, { reviewed: r.reviewed + 1 }); });
+            setFcFlipped(false); setFcIndex(fcIndex + 1);
+          }, style: { flex: 1, padding: "14px 8px", borderRadius: 10, background: "rgba(251,191,36,.08)", border: "1.5px solid rgba(251,191,36,.25)", fontSize: 13 + fz, fontWeight: 700, color: "#fbbf24", textAlign: "center" } }, "\u{1F610} Hard"),
+          React.createElement("button", { onClick: function() {
+            dirtyRef.current = true;
+            setData(function(d) { return Object.assign({}, d, { flashcardStats: rateFlashcard(d, currentCard.id, 2) }); });
+            setFcResults(function(r) { return Object.assign({}, r, { reviewed: r.reviewed + 1, newLearned: r.newLearned + 1 }); });
+            setFcFlipped(false); setFcIndex(fcIndex + 1);
+          }, style: { flex: 1, padding: "14px 8px", borderRadius: 10, background: "rgba(74,222,128,.08)", border: "1.5px solid rgba(74,222,128,.25)", fontSize: 13 + fz, fontWeight: 700, color: "#4ade80", textAlign: "center" } }, "\u2705 Good")
+        ) : null
+      )
+    );
+  }
+
+  // === V18: FLASHCARD DONE SCREEN ===
+  if (scr === "flashcard_done") {
+    return React.createElement("div", { style: { ...S.c, background: bg, color: fg }, className: "screen-fade" },
+      React.createElement("div", { style: { maxWidth: 640, margin: "0 auto", padding: "40px 16px", textAlign: "center" } },
+        React.createElement("div", { style: { fontSize: 48, marginBottom: 12 } }, "\u{1F389}"),
+        React.createElement("h2", { style: { fontSize: 20 + fz, fontWeight: 800, color: fg, marginBottom: 16 } }, "Session Complete!"),
+        React.createElement("div", { style: { display: "flex", justifyContent: "center", gap: 20, marginBottom: 24 } },
+          React.createElement("div", null, React.createElement("div", { style: { fontSize: 24, fontWeight: 800, color: "#667eea" } }, fcResults.reviewed), React.createElement("div", { style: { fontSize: 10, color: TC.dim } }, "Reviewed")),
+          React.createElement("div", null, React.createElement("div", { style: { fontSize: 24, fontWeight: 800, color: "#4ade80" } }, fcResults.newLearned), React.createElement("div", { style: { fontSize: 10, color: TC.dim } }, "Learned")),
+          React.createElement("div", null, React.createElement("div", { style: { fontSize: 24, fontWeight: 800, color: "#f87171" } }, fcResults.again), React.createElement("div", { style: { fontSize: 10, color: TC.dim } }, "Review Again"))
+        ),
+        React.createElement("div", { style: { fontSize: 11, color: TC.muted, marginBottom: 24 } }, getFlashcardsDueCount(data) + " cards due tomorrow"),
+        React.createElement("div", { style: { display: "flex", gap: 8, justifyContent: "center" } },
+          React.createElement("button", { onClick: function() { setStudySubTab("flashcards"); setScr("study_hub"); }, style: { padding: "12px 24px", background: "linear-gradient(135deg,#667eea,#764ba2)", borderRadius: 10, color: "#fff", fontSize: 13 + fz, fontWeight: 700 } }, "Done"),
+          React.createElement("button", { onClick: function() {
+            var due = getFlashcardsDue(data);
+            if (due.length === 0) { setScr("study_hub"); return; }
+            setFcCards(due.slice(0, 20)); setFcIndex(0); setFcFlipped(false);
+            setFcResults({ reviewed: 0, newLearned: 0, again: 0 });
+            setScr("flashcard_session");
+          }, style: { padding: "12px 24px", background: TC.card, border: "1px solid " + TC.cbr, borderRadius: 10, color: TC.muted, fontSize: 13 + fz, fontWeight: 600 } }, "More Cards")
+        )
+      )
+    );
+  }
+
+    if (scr === "study_hub") {
+    var hasCards = typeof CARDS !== "undefined";
+    var hasMods = typeof MODULES !== "undefined";
+    var cardTopics = hasCards ? Object.keys(CARDS) : [];
+    var modTopics = hasMods ? Object.keys(MODULES) : [];
+    var searchLower = studySearch.toLowerCase();
+    if (searchLower) {
+      cardTopics = cardTopics.filter(function(t) { return t.toLowerCase().indexOf(searchLower) >= 0; });
+      modTopics = modTopics.filter(function(t) { return t.toLowerCase().indexOf(searchLower) >= 0; });
+    }
+    return React.createElement("div", { style: { ...S.c, background: bg, color: fg, paddingBottom: 80 }, className: "screen-fade" },
+      React.createElement("div", { style: S.i },
+        React.createElement("h2", { style: { fontSize: 20 + fz, fontWeight: 800, marginBottom: 12, color: fg } }, "\u{1F4DA} Study"),
+        // Search bar
+        React.createElement("input", { type: "text", placeholder: "Search topics...", value: studySearch, style: { width: "100%", padding: "10px 14px", marginBottom: 12, background: isDark ? "rgba(255,255,255,.05)" : "rgba(0,0,0,.04)", border: "1px solid " + TC.cbr, borderRadius: 10, color: fg, fontSize: 12 + fz, fontFamily: "inherit" }, onChange: function(e) { setStudySearch(e.target.value); } }),
+        // Segmented control
+        React.createElement("div", { style: { display: "flex", gap: 4, marginBottom: 14, background: isDark ? "rgba(255,255,255,.04)" : "rgba(0,0,0,.04)", borderRadius: 8, padding: 3, overflowX: "auto", scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch" } },
+          ["cards", "modules", "flashcards", "mnemonics", "connections"].map(function(tab) {
+            var active = studySubTab === tab;
+            var fcDue = tab === "flashcards" ? getFlashcardsDueCount(data) : 0;
+            var label = tab === "cards" ? "\u{1F0CF} Cards" : tab === "modules" ? "\u{1F4DA} Lessons" : tab === "flashcards" ? "\u{1F4C7} Flip" + (fcDue > 0 ? " (" + fcDue + ")" : "") : tab === "mnemonics" ? "\u{1F4A1} Mnemo" : "\u{1F517} Map";
+            return React.createElement("button", { key: tab, onClick: function() { setStudySubTab(tab); }, style: { flex: "0 0 auto", padding: "7px 10px", borderRadius: 6, fontSize: 10 + fz, fontWeight: 600, background: active ? (isDark ? "rgba(255,255,255,.1)" : "#fff") : "transparent", color: active ? fg : TC.muted, border: "none", transition: "all .15s", boxShadow: active ? "0 1px 3px rgba(0,0,0,.1)" : "none", whiteSpace: "nowrap" } }, label);
+          })
+        ),
+        // Content
+        studySubTab === "cards" ? React.createElement("div", null,
+          cardTopics.length === 0 ? React.createElement("div", { style: { textAlign: "center", padding: 20, color: TC.dim, fontSize: 12 } }, searchLower ? "No cards match \u201C" + studySearch + "\u201D" : "No study cards available") :
+          cardTopics.map(function(topic) {
+            return React.createElement("button", { key: topic, onClick: function() { setOpenCard(topic); setScr("study_cards"); }, style: { display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", padding: "12px 14px", marginBottom: 6, background: TC.card, border: "1px solid " + TC.cbr, borderRadius: 10, textAlign: "left" } },
+              React.createElement("span", { style: { fontSize: 12 + fz, fontWeight: 600, color: fg } }, topic),
+              React.createElement("span", { style: { fontSize: 10, color: TC.dim } }, CARDS[topic].length + " cards \u203A")
+            );
+          })
+        ) : studySubTab === "lessons" ? React.createElement("div", null,
+          modTopics.length === 0 ? React.createElement("div", { style: { textAlign: "center", padding: 20, color: TC.dim, fontSize: 12 } }, searchLower ? "No lessons match \u201C" + studySearch + "\u201D" : "No lessons available") :
+          modTopics.map(function(topic) {
+            var mp = data.moduleProgress && data.moduleProgress[topic];
+            var done = !!(mp && mp.completed);
+            return React.createElement("button", { key: topic, onClick: function() { setModuleTag(topic); setModuleStep(0); setModuleCheckSel(null); setModuleCheckDone(false); setScr("module"); }, style: { display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", padding: "12px 14px", marginBottom: 6, background: TC.card, border: "1px solid " + (done ? "rgba(74,222,128,.3)" : TC.cbr), borderRadius: 10, textAlign: "left" } },
+              React.createElement("span", { style: { fontSize: 12 + fz, fontWeight: 600, color: fg } }, (done ? "\u2705 " : "\u{1F4DA} ") + topic),
+              React.createElement("span", { style: { fontSize: 10, color: done ? "#4ade80" : TC.dim } }, done ? "Complete" : "Start \u203A")
+            );
+          })
+        ) :
+        // V18: FLASHCARDS TAB
+        studySubTab === "flashcards" ? React.createElement("div", null,
+          // Due count banner
+          React.createElement("div", { style: { padding: "12px 14px", background: "rgba(102,126,234,.06)", border: "1px solid rgba(102,126,234,.15)", borderRadius: 10, marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center" } },
+            React.createElement("div", null,
+              React.createElement("div", { style: { fontSize: 13 + fz, fontWeight: 700, color: fg } }, "\u{1F4C7} " + getFlashcardsDueCount(data) + " cards due"),
+              React.createElement("div", { style: { fontSize: 10, color: TC.muted } }, generateFlashcards(data).length + " total flashcards")
+            ),
+            React.createElement("button", { onClick: function() {
+              var due = getFlashcardsDue(data);
+              if (due.length === 0) { alert("No cards due! Check back later."); return; }
+              setFcCards(due.slice(0, 20)); setFcIndex(0); setFcFlipped(false);
+              setFcResults({ reviewed: 0, newLearned: 0, again: 0 }); setFcTopic(null);
+              setScr("flashcard_session");
+            }, style: { padding: "10px 18px", background: "linear-gradient(135deg,#667eea,#764ba2)", borderRadius: 10, color: "#fff", fontSize: 12 + fz, fontWeight: 700 } }, "\u{25B6} Study Due")
+          ),
+          // Topic list
+          (function() {
+            var allFc = generateFlashcards(data);
+            var topics = {};
+            allFc.forEach(function(c) { var t = c.topic || "Other"; if (!topics[t]) topics[t] = { total: 0, due: 0 }; topics[t].total++; var st = (data.flashcardStats||{})[c.id]; if (!st || !st.nextReview || Date.now() >= st.nextReview) topics[t].due++; });
+            return Object.keys(topics).sort().map(function(t) {
+              return React.createElement("button", { key: t, onClick: function() {
+                var pool = allFc.filter(function(c) { return c.topic === t; });
+                var due = pool.filter(function(c) { var st = (data.flashcardStats||{})[c.id]; return !st || !st.nextReview || Date.now() >= st.nextReview; });
+                if (due.length === 0) due = pool.slice(0, 5);
+                setFcCards(due.slice(0, 20)); setFcIndex(0); setFcFlipped(false);
+                setFcResults({ reviewed: 0, newLearned: 0, again: 0 }); setFcTopic(t);
+                setScr("flashcard_session");
+              }, style: { display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", padding: "10px 14px", marginBottom: 6, background: TC.card, border: "1px solid " + TC.cbr, borderRadius: 8, textAlign: "left" } },
+                React.createElement("span", { style: { fontSize: 12 + fz, fontWeight: 600, color: fg } }, t),
+                React.createElement("div", { style: { display: "flex", gap: 8, alignItems: "center" } },
+                  topics[t].due > 0 ? React.createElement("span", { style: { fontSize: 10, fontWeight: 700, color: "#667eea", background: "rgba(102,126,234,.1)", padding: "2px 6px", borderRadius: 4 } }, topics[t].due + " due") : null,
+                  React.createElement("span", { style: { fontSize: 10, color: TC.dim } }, topics[t].total + " cards")
+                )
+              );
+            });
+          })(),
+          // Add custom card button
+          React.createElement("button", { onClick: function() { setFcAddMode(true); setFcNewFront(""); setFcNewBack(""); }, style: { width: "100%", padding: "10px", marginTop: 8, background: "transparent", border: "1.5px dashed " + TC.cbr, borderRadius: 8, fontSize: 12 + fz, color: TC.muted, textAlign: "center" } }, "+ Add Custom Flashcard"),
+          fcAddMode ? React.createElement("div", { style: { padding: "14px", background: TC.card, border: "1px solid " + TC.cbr, borderRadius: 10, marginTop: 8 } },
+            React.createElement("input", { type: "text", placeholder: "Front (question)", value: fcNewFront, onChange: function(e) { setFcNewFront(e.target.value); }, style: { width: "100%", padding: "8px 10px", marginBottom: 6, background: isDark ? "rgba(255,255,255,.05)" : "rgba(0,0,0,.04)", border: "1px solid " + TC.cbr, borderRadius: 6, color: fg, fontSize: 11 + fz, fontFamily: "inherit" } }),
+            React.createElement("input", { type: "text", placeholder: "Back (answer)", value: fcNewBack, onChange: function(e) { setFcNewBack(e.target.value); }, style: { width: "100%", padding: "8px 10px", marginBottom: 8, background: isDark ? "rgba(255,255,255,.05)" : "rgba(0,0,0,.04)", border: "1px solid " + TC.cbr, borderRadius: 6, color: fg, fontSize: 11 + fz, fontFamily: "inherit" } }),
+            React.createElement("div", { style: { display: "flex", gap: 6 } },
+              React.createElement("button", { onClick: function() {
+                if (!fcNewFront.trim() || !fcNewBack.trim()) return;
+                dirtyRef.current = true;
+                setData(function(d) { var cc = (d.customCards || []).slice(); cc.push({ id: "custom_" + Date.now(), front: fcNewFront.trim(), back: fcNewBack.trim(), tags: [], created: Date.now() }); return Object.assign({}, d, { customCards: cc }); });
+                setFcAddMode(false); setFcNewFront(""); setFcNewBack("");
+              }, style: { flex: 1, padding: "8px", background: "linear-gradient(135deg,#667eea,#764ba2)", borderRadius: 6, color: "#fff", fontSize: 11, fontWeight: 700 } }, "Save"),
+              React.createElement("button", { onClick: function() { setFcAddMode(false); }, style: { padding: "8px 12px", background: TC.card, border: "1px solid " + TC.cbr, borderRadius: 6, color: TC.muted, fontSize: 11 } }, "Cancel")
+            )
+          ) : null
+        ) :
+        // V18: MNEMONICS TAB
+        studySubTab === "mnemonics" ? React.createElement("div", null,
+          React.createElement("div", { style: { fontSize: 10, color: TC.dim, marginBottom: 10 } }, (typeof MNEMONICS !== "undefined" ? MNEMONICS.length : 0) + " pre-built + " + ((data.savedMnemonics||[]).length) + " saved"),
+          // AI Generate
+          React.createElement("div", { style: { padding: "12px 14px", background: "rgba(102,126,234,.06)", border: "1px solid rgba(102,126,234,.15)", borderRadius: 10, marginBottom: 12 } },
+            React.createElement("div", { style: { fontSize: 12 + fz, fontWeight: 700, color: fg, marginBottom: 6 } }, "\u{1F916} Generate Mnemonic"),
+            React.createElement("input", { type: "text", placeholder: "Enter a concept or list to memorize...", value: mnGenConcept, onChange: function(e) { setMnGenConcept(e.target.value); }, style: { width: "100%", padding: "8px 10px", marginBottom: 6, background: isDark ? "rgba(255,255,255,.05)" : "rgba(0,0,0,.04)", border: "1px solid " + TC.cbr, borderRadius: 6, color: fg, fontSize: 11 + fz, fontFamily: "inherit" } }),
+            mnGenLoading ? aiLoader("Creating mnemonic...") :
+            mnGenResult ? React.createElement("div", null,
+              aiCard(mnGenResult, TC, fg, fz, isDark, { title: "GENERATED MNEMONIC" }),
+              React.createElement("div", { style: { display: "flex", gap: 6, marginTop: 6 } },
+                React.createElement("button", { onClick: function() {
+                  dirtyRef.current = true;
+                  setData(function(d) { var sm = (d.savedMnemonics||[]).slice(); sm.push({ id: "mn_" + Date.now(), concept: mnGenConcept, mnemonic: mnGenResult, tags: [] }); return Object.assign({}, d, { savedMnemonics: sm }); });
+                  setMnGenResult(null); setMnGenConcept("");
+                }, style: { flex: 1, padding: "6px", background: "rgba(74,222,128,.1)", border: "1px solid rgba(74,222,128,.25)", borderRadius: 6, color: "#4ade80", fontSize: 10, fontWeight: 600 } }, "\u2705 Save"),
+                React.createElement("button", { onClick: function() { setMnGenResult(null); }, style: { padding: "6px 10px", background: TC.card, border: "1px solid " + TC.cbr, borderRadius: 6, color: TC.muted, fontSize: 10 } }, "Dismiss")
+              )
+            ) :
+            React.createElement("button", { onClick: function() {
+              if (!mnGenConcept.trim()) return;
+              if (!getApiKey()) { setMnGenResult("\u26A0\uFE0F Set your API key in Settings to use AI features."); return; }
+              setMnGenLoading(true);
+              callAI([{role:"user",content:"Create a memorable mnemonic for: " + mnGenConcept}], "You are an MCAT study tool. Create a catchy, memorable mnemonic for the given concept. Format: first line is the mnemonic phrase, second line explains what each letter/word represents. Keep it short and memorable. Use **bold** for the mnemonic itself.").then(function(r) { setMnGenLoading(false); setMnGenResult(r); });
+            }, style: { padding: "8px 14px", background: "linear-gradient(135deg,#667eea,#764ba2)", borderRadius: 6, color: "#fff", fontSize: 11, fontWeight: 700 } }, "\u{1F916} Generate")
+          ),
+          // Saved mnemonics
+          (data.savedMnemonics||[]).length > 0 ? React.createElement("div", { style: { marginBottom: 12 } },
+            React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: fg, marginBottom: 6, letterSpacing: 1 } }, "\u2B50 SAVED"),
+            (data.savedMnemonics||[]).map(function(sm, si) {
+              return React.createElement("div", { key: si, style: { padding: "10px 12px", marginBottom: 6, background: "rgba(255,200,50,.04)", border: "1px solid rgba(255,200,50,.15)", borderRadius: 8, fontSize: 11 + fz, color: TC.muted, lineHeight: 1.6 } },
+                React.createElement("div", { style: { fontWeight: 700, color: "#fbbf24", marginBottom: 2 } }, sm.concept),
+                React.createElement("div", { style: { whiteSpace: "pre-wrap" } }, renderMdGlobal(sm.mnemonic, fg))
+              );
+            })
+          ) : null,
+          // Pre-built mnemonics
+          React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: fg, marginBottom: 6, letterSpacing: 1 } }, "\u{1F4DA} PRE-BUILT"),
+          (typeof MNEMONICS !== "undefined" ? MNEMONICS : []).map(function(mn, mi) {
+            return React.createElement("div", { key: mi, style: { padding: "10px 12px", marginBottom: 6, background: TC.card, border: "1px solid " + TC.cbr, borderRadius: 8 } },
+              React.createElement("div", { style: { fontSize: 13 + fz, fontWeight: 800, color: "#667eea", marginBottom: 2 } }, mn.mnemonic),
+              React.createElement("div", { style: { fontSize: 11 + fz, color: TC.muted, lineHeight: 1.5, marginBottom: 4 } }, mn.encodes),
+              React.createElement("div", { style: { display: "flex", gap: 6, fontSize: 9, color: TC.dim } },
+                React.createElement("span", null, mn.topic),
+                React.createElement("span", null, "\u2022"),
+                React.createElement("span", null, mn.section)
+              )
+            );
+          })
+        ) :
+        // V18: CONNECTIONS TAB
+        studySubTab === "connections" ? React.createElement("div", null,
+          React.createElement("div", { style: { fontSize: 10, color: TC.dim, marginBottom: 10 } }, "See how MCAT topics connect to each other"),
+          (typeof CONNECTIONS !== "undefined" ? Object.keys(CONNECTIONS) : []).map(function(topic) {
+            var related = CONNECTIONS[topic];
+            var tc = getTagCounts(data);
+            var topicInfo = tc[topic] || { seen: 0, correct: 0 };
+            var topicPct = topicInfo.seen > 0 ? Math.round(topicInfo.correct / topicInfo.seen * 100) : null;
+            var topicColor = topicPct === null ? TC.dim : topicPct >= 80 ? "#4ade80" : topicPct >= 60 ? "#fbbf24" : "#f87171";
+            return React.createElement("div", { key: topic, style: { padding: "14px", marginBottom: 10, background: TC.card, border: "1px solid " + TC.cbr, borderRadius: 12 } },
+              // Central node
+              React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 10 } },
+                React.createElement("div", { style: { width: 36, height: 36, borderRadius: 18, border: "2.5px solid " + topicColor, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: topicColor, flexShrink: 0 } }, topicPct !== null ? topicPct + "%" : "?"),
+                React.createElement("button", { onClick: function() {
+                  if (typeof CARDS !== "undefined" && CARDS[topic]) { setOpenCard(topic); setScr("study_cards"); }
+                  else if (typeof MODULES !== "undefined" && MODULES[topic]) { setModuleTag(topic); setModuleStep(0); setModuleCheckSel(null); setModuleCheckDone(false); setScr("module"); }
+                }, style: { fontSize: 13 + fz, fontWeight: 700, color: fg, background: "none", border: "none", padding: 0, textAlign: "left" } }, topic)
+              ),
+              // Connected nodes
+              React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", paddingLeft: 8, borderLeft: "2px solid " + TC.cbr } },
+                related.map(function(rel) {
+                  var relInfo = tc[rel] || { seen: 0, correct: 0 };
+                  var relPct = relInfo.seen > 0 ? Math.round(relInfo.correct / relInfo.seen * 100) : null;
+                  var relColor = relPct === null ? TC.dim : relPct >= 80 ? "#4ade80" : relPct >= 60 ? "#fbbf24" : "#f87171";
+                  return React.createElement("button", { key: rel, onClick: function() {
+                    if (typeof CARDS !== "undefined" && CARDS[rel]) { setOpenCard(rel); setScr("study_cards"); }
+                    else if (typeof MODULES !== "undefined" && MODULES[rel]) { setModuleTag(rel); setModuleStep(0); setModuleCheckSel(null); setModuleCheckDone(false); setScr("module"); }
+                  }, style: { display: "flex", alignItems: "center", gap: 4, padding: "5px 10px", background: isDark ? "rgba(255,255,255,.03)" : "rgba(0,0,0,.02)", border: "1px solid " + TC.cbr, borderRadius: 6 } },
+                    React.createElement("div", { style: { width: 18, height: 18, borderRadius: 9, border: "2px solid " + relColor, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 7, fontWeight: 700, color: relColor, flexShrink: 0 } }, relPct !== null ? relPct : "?"),
+                    React.createElement("span", { style: { fontSize: 10 + fz, color: TC.muted } }, rel)
+                  );
+                })
+              )
+            );
+          })
+        ) :
+        null
+      ),
+      // V18: Notes button (floating)
+      React.createElement("button", { onClick: function() {
+        var t = studySubTab === "cards" && openCard ? openCard : studySubTab === "modules" && moduleTag ? moduleTag : "General";
+        setNotesTopic(t); setNotesText((data.notes||{})[t] || ""); setNotesOpen(true);
+      }, style: { position: "fixed", bottom: 72, right: 16, width: 44, height: 44, borderRadius: 22, background: "linear-gradient(135deg,#667eea,#764ba2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, color: "#fff", boxShadow: "0 2px 10px rgba(102,126,234,.4)", zIndex: 50, border: "none" } }, "\u{1F4DD}"),
+      // Notes panel
+      notesOpen ? React.createElement("div", { style: { position: "fixed", bottom: 0, left: 0, right: 0, top: 0, zIndex: 200 } },
+        React.createElement("div", { onClick: function() { setNotesOpen(false); }, style: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,.5)" } }),
+        React.createElement("div", { style: { position: "absolute", bottom: 0, left: 0, right: 0, maxHeight: "60vh", background: bg, borderTop: "1px solid " + TC.cbr, borderRadius: "16px 16px 0 0", padding: "16px", paddingBottom: "calc(16px + env(safe-area-inset-bottom))" } },
+          React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 } },
+            React.createElement("span", { style: { fontSize: 14 + fz, fontWeight: 700, color: fg } }, "\u{1F4DD} Notes: " + notesTopic),
+            React.createElement("button", { onClick: function() { setNotesOpen(false); }, style: { fontSize: 18, color: TC.muted, padding: "4px 8px" } }, "\u2715")
+          ),
+          React.createElement("textarea", { value: notesText, onChange: function(e) {
+            setNotesText(e.target.value);
+            dirtyRef.current = true;
+            setData(function(d) { var n = Object.assign({}, d.notes || {}); n[notesTopic] = e.target.value; return Object.assign({}, d, { notes: n }); });
+          }, placeholder: "Type your notes here...", style: { width: "100%", height: 200, padding: "10px 12px", background: isDark ? "rgba(255,255,255,.05)" : "rgba(0,0,0,.04)", border: "1px solid " + TC.cbr, borderRadius: 8, color: fg, fontSize: 12 + fz, fontFamily: "inherit", resize: "vertical" } })
+        )
+      ) : null,
+      React.createElement(TabBar, { activeTab: activeTab, setActiveTab: setActiveTab, setScr: setScr, isDark: isDark, fg: fg })
+    );
+  }
+
+    if (scr === "select_cats") {
     var secs = {};
     Object.entries(CATS).filter(function (e) {
       return e[0] !== "CARS";
@@ -6117,6 +6948,35 @@ function Game(_ref2) {
         fontSize: 13 + fz
       }
     }, "Resume"))));
+    // V19: SIM GRID OVERLAY
+    if (simGridOpen && gm === "SECTION_SIM") {
+      return React.createElement("div", { style: { ...S.c, background: bg, color: fg } },
+        React.createElement("div", { style: { maxWidth: 640, margin: "0 auto", padding: "16px" } },
+          React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 } },
+            React.createElement("span", { style: { fontSize: 14 + fz, fontWeight: 800, color: fg } }, "Question Navigator"),
+            React.createElement("button", { onClick: function() { setSimGridOpen(false); }, style: { fontSize: 14, color: TC.muted, padding: "4px 8px" } }, "\u2715")
+          ),
+          simTimer !== null ? React.createElement("div", { style: { fontSize: 11, color: TC.muted, marginBottom: 10 } }, "\u23F1 " + Math.floor(simTimer/60) + ":" + String(simTimer%60).padStart(2,"0") + " remaining \u2022 " + Object.keys(simAnswers).length + "/" + qs.length + " answered") : null,
+          React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(8, 1fr)", gap: 6 } },
+            qs.map(function(qq, idx) {
+              var answered = !!simAnswers[idx];
+              var flagged = (data.flagged || []).indexOf(qq.id) >= 0;
+              var isCurrent = idx === qi;
+              var bgColor = isCurrent ? "#667eea" : answered ? (isDark ? "rgba(74,222,128,.15)" : "rgba(74,222,128,.12)") : TC.card;
+              var borderColor = isCurrent ? "#667eea" : flagged ? "#f87171" : TC.cbr;
+              return React.createElement("button", { key: idx, onClick: function() {
+                setQI(idx); setSel(simAnswers[idx] ? simAnswers[idx].sel : null); setSR(false); setSimGridOpen(false);
+              }, style: { width: "100%", aspectRatio: "1", borderRadius: 6, background: bgColor, border: "1.5px solid " + borderColor, fontSize: 10, fontWeight: isCurrent ? 800 : 600, color: isCurrent ? "#fff" : fg, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" } },
+                idx + 1,
+                flagged ? React.createElement("span", { style: { position: "absolute", top: -2, right: -2, fontSize: 8 } }, "\u{1F6A9}") : null
+              );
+            })
+          ),
+          React.createElement("button", { onClick: function() { setSimGridOpen(false); }, style: { ...S.btn, marginTop: 16, fontSize: 13 + fz } }, "Back to Question " + (qi + 1))
+        )
+      );
+    }
+
     return /*#__PURE__*/React.createElement("div", {
       style: Object.assign({}, S.c, {
         background: bg,
@@ -6208,7 +7068,13 @@ function Game(_ref2) {
         flexShrink: 0,
         color: TC.muted
       }
-    }, isFlagged ? "\u{1F6A9}" : "\u2690"), streak >= 2 && /*#__PURE__*/React.createElement("span", {
+    }, isFlagged ? "\u{1F6A9}" : "\u2690"),
+    // V19: Sim question grid button
+    gm === "SECTION_SIM" ? React.createElement("button", {
+      onClick: function() { setSimGridOpen(!simGridOpen); },
+      style: { background: TC.card, width: 28, height: 28, borderRadius: 7, fontSize: 11, color: TC.muted, flexShrink: 0 }
+    }, "\u{1F4CB}") : null,
+    streak >= 2 && /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 10,
         fontWeight: 700,
@@ -6358,7 +7224,10 @@ function Game(_ref2) {
         color: "#fff",
         background: cat.color
       }
-    }, cat.icon, " ", cat.name), /*#__PURE__*/React.createElement("span", {
+    }, cat.icon, " ", cat.name),
+    // V19: Difficulty indicator
+    React.createElement("span", { style: { fontSize: 9 + fz, fontWeight: 700 }, title: getQuestionDifficulty(data, q.id).label }, getQuestionDifficulty(data, q.id).dot),
+    /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 8 + fz,
         color: TC.dim
@@ -7511,7 +8380,33 @@ function Game(_ref2) {
           borderRadius: 5,
           borderLeft: "2px solid #ffc832"
         }
-      }, "\u{1F4A1}", " ", wq.mn));
+      }, "\u{1F4A1}", " ", wq.mn),
+      // V17: AI Explain button for wrong answers
+      (function() {
+        var cached = aiResultExplains[wq.id];
+        if (cached && cached.text) {
+          return aiCard(cached.text, TC, fg, fz, isDark, { title: "AI EXPLANATION", mt: 6 });
+        }
+        if (cached && cached.loading) {
+          return aiLoader("Analyzing your mistake...");
+        }
+        return React.createElement("button", {
+          onClick: function() {
+            if (!getApiKey()) { setAiResultExplains(function(p) { var n = Object.assign({}, p); n[wq.id] = { loading: false, text: null }; return n; }); return; }
+            setAiResultExplains(function(p) { var n = Object.assign({}, p); n[wq.id] = { loading: true, text: null }; return n; });
+            var wrongIdx = data.questionStats[wq.id] ? data.questionStats[wq.id].lastPick : null;
+            var wrongAns = wrongIdx !== null && wq.o[wrongIdx] ? wq.o[wrongIdx] : "unknown";
+            var wxExpl = wq.wx && wrongIdx !== null && wq.wx[wrongIdx] ? wq.wx[wrongIdx] : "";
+            var userMsg = "Question: " + wq.q + "\nMy wrong answer: " + wrongAns + "\nCorrect answer: " + wq.o[wq.a] + (wxExpl ? "\nWhy wrong: " + wxExpl : "") + (wq.ex ? "\nExplanation: " + wq.ex : "");
+            var sysP = "You are an MCAT tutor. The student just got a question wrong. In 2-3 sentences, explain their specific misconception and why the correct answer is right. End with a bold **MCAT Tip:** highlighting the key testable concept. Be direct and concise. Use **bold** for key terms.";
+            callAI([{role:"user", content: userMsg}], sysP).then(function(reply) {
+              setAiResultExplains(function(p) { var n = Object.assign({}, p); n[wq.id] = { loading: false, text: reply }; return n; });
+            });
+          },
+          style: { display: "flex", alignItems: "center", gap: 4, marginTop: 6, padding: "5px 10px", background: isDark ? "rgba(102,126,234,.08)" : "rgba(102,126,234,.06)", border: "1px solid rgba(102,126,234,.2)", borderRadius: 6, fontSize: 10 + fz, color: "#667eea", fontWeight: 600 }
+        }, "\u{1F916} Explain");
+      })()
+      );
     })), /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
@@ -7559,6 +8454,341 @@ function App() {
     initialData: s[0].data
   });
 }
+
+// === V18: FLASHCARD GENERATION ===
+function generateFlashcards(data) {
+  var cards = [];
+  // (a) From CARDS data
+  if (typeof CARDS !== "undefined") {
+    Object.keys(CARDS).forEach(function(topic) {
+      CARDS[topic].forEach(function(bullet, bi) {
+        var id = "fc_" + topic.replace(/\s+/g,"_").substring(0,20) + "_" + bi;
+        var front, back;
+        if (bullet.indexOf(":") > 0 && bullet.indexOf(":") < 60) {
+          front = bullet.substring(0, bullet.indexOf(":")).trim();
+          back = bullet.trim();
+        } else {
+          var words = bullet.split(" ").slice(0, 5).join(" ");
+          front = "What is " + words + "...?";
+          back = bullet.trim();
+        }
+        cards.push({ id: id, front: front, back: back, topic: topic, source: "cards" });
+      });
+    });
+  }
+  // (b) From wrong answers (2+ times wrong)
+  if (data && data.questionStats) {
+    QS.forEach(function(q) {
+      var st = data.questionStats[q.id];
+      if (st && st.seen >= 2 && st.correct < st.seen * 0.5) {
+        var id = "fc_q_" + q.id;
+        var front = q.q.length > 100 ? q.q.substring(0, 97) + "..." : q.q;
+        var back = q.o[q.a];
+        if (q.ex) back += "\n\n" + q.ex.split(".")[0] + ".";
+        cards.push({ id: id, front: front, back: back, topic: (q.tags||[])[0] || q.cat, source: "wrong" });
+      }
+    });
+  }
+  // (c) Custom cards
+  if (data && data.customCards) {
+    data.customCards.forEach(function(cc) {
+      cards.push({ id: cc.id, front: cc.front, back: cc.back, topic: (cc.tags||[])[0] || "Custom", source: "custom" });
+    });
+  }
+  return cards;
+}
+
+function getFlashcardsDue(data) {
+  var allCards = generateFlashcards(data);
+  var now = Date.now();
+  var fcStats = data.flashcardStats || {};
+  return allCards.filter(function(c) {
+    var st = fcStats[c.id];
+    if (!st) return true;
+    return !st.nextReview || now >= st.nextReview;
+  });
+}
+
+function getFlashcardsDueCount(data) {
+  return getFlashcardsDue(data).length;
+}
+
+function rateFlashcard(data, cardId, rating) {
+  // rating: 0=again, 1=hard, 2=good
+  var fcStats = Object.assign({}, data.flashcardStats || {});
+  var st = fcStats[cardId] || { ef: 2.5, rep: 0, interval: 1, box: 1 };
+  var quality = rating === 2 ? 5 : rating === 1 ? 3 : 1;
+  var result = calcSM2(st, rating >= 1, rating === 2 ? "high" : rating === 1 ? "med" : "low", false, 0);
+  fcStats[cardId] = result;
+  return fcStats;
+}
+
+
+// === V19: QUESTION DIFFICULTY ===
+function getQuestionDifficulty(data, qId) {
+  var st = data.questionStats ? data.questionStats[qId] : null;
+  if (!st || st.seen === 0) return { label: "New", color: "#aaa", dot: "\u26AA" };
+  // Bayesian: prior=0.5, weight=2
+  var pCorrect = (st.correct + 1) / (st.seen + 2);
+  if (pCorrect > 0.7) return { label: "Easy", color: "#4ade80", dot: "\u{1F7E2}" };
+  if (pCorrect >= 0.4) return { label: "Medium", color: "#fbbf24", dot: "\u{1F7E1}" };
+  return { label: "Hard", color: "#f87171", dot: "\u{1F534}" };
+}
+
+// === V19: PERFORMANCE INSIGHTS ENGINE ===
+function generateInsights(data) {
+  var insights = [];
+  var tc = getTagCounts(data);
+  var now = Date.now();
+  var weekAgo = now - 7 * 86400000;
+  // Check per-category improvement
+  Object.keys(tc).forEach(function(tag) {
+    var info = tc[tag];
+    if (info.seen < 5) return;
+    var pct = Math.round(info.correct / info.seen * 100);
+    var hist = (data.tagHistory || {})[tag] || [];
+    if (hist.length >= 2) {
+      var old = hist[0]; var cur = hist[hist.length - 1];
+      if (cur - old >= 15) insights.push({ id: "imp_" + tag, text: "\u{1F525} Your " + tag + " accuracy jumped from " + old + "% to " + cur + "% recently!", icon: "\u{1F525}", type: "positive" });
+      if (old - cur >= 15 && info.seen >= 8) insights.push({ id: "dec_" + tag, text: "\u26A0\uFE0F Your " + tag + " accuracy dropped from " + old + "% to " + cur + "%. Time for review?", icon: "\u26A0\uFE0F", type: "warning" });
+    }
+    if (pct < 50 && info.seen >= 10) insights.push({ id: "weak_" + tag, text: "\u{1F3AF} " + tag + " is at " + pct + "% \u2014 focused practice could boost your score.", icon: "\u{1F3AF}", type: "action" });
+  });
+  // Weekly goal pacing
+  var weeklyQs = 0;
+  (data.sessionHistory || []).forEach(function(s) { if (s.ts && s.ts > weekAgo) weeklyQs += (s.total || 0); });
+  var goal = data.weeklyGoal || 100;
+  var dayOfWeek = new Date().getDay() || 7;
+  var expectedByNow = Math.round(goal * dayOfWeek / 7);
+  if (weeklyQs >= expectedByNow * 1.2) insights.push({ id: "pace_ahead", text: "\u{1F4C8} You're ahead of pace! " + weeklyQs + "/" + goal + " questions this week.", icon: "\u{1F4C8}", type: "positive" });
+  else if (weeklyQs < expectedByNow * 0.5 && dayOfWeek >= 3) insights.push({ id: "pace_behind", text: "\u23F0 You need " + (goal - weeklyQs) + " more questions to hit your weekly goal.", icon: "\u23F0", type: "warning" });
+  // Streak recognition
+  var streak = computeStreak(data);
+  if (streak >= 7) insights.push({ id: "streak_" + streak, text: "\u{1F525} " + streak + "-day study streak! Consistency is the #1 predictor of MCAT success.", icon: "\u{1F525}", type: "positive" });
+  return insights.slice(0, 4);
+}
+
+// === V19: SVG LINE CHART ===
+function svgLineChart(dataPoints, width, height, color, TC, isDark) {
+  if (!dataPoints || dataPoints.length < 2) return null;
+  var maxV = Math.max.apply(null, dataPoints.map(function(p){return p.y;}));
+  var minV = Math.min.apply(null, dataPoints.map(function(p){return p.y;}));
+  var range = Math.max(maxV - minV, 10);
+  var pad = 30;
+  var w = width - pad * 2;
+  var h = height - pad * 2;
+  var points = dataPoints.map(function(p, i) {
+    var x = pad + (i / Math.max(dataPoints.length - 1, 1)) * w;
+    var y = pad + h - ((p.y - minV) / range) * h;
+    return x + "," + y;
+  });
+  var pathD = "M" + points.join(" L");
+  var trending = dataPoints[dataPoints.length - 1].y > dataPoints[0].y;
+  var lineColor = color || (trending ? "#4ade80" : "#f87171");
+  return React.createElement("svg", { viewBox: "0 0 " + width + " " + height, style: { width: "100%", maxHeight: height } },
+    // Grid lines
+    [0, 25, 50, 75, 100].map(function(pct) {
+      var y = pad + h - (pct - minV) / range * h;
+      if (y < pad || y > pad + h) return null;
+      return React.createElement("g", { key: pct },
+        React.createElement("line", { x1: pad, y1: y, x2: pad + w, y2: y, stroke: isDark ? "rgba(255,255,255,.06)" : "rgba(0,0,0,.06)", strokeWidth: 1 }),
+        React.createElement("text", { x: pad - 4, y: y + 3, textAnchor: "end", fill: isDark ? "#555" : "#999", fontSize: 8 }, pct + "%")
+      );
+    }),
+    React.createElement("path", { d: pathD, fill: "none", stroke: lineColor, strokeWidth: 2, strokeLinejoin: "round" }),
+    // Dots
+    dataPoints.map(function(p, i) {
+      var x = pad + (i / Math.max(dataPoints.length - 1, 1)) * w;
+      var y = pad + h - ((p.y - minV) / range) * h;
+      return React.createElement("circle", { key: i, cx: x, cy: y, r: 3, fill: lineColor });
+    })
+  );
+}
+
+// === V19: SVG BAR CHART ===
+function svgBarChart(bars, width, height, TC, isDark) {
+  if (!bars || bars.length === 0) return null;
+  var maxV = Math.max.apply(null, bars.map(function(b){return b.value;}));
+  if (maxV === 0) maxV = 1;
+  var pad = 30;
+  var w = width - pad * 2;
+  var h = height - pad * 2;
+  var barW = Math.min(w / bars.length * 0.7, 24);
+  var gap = (w - barW * bars.length) / (bars.length + 1);
+  return React.createElement("svg", { viewBox: "0 0 " + width + " " + height, style: { width: "100%", maxHeight: height } },
+    bars.map(function(b, i) {
+      var barH = (b.value / maxV) * h;
+      var x = pad + gap + i * (barW + gap);
+      var y = pad + h - barH;
+      return React.createElement("g", { key: i },
+        React.createElement("rect", { x: x, y: y, width: barW, height: barH, rx: 3, fill: b.color || "#667eea", opacity: 0.8 }),
+        React.createElement("text", { x: x + barW / 2, y: pad + h + 12, textAnchor: "middle", fill: isDark ? "#555" : "#999", fontSize: 7 }, b.label),
+        React.createElement("text", { x: x + barW / 2, y: y - 4, textAnchor: "middle", fill: isDark ? "#888" : "#666", fontSize: 8, fontWeight: 600 }, b.value > 0 ? b.value : "")
+      );
+    })
+  );
+}
+
+// === V19: SECTION SIM CONFIG ===
+var SIM_CONFIG = {
+  "Bio/Biochem": { realQs: 59, realTime: 95 },
+  "Chem/Phys": { realQs: 59, realTime: 95 },
+  "Psych/Soc": { realQs: 59, realTime: 95 },
+  "CARS": { realQs: 53, realTime: 90 }
+};
+
+// === V20: XP MULTIPLIER ===
+function getXPMultiplier(data) {
+  var streak = computeStreak(data);
+  if (streak >= 30) return { mult: 2.0, label: "2x (30-day streak!)" };
+  if (streak >= 7) return { mult: 1.5, label: "1.5x (7-day streak)" };
+  return { mult: 1.0, label: "" };
+}
+
+// === V20: DAILY CHALLENGE ===
+function getDailyChallenge(data) {
+  var today = todayStr();
+  if (data.dailyChallengeDate === today && data.dailyChallengeId) {
+    return { id: data.dailyChallengeId, done: data.dailyChallengeDone };
+  }
+  // Pick a hard question or unseen passage question
+  var pool = QS.filter(function(q) {
+    var st = data.questionStats[q.id];
+    if (!st || st.seen === 0) return !!q.pass; // unseen passage Qs
+    return st.seen >= 2 && (st.correct / st.seen) < 0.5; // hard Qs
+  });
+  if (pool.length === 0) pool = QS.filter(function(q) { return !data.questionStats[q.id]; });
+  if (pool.length === 0) return null;
+  // Deterministic "random" based on date
+  var seed = today.split("-").join("");
+  var idx = parseInt(seed) % pool.length;
+  return { id: pool[idx].id, done: false };
+}
+
+// === V20: TOAST SYSTEM ===
+var _toastQueue = [];
+var _toastTimeout = null;
+function showToast(text) {
+  _toastQueue.push({ text: text, ts: Date.now() });
+  if (!_toastTimeout) { _drainToast(); }
+}
+function _drainToast() {
+  if (_toastQueue.length === 0) { _toastTimeout = null; return; }
+  var t = _toastQueue.shift();
+  var el = document.getElementById("toast-container");
+  if (el) {
+    el.textContent = t.text;
+    el.style.opacity = "1";
+    el.style.transform = "translateY(0)";
+    _toastTimeout = setTimeout(function() {
+      el.style.opacity = "0";
+      el.style.transform = "translateY(-20px)";
+      setTimeout(_drainToast, 300);
+    }, 3000);
+  }
+}
+
+// === V20: NEW BADGES ===
+var V20_BADGES = [
+  { id: "century_club", name: "Century Club", icon: "\u{1F4AF}", desc: "100 questions in one day" },
+  { id: "perfect_sim", name: "Perfect Sim", icon: "\u{1F3C6}", desc: "100% on a section sim" },
+  { id: "mcat_ready", name: "MCAT Ready", icon: "\u{1F393}", desc: "All categories above 75%" },
+  { id: "early_bird", name: "Early Bird", icon: "\u{1F305}", desc: "Study before 7 AM" },
+  { id: "night_owl", name: "Night Owl", icon: "\u{1F989}", desc: "Study after 11 PM" },
+  { id: "comeback_kid", name: "Comeback Kid", icon: "\u{1F4AA}", desc: "Improve a category by 20+" },
+  { id: "fc_master", name: "Flashcard Master", icon: "\u{1F4C7}", desc: "500 flashcard reviews" }
+];
+
+function checkNewBadges(data) {
+  var earned = (data.badges || []).slice();
+  var earnedIds = {};
+  earned.forEach(function(b) { earnedIds[b.id || b] = true; });
+  var newBadges = [];
+  // Century Club
+  var todayQs = 0;
+  (data.sessionHistory || []).forEach(function(s) { if (s.date === todayStr()) todayQs += (s.total || 0); });
+  if (todayQs >= 100 && !earnedIds["century_club"]) newBadges.push("century_club");
+  // Early Bird / Night Owl
+  var hour = new Date().getHours();
+  if (hour < 7 && !earnedIds["early_bird"]) newBadges.push("early_bird");
+  if (hour >= 23 && !earnedIds["night_owl"]) newBadges.push("night_owl");
+  return newBadges;
+}
+
+// === V16: TAB BAR COMPONENT ===
+function TabBar(props) {
+  var activeTab = props.activeTab, setActiveTab = props.setActiveTab, setScr = props.setScr;
+  var isDark = props.isDark, fg = props.fg;
+  var tabs = [
+    { id: "home", icon: "\u{1F3E0}", label: "Home" },
+    { id: "study", icon: "\u{1F4DA}", label: "Study" },
+    { id: "practice", icon: "\u{1F3AF}", label: "Practice" },
+    { id: "stats", icon: "\u{1F4CA}", label: "Stats" },
+    { id: "tools", icon: "\u{1F527}", label: "Tools" }
+  ];
+  // Set CSS vars for theming
+  var barStyle = {
+    "--tab-bg": isDark ? "rgba(15,15,20,.97)" : "rgba(250,250,250,.97)",
+    "--tab-border": isDark ? "rgba(255,255,255,.06)" : "rgba(0,0,0,.08)",
+    "--tab-color": isDark ? "#888" : "#666"
+  };
+  return React.createElement("div", { className: "tab-bar", style: barStyle },
+    tabs.map(function(tab) {
+      return React.createElement("button", {
+        key: tab.id,
+        className: activeTab === tab.id ? "active" : "",
+        onClick: function() {
+          setActiveTab(tab.id);
+          // Map tab to default screen
+          if (tab.id === "home") setScr("home");
+          else if (tab.id === "study") setScr("study_hub");
+          else if (tab.id === "practice") setScr("practice_grid");
+          else if (tab.id === "stats") setScr("stats");
+          else if (tab.id === "tools") setScr("tools_hub");
+        }
+      },
+        React.createElement("span", { className: "tab-icon" }, tab.icon),
+        React.createElement("span", null, tab.label)
+      );
+    })
+  );
+}
+
+// === V16: PROGRESS RING SVG ===
+function ProgressRing(props) {
+  var pct = props.pct || 0, size = props.size || 80, stroke = props.stroke || 6;
+  var r = (size - stroke) / 2;
+  var circ = 2 * Math.PI * r;
+  var offset = circ - (Math.min(pct, 100) / 100) * circ;
+  var center = size / 2;
+  return React.createElement("div", { className: "progress-ring-container", style: { width: size, height: size } },
+    React.createElement("svg", { viewBox: "0 0 " + size + " " + size, style: { transform: "rotate(-90deg)", width: size, height: size } },
+      React.createElement("circle", { cx: center, cy: center, r: r, fill: "none", stroke: props.trackColor || "rgba(255,255,255,.06)", strokeWidth: stroke }),
+      React.createElement("circle", { cx: center, cy: center, r: r, fill: "none", stroke: props.color || "#667eea", strokeWidth: stroke, strokeDasharray: circ, strokeDashoffset: offset, strokeLinecap: "round", style: { transition: "stroke-dashoffset 0.6s ease" } })
+    ),
+    React.createElement("div", { className: "progress-ring-text" }, props.children)
+  );
+}
+
+// === V16: GREETING HELPER ===
+function getGreeting(name) {
+  var h = new Date().getHours();
+  var g = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
+  return name ? g + ", " + name + "!" : g + "!";
+}
+
+// === V16: WEEKLY PROGRESS ===
+function getWeeklyQsAnswered(data) {
+  var count = 0;
+  var now = Date.now();
+  var weekAgo = now - 7 * 86400000;
+  // Count from session history
+  (data.sessionHistory || []).forEach(function(s) {
+    if (s.ts && s.ts > weekAgo) count += (s.total || 0);
+  });
+  return count;
+}
+
 const S = {
   c: {
     minHeight: "100vh",
@@ -7663,6 +8893,13 @@ const S = {
     marginBottom: 10
   }
 };
+
+// === V16: SCREEN WRAPPER - Injects TabBar on non-play/results screens ===
+function GameWrapper(props) {
+  var gameEl = React.createElement(Game, props);
+  return gameEl;
+}
+
 class EB extends React.Component {
   constructor(p) {
     super(p);
@@ -7696,7 +8933,18 @@ class EB extends React.Component {
   }
 }
 try {
-  ReactDOM.render(React.createElement(EB, null, React.createElement(App)), document.getElementById("root"));
+  // V16: Create tab bar portal container
+var tabBarRoot = document.createElement("div");
+tabBarRoot.id = "tab-bar-root";
+document.body.appendChild(tabBarRoot);
+
+// V20: Toast container
+var toastEl = document.createElement("div");
+toastEl.id = "toast-container";
+toastEl.style.cssText = "position:fixed;top:env(safe-area-inset-top,0);left:50%;transform:translateX(-50%) translateY(-20px);opacity:0;transition:all .3s;z-index:10000;padding:8px 20px;background:rgba(102,126,234,.95);color:#fff;border-radius:20px;font-size:12px;font-weight:600;font-family:inherit;pointer-events:none;white-space:nowrap;margin-top:8px";
+document.body.appendChild(toastEl);
+
+ReactDOM.render(React.createElement(EB, null, React.createElement(App)), document.getElementById("root"));
 } catch (e) {
   document.getElementById("root").innerHTML = '<div style="padding:40px;color:#f87171;font-family:monospace"><h2>Error</h2><pre>' + e.message + '</pre></div>';
 }
