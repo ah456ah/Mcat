@@ -2183,7 +2183,8 @@ function Game(_ref2) {
         left: leftItem,
         right: rightItem,
         correct: isCorrect,
-        expected: correctRight
+        expected: correctRight,
+        rightIdx: idx
       }]);
       setMatchDone(newDone);
       setMatchResults(newResults);
@@ -3146,7 +3147,7 @@ function Game(_ref2) {
         color: TC.dim,
         letterSpacing: 2
       }
-    }, "v13.1.0 ", "\u2022", " AI TUTOR ", "\u2022", " ANALYTICS")), dayStreak >= 1 && /*#__PURE__*/React.createElement("div", {
+    }, "v13.1.2 ", "\u2022", " AI TUTOR ", "\u2022", " ANALYTICS")), dayStreak >= 1 && /*#__PURE__*/React.createElement("div", {
       style: {
         marginBottom: 12,
         padding: "10px 14px",
@@ -3192,27 +3193,55 @@ function Game(_ref2) {
           /*#__PURE__*/React.createElement("button", { onClick: function() { var nd = prompt("Set MCAT date (YYYY-MM-DD):", testDate || ""); if (nd) { dirtyRef.current = true; setData(function(d) { return Object.assign({}, d, { testDate: nd }); }); } }, style: { fontSize: 9, color: TC.dim, padding: "3px 6px", border: "1px solid " + TC.cbr, borderRadius: 5 } }, "Edit")
         ) : /*#__PURE__*/React.createElement("button", { onClick: function() { var nd = prompt("Set your MCAT date (YYYY-MM-DD):"); if (nd) { dirtyRef.current = true; setData(function(d) { return Object.assign({}, d, { testDate: nd }); }); } }, style: { width: "100%", padding: "8px 12px", marginBottom: 8, background: TC.card, border: "1px solid " + TC.cbr, borderRadius: 10, fontSize: 11 + fz, color: TC.muted, textAlign: "center" } }, "\u{1F4C5} Set your MCAT test date"),
         // Smart Daily Plan card
-        /*#__PURE__*/React.createElement("div", { style: { padding: "14px 16px", background: "linear-gradient(135deg, rgba(102,126,234,.08), rgba(74,222,128,.04))", border: "1px solid rgba(102,126,234,.2)", borderRadius: 14 } },
-          /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 } },
-            /*#__PURE__*/React.createElement("span", { style: { fontSize: 14 + fz, fontWeight: 800, color: fg } }, "\u{1F9E0} Today\u2019s Plan"),
-            /*#__PURE__*/React.createElement("span", { style: { fontSize: 10, color: TC.dim } }, stToday + "min today \u2022 " + stWeek + " this week")
-          ),
-          plan.total === 0
-            ? /*#__PURE__*/React.createElement("div", { style: { fontSize: 12 + fz, color: "#4ade80", padding: "8px 0" } }, "\u2705 All caught up! Try New Questions or Boss Battle.")
-            : /*#__PURE__*/React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } },
-              plan.review.length > 0 ? /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, fontSize: 12 + fz, color: TC.muted } },
-                /*#__PURE__*/React.createElement("span", { style: { width: 24, height: 24, borderRadius: 6, background: "rgba(102,126,234,.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, flexShrink: 0 } }, "\u{1F504}"),
-                /*#__PURE__*/React.createElement("span", null, plan.review.length, " spaced review due")
-              ) : null,
-              plan.weak.length > 0 ? /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, fontSize: 12 + fz, color: TC.muted } },
-                /*#__PURE__*/React.createElement("span", { style: { width: 24, height: 24, borderRadius: 6, background: "rgba(248,113,113,.12)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, flexShrink: 0 } }, "\u{1F3AF}"),
-                /*#__PURE__*/React.createElement("span", null, plan.weak.length, " weak-topic Qs", plan.weakTags && plan.weakTags.length > 0 ? " (" + plan.weakTags.slice(0,2).join(", ") + ")" : "")
-              ) : null,
-              plan.unseen.length > 0 ? /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, fontSize: 12 + fz, color: TC.muted } },
-                /*#__PURE__*/React.createElement("span", { style: { width: 24, height: 24, borderRadius: 6, background: "rgba(74,222,128,.12)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, flexShrink: 0 } }, "\u2728"),
-                /*#__PURE__*/React.createElement("span", null, plan.unseen.length, " new questions")
-              ) : null
+        (function() {
+          // Calculate how many plan questions were done today
+          var todayStart = new Date(); todayStart.setHours(0,0,0,0); var todayMs = todayStart.getTime();
+          function countDoneToday(arr) {
+            return arr.filter(function(q) { var s = data.questionStats[q.id]; return s && s.lastSeen && s.lastSeen >= todayMs; }).length;
+          }
+          var reviewDone = countDoneToday(plan.review);
+          var weakDone = countDoneToday(plan.weak);
+          var unseenDone = countDoneToday(plan.unseen);
+          var totalDone = reviewDone + weakDone + unseenDone;
+          var progressPct = plan.total > 0 ? Math.min(100, Math.round(totalDone / plan.total * 100)) : 100;
+          var allDone = plan.total > 0 && totalDone >= plan.total;
+
+          return React.createElement("div", { style: { padding: "14px 16px", background: "linear-gradient(135deg, rgba(102,126,234,.08), rgba(74,222,128,.04))", border: "1px solid rgba(102,126,234,.2)", borderRadius: 14 } },
+            // Header
+            React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 } },
+              React.createElement("span", { style: { fontSize: 14 + fz, fontWeight: 800, color: fg } }, "\u{1F9E0} Today\u2019s Plan"),
+              React.createElement("span", { style: { fontSize: 10, color: TC.dim } }, stToday + "min today \u2022 " + stWeek + " this week")
             ),
+            // Progress bar
+            plan.total > 0 ? React.createElement("div", { style: { marginBottom: 12 } },
+              React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 } },
+                React.createElement("span", { style: { fontSize: 10 + fz, fontWeight: 700, color: allDone ? "#4ade80" : "#667eea" } }, allDone ? "\u2705 Plan complete!" : totalDone + "/" + plan.total + " done"),
+                React.createElement("span", { style: { fontSize: 10, color: TC.dim } }, progressPct + "%")
+              ),
+              React.createElement("div", { style: { width: "100%", height: 6, background: isDark ? "rgba(255,255,255,.08)" : "rgba(0,0,0,.06)", borderRadius: 3, overflow: "hidden" } },
+                React.createElement("div", { style: { width: progressPct + "%", height: "100%", borderRadius: 3, background: allDone ? "#4ade80" : "linear-gradient(90deg, #667eea, #764ba2)", transition: "width 0.4s ease" } })
+              )
+            ) : null,
+            // Category breakdown with completion checkboxes
+            plan.total === 0
+              ? React.createElement("div", { style: { fontSize: 12 + fz, color: "#4ade80", padding: "8px 0" } }, "\u2705 All caught up! Try New Questions or Boss Battle.")
+              : React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4 } },
+                plan.review.length > 0 ? React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, fontSize: 12 + fz, color: reviewDone >= plan.review.length ? "#4ade80" : TC.muted, opacity: reviewDone >= plan.review.length ? 0.7 : 1 } },
+                  React.createElement("span", { style: { width: 22, height: 22, borderRadius: 6, background: reviewDone >= plan.review.length ? "rgba(74,222,128,.15)" : "rgba(102,126,234,.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, flexShrink: 0 } }, reviewDone >= plan.review.length ? "\u2713" : "\u{1F504}"),
+                  React.createElement("span", { style: { flex: 1 } }, plan.review.length, " spaced review"),
+                  React.createElement("span", { style: { fontSize: 10, fontWeight: 600, color: reviewDone >= plan.review.length ? "#4ade80" : TC.dim } }, reviewDone + "/" + plan.review.length)
+                ) : null,
+                plan.weak.length > 0 ? React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, fontSize: 12 + fz, color: weakDone >= plan.weak.length ? "#4ade80" : TC.muted, opacity: weakDone >= plan.weak.length ? 0.7 : 1 } },
+                  React.createElement("span", { style: { width: 22, height: 22, borderRadius: 6, background: weakDone >= plan.weak.length ? "rgba(74,222,128,.15)" : "rgba(248,113,113,.12)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, flexShrink: 0 } }, weakDone >= plan.weak.length ? "\u2713" : "\u{1F3AF}"),
+                  React.createElement("span", { style: { flex: 1 } }, plan.weak.length, " weak-topic Qs", plan.weakTags && plan.weakTags.length > 0 ? " (" + plan.weakTags.slice(0,2).join(", ") + ")" : ""),
+                  React.createElement("span", { style: { fontSize: 10, fontWeight: 600, color: weakDone >= plan.weak.length ? "#4ade80" : TC.dim } }, weakDone + "/" + plan.weak.length)
+                ) : null,
+                plan.unseen.length > 0 ? React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, fontSize: 12 + fz, color: unseenDone >= plan.unseen.length ? "#4ade80" : TC.muted, opacity: unseenDone >= plan.unseen.length ? 0.7 : 1 } },
+                  React.createElement("span", { style: { width: 22, height: 22, borderRadius: 6, background: unseenDone >= plan.unseen.length ? "rgba(74,222,128,.15)" : "rgba(74,222,128,.12)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, flexShrink: 0 } }, unseenDone >= plan.unseen.length ? "\u2713" : "\u2728"),
+                  React.createElement("span", { style: { flex: 1 } }, plan.unseen.length, " new questions"),
+                  React.createElement("span", { style: { fontSize: 10, fontWeight: 600, color: unseenDone >= plan.unseen.length ? "#4ade80" : TC.dim } }, unseenDone + "/" + plan.unseen.length)
+                ) : null
+              ),
           // AI STUDY COACH
           (function() {
             var hasKey = false;
@@ -3258,7 +3287,8 @@ function Game(_ref2) {
             );
           })(),
           plan.total > 0 ? /*#__PURE__*/React.createElement("button", { onClick: startSmartSession, style: { ...S.btn, fontSize: 13 + fz, marginTop: 10 } }, "\u{1F680} Start Smart Session (" + plan.total + " Qs)") : null
-        )
+          );
+        })()
       );
     }(), /*#__PURE__*/React.createElement("div", {
       style: {
@@ -3379,94 +3409,7 @@ function Game(_ref2) {
         color: TC.muted,
         marginTop: 2
       }
-    }, "Spaced repetition")), (dueC > 0 || blindC > 0 || daysSinceCars >= 3 || weakC.length > 0) && /*#__PURE__*/React.createElement("div", {
-      style: {
-        padding: "12px 14px",
-        background: TC.card,
-        border: "1px solid " + TC.cbr,
-        borderRadius: 12,
-        marginBottom: 14
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 11,
-        fontWeight: 700,
-        color: fg,
-        marginBottom: 8
-      }
-    }, "\u{1F4CB}", " Today's Plan"), /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        flexWrap: "wrap",
-        gap: 6
-      }
-    }, dueC > 0 && /*#__PURE__*/React.createElement("button", {
-      onClick: function () {
-        startGame("SPACED_REVIEW", []);
-      },
-      style: {
-        padding: "6px 10px",
-        borderRadius: 8,
-        fontSize: 10,
-        fontWeight: 600,
-        background: "rgba(102,126,234,.12)",
-        border: "1px solid rgba(102,126,234,.25)",
-        color: "#667eea"
-      }
-    }, "\u{1F9E0}", " ", dueC, " reviews due"), blindC > 0 && /*#__PURE__*/React.createElement("button", {
-      onClick: function () {
-        startGame("BLIND_SPOTS", []);
-      },
-      style: {
-        padding: "6px 10px",
-        borderRadius: 8,
-        fontSize: 10,
-        fontWeight: 600,
-        background: "rgba(248,113,113,.1)",
-        border: "1px solid rgba(248,113,113,.25)",
-        color: "#f87171"
-      }
-    }, "\u{1F4A5}", " ", blindC, " blind spots"), daysSinceCars >= 3 && /*#__PURE__*/React.createElement("button", {
-      onClick: function () {
-        startGame("CARS_MODE", []);
-      },
-      style: {
-        padding: "6px 10px",
-        borderRadius: 8,
-        fontSize: 10,
-        fontWeight: 600,
-        background: "rgba(155,93,229,.1)",
-        border: "1px solid rgba(155,93,229,.25)",
-        color: "#9b5de5"
-      }
-    }, "\u{1F4D6}", " CARS (", daysSinceCars, "d ago)"), weakC.length > 0 && /*#__PURE__*/React.createElement("button", {
-      onClick: function () {
-        startGame("WEAK_TOPICS", []);
-      },
-      style: {
-        padding: "6px 10px",
-        borderRadius: 8,
-        fontSize: 10,
-        fontWeight: 600,
-        background: "rgba(251,191,36,.1)",
-        border: "1px solid rgba(251,191,36,.25)",
-        color: "#fbbf24"
-      }
-    }, "\u{1F3AF}", " Weak topics"), function () {
-      // Count POE mistakes
-      var poeCount = 0;
-      Object.keys(data.questionStats || {}).forEach(function (qid) {
-        var s = data.questionStats[qid];
-        if (s && s.eliminatedCorrect && s.eliminatedCorrect > 0) poeCount++;
-      });
-      return poeCount > 0 ? /*#__PURE__*/React.createElement("button", {
-        onClick: function () { startGame("POE_TRAINER", []); },
-        style: { padding: "6px 10px", borderRadius: 8, fontSize: 10, fontWeight: 600, background: "rgba(248,113,113,.08)", border: "1px solid rgba(248,113,113,.2)", color: "#f87171" }
-      }, "\u2702\uFE0F ", poeCount, " POE mistakes") : null;
-    }(), daysSinceCars >= 2 ? /*#__PURE__*/React.createElement("button", {
-      onClick: function () { startGame("CARS_SPEED", []); },
-      style: { padding: "6px 10px", borderRadius: 8, fontSize: 10, fontWeight: 600, background: "rgba(155,93,229,.08)", border: "1px solid rgba(155,93,229,.2)", color: "#9b5de5" }
-    }, "\u{1F4D6}\u23F1 Speed Read") : null)),
+    }, "Spaced repetition")),
     // Error Pattern Notification Card
     function () {
       var hpats = getErrorPatterns(data);
@@ -3572,93 +3515,7 @@ function Game(_ref2) {
         fontWeight: 700,
         color: "#f87171"
       }
-    }, "\u{1F4D3}", " Mistakes", getMistakeLog(data).length > 0 ? " (" + getMistakeLog(data).length + ")" : ""))), /*#__PURE__*/React.createElement("div", {
-      style: {
-        marginBottom: 14
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: S.sh
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        ...TS.sln,
-        background: TC.sbg
-      }
-    }), /*#__PURE__*/React.createElement("span", {
-      style: {
-        ...TS.stt,
-        color: TC.dim
-      }
-    }, "MASTERY"), /*#__PURE__*/React.createElement("span", {
-      style: {
-        ...TS.sln,
-        background: TC.sbg
-      }
-    })), /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "grid",
-        gridTemplateColumns: "1fr 1fr 1fr",
-        gap: 4
-      }
-    }, Object.entries(CATS).filter(function (e) {
-      return e[0] !== "CARS";
-    }).map(function (e) {
-      var k = e[0],
-        cat = e[1],
-        ac = getCatAcc(data, k),
-        p = ac.pct || 0,
-        c = p >= 80 ? "#4ade80" : p >= 60 ? "#fbbf24" : p > 0 ? "#f87171" : "#333";
-      return /*#__PURE__*/React.createElement("div", {
-        key: k,
-        style: {
-          padding: "6px 3px",
-          background: TC.card,
-          borderRadius: 6,
-          textAlign: "center",
-          borderBottom: "2px solid " + c,
-          background: TC.card
-        }
-      }, /*#__PURE__*/React.createElement("div", {
-        style: {
-          fontSize: 13
-        }
-      }, cat.icon), /*#__PURE__*/React.createElement("div", {
-        style: {
-          fontSize: 7,
-          color: TC.dim
-        }
-      }, cat.name), /*#__PURE__*/React.createElement("div", {
-        style: {
-          fontSize: 11,
-          fontWeight: 700,
-          color: c
-        }
-      }, ac.seen > 0 ? p + "%" : "\u2014"));
-    }))), /*#__PURE__*/React.createElement("button", {
-      onClick: function () {
-        startGame("QUICK_5", []);
-      },
-      style: {
-        width: "100%",
-        padding: 14,
-        marginBottom: 14,
-        background: "linear-gradient(135deg,rgba(102,126,234,.1),rgba(118,75,162,.1))",
-        border: "1.5px solid rgba(102,126,234,.25)",
-        borderRadius: 12,
-        textAlign: "center"
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 14,
-        fontWeight: 700,
-        color: "#667eea"
-      }
-    }, "\u26A1", " Quick 5"), /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 10,
-        color: TC.muted,
-        marginTop: 2
-      }
-    }, "5 mixed questions ", "\u2022", " perfect for on-the-go")),
+    }, "\u{1F4D3}", " Mistakes", getMistakeLog(data).length > 0 ? " (" + getMistakeLog(data).length + ")" : ""))),
     // === COLLAPSIBLE MODE SECTIONS ===
     // --- TARGETED PRACTICE (collapsed by default) ---
     /*#__PURE__*/React.createElement("button", {
@@ -3739,36 +3596,49 @@ function Game(_ref2) {
       /*#__PURE__*/React.createElement("div", null,
         /*#__PURE__*/React.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: "#667eea", display: "block" } }, "AI Tutor"),
         /*#__PURE__*/React.createElement("span", { style: { fontSize: 10, color: TC.muted } }, "Ask anything about any MCAT topic"))
-    ), /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        gap: 8
-      }
-    }, data.bestStreak > 0 && /*#__PURE__*/React.createElement("div", {
-      style: {
-        flex: 1,
-        textAlign: "center",
-        padding: 8,
-        background: "rgba(255,150,50,.08)",
-        borderRadius: 8,
-        fontSize: 12,
-        color: "#ffa033",
-        fontWeight: 600
-      }
-    }, "\u{1F525}", " Best: ", data.bestStreak), /*#__PURE__*/React.createElement("button", {
-      onClick: function () {
-        setScr("stats");
-      },
-      style: {
-        flex: 1,
-        padding: 8,
-        background: "rgba(102,126,234,.1)",
-        borderRadius: 8,
-        fontSize: 12,
-        color: "#667eea",
-        fontWeight: 600
-      }
-    }, "\u{1F4CA}", " Stats")), /*#__PURE__*/React.createElement("div", {
+    ),
+    // === INTERACTIVE STATS CARD ===
+    React.createElement("button", {
+      onClick: function() { setScr("stats"); },
+      style: { width: "100%", padding: "14px 16px", marginBottom: 14, background: TC.card, border: "1px solid " + TC.cbr, borderRadius: 14, textAlign: "left" }
+    },
+      React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 } },
+        React.createElement("span", { style: { fontSize: 13 + fz, fontWeight: 800, color: fg } }, "\u{1F4CA} Stats & Scores"),
+        React.createElement("span", { style: { fontSize: 10, color: TC.dim } }, "\u203A")
+      ),
+      // Section score predictions row
+      (function() {
+        var secs = ["Bio/Biochem", "Chem/Phys", "Psych/Soc", "CARS"];
+        var secColors = { "Bio/Biochem": "#2a9d8f", "Chem/Phys": "#457b9d", "Psych/Soc": "#e76f51", "CARS": "#9b5de5" };
+        var secShort = { "Bio/Biochem": "B/B", "Chem/Phys": "C/P", "Psych/Soc": "P/S", "CARS": "CARS" };
+        var tp = getTotalPredicted(data);
+        return React.createElement("div", null,
+          React.createElement("div", { style: { display: "flex", gap: 6, marginBottom: 8 } },
+            secs.map(function(sec) {
+              var a = getSectionAccEMA(data, sec);
+              var p = a !== null ? predictScore(a) : null;
+              var scoreStr = p ? p.low + "-" + p.high : "--";
+              var pctStr = a !== null ? a + "%" : "--";
+              var c = a === null ? TC.dim : a >= 80 ? "#4ade80" : a >= 65 ? "#fbbf24" : "#f87171";
+              return React.createElement("div", { key: sec, style: { flex: 1, padding: "8px 4px", background: isDark ? "rgba(255,255,255,.03)" : "rgba(0,0,0,.02)", borderRadius: 8, textAlign: "center", borderTop: "2px solid " + (secColors[sec] || "#667eea") } },
+                React.createElement("div", { style: { fontSize: 8, color: TC.dim, marginBottom: 2, fontWeight: 600, letterSpacing: 0.5 } }, secShort[sec]),
+                React.createElement("div", { style: { fontSize: 14, fontWeight: 900, color: c } }, pctStr),
+                React.createElement("div", { style: { fontSize: 8, color: TC.dim, marginTop: 1 } }, scoreStr)
+              );
+            })
+          ),
+          // Total predicted + key stats row
+          React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } },
+            React.createElement("div", { style: { display: "flex", gap: 12 } },
+              React.createElement("span", { style: { fontSize: 10, color: TC.muted } }, "\u{1F525} ", data.bestStreak > 0 ? data.bestStreak + " best streak" : "No streak yet"),
+              React.createElement("span", { style: { fontSize: 10, color: TC.muted } }, "\u{1F4AA} ", data.totalAnswered, " answered")
+            ),
+            tp ? React.createElement("span", { style: { fontSize: 11, fontWeight: 800, color: "#667eea" } }, "Est: " + tp.low + "-" + tp.high) : React.createElement("span", { style: { fontSize: 10, color: TC.dim } }, "Need more data")
+          )
+        );
+      })()
+    ),
+    /*#__PURE__*/React.createElement("div", {
       style: {
         textAlign: "center",
         marginTop: 12
@@ -6000,7 +5870,7 @@ function Game(_ref2) {
       }
     }, q.shuffledRight.map(function (r, i) {
       var used = matchResults.some(function (mr) {
-        return mr.right === r;
+        return mr.rightIdx === i;
       });
       return /*#__PURE__*/React.createElement("button", {
         key: i,
