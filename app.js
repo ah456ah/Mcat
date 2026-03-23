@@ -873,7 +873,7 @@ function exportStats(data) {
   }).sort(function (a, b) {
     return a.pct - b.pct;
   }).slice(0, 3).forEach(function (c) {
-    lines.push("  " + CATS[c.key].name + ": " + c.pct + "%");
+    lines.push("  " + (CATS[c.key]||{name:c.key}).name + ": " + c.pct + "%");
   });
   return lines.join("\n");
 }
@@ -3260,7 +3260,7 @@ function Game(_ref2) {
       var firstQ = QS.find(function (q) {
         return (q.tags || []).indexOf(tag) >= 0;
       });
-      var sec = firstQ ? CATS[firstQ.cat].sec : "Other";
+      var sec = firstQ && CATS[firstQ.cat] ? CATS[firstQ.cat].sec : "Other";
       if (!cardCats[sec]) cardCats[sec] = [];
       cardCats[sec].push(tag);
     });
@@ -3728,7 +3728,7 @@ function Game(_ref2) {
         color: TC.dim,
         letterSpacing: 2
       }
-    }, "v20.0.0 ", "\u2022", " AI TUTOR ", "\u2022", " SECTION SIM")), dayStreak >= 1 && /*#__PURE__*/React.createElement("div", {
+    }, "v20.0.1 ", "\u2022", " AI TUTOR ", "\u2022", " SECTION SIM")), dayStreak >= 1 && /*#__PURE__*/React.createElement("div", {
       style: {
         marginBottom: 12,
         padding: "10px 14px",
@@ -6389,7 +6389,7 @@ function Game(_ref2) {
           React.createElement("div", { style: { padding: "14px 16px", background: TC.card, border: "1px solid " + TC.cbr, borderRadius: 12 } },
             React.createElement("div", { style: { fontSize: 12 + fz, fontWeight: 700, marginBottom: 6, color: fg } }, "About"),
             React.createElement("div", { style: { fontSize: 11, color: TC.muted, lineHeight: 1.8 } },
-              "Version: v20.0.0", React.createElement("br"),
+              "Version: v20.0.1", React.createElement("br"),
               "Questions: " + QS.length, React.createElement("br"),
               React.createElement("a", { href: "https://github.com/ah456ah/Mcat", target: "_blank", style: { color: "#667eea" } }, "GitHub Repository")
             )
@@ -6568,10 +6568,10 @@ function Game(_ref2) {
         React.createElement("input", { type: "text", placeholder: "Search topics...", value: studySearch, style: { width: "100%", padding: "10px 14px", marginBottom: 12, background: isDark ? "rgba(255,255,255,.05)" : "rgba(0,0,0,.04)", border: "1px solid " + TC.cbr, borderRadius: 10, color: fg, fontSize: 12 + fz, fontFamily: "inherit" }, onChange: function(e) { setStudySearch(e.target.value); } }),
         // Segmented control
         React.createElement("div", { style: { display: "flex", gap: 4, marginBottom: 14, background: isDark ? "rgba(255,255,255,.04)" : "rgba(0,0,0,.04)", borderRadius: 8, padding: 3, overflowX: "auto", scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch" } },
-          ["cards", "modules", "flashcards", "mnemonics", "connections"].map(function(tab) {
+          ["cards", "lessons", "flashcards", "mnemonics", "connections"].map(function(tab) {
             var active = studySubTab === tab;
             var fcDue = tab === "flashcards" ? getFlashcardsDueCount(data) : 0;
-            var label = tab === "cards" ? "\u{1F0CF} Cards" : tab === "modules" ? "\u{1F4DA} Lessons" : tab === "flashcards" ? "\u{1F4C7} Flip" + (fcDue > 0 ? " (" + fcDue + ")" : "") : tab === "mnemonics" ? "\u{1F4A1} Mnemo" : "\u{1F517} Map";
+            var label = tab === "cards" ? "\u{1F0CF} Cards" : tab === "lessons" ? "\u{1F4DA} Lessons" : tab === "flashcards" ? "\u{1F4C7} Flip" + (fcDue > 0 ? " (" + fcDue + ")" : "") : tab === "mnemonics" ? "\u{1F4A1} Mnemo" : "\u{1F517} Map";
             return React.createElement("button", { key: tab, onClick: function() { setStudySubTab(tab); }, style: { flex: "0 0 auto", padding: "7px 10px", borderRadius: 6, fontSize: 10 + fz, fontWeight: 600, background: active ? (isDark ? "rgba(255,255,255,.1)" : "#fff") : "transparent", color: active ? fg : TC.muted, border: "none", transition: "all .15s", boxShadow: active ? "0 1px 3px rgba(0,0,0,.1)" : "none", whiteSpace: "nowrap" } }, label);
           })
         ),
@@ -6891,7 +6891,7 @@ function Game(_ref2) {
       setScr("results");
       return null;
     }
-    var cat = CATS[q.cat];
+    var cat = CATS[q.cat] || {name:q.cat,icon:"",color:"#667eea",sec:"Other"};
     var low = tl != null && tl <= 10;
     var passageData = q.pass ? PASSAGES[q.pass] : null;
     var isFlagged = (data.flagged || []).indexOf(q.id) >= 0;

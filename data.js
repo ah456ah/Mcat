@@ -1144,39 +1144,39 @@ var MODULES={"Enzyme Inhibition": {"title": "Enzyme Inhibition", "icon": "🧬",
 
 var REF_FORMULAS={
 "Physics":[
-{cat:"Kinematics",formulas:[
+{cat:"PHYSICS",formulas:[
 {eq:"v = v₀ + at",desc:"Final velocity",vars:"v₀=initial velocity, a=acceleration, t=time"},
 {eq:"x = v₀t + ½at²",desc:"Displacement",vars:"v₀=initial velocity, a=acceleration, t=time"},
 {eq:"v² = v₀² + 2ax",desc:"Velocity-displacement",vars:"No time variable needed"},
 {eq:"x = ½(v + v₀)t",desc:"Average velocity method",vars:"Works when acceleration is constant"}
 ]},
-{cat:"Forces",formulas:[
+{cat:"PHYSICS",formulas:[
 {eq:"F = ma",desc:"Newton's 2nd law",vars:"F=force(N), m=mass(kg), a=acceleration(m/s²)"},
 {eq:"F_g = mg",desc:"Weight/gravity force",vars:"g=9.8 m/s² on Earth"},
 {eq:"f = μN",desc:"Friction force",vars:"μ=coefficient of friction, N=normal force"},
 {eq:"F = -kx",desc:"Hooke's law (springs)",vars:"k=spring constant, x=displacement from equilibrium"}
 ]},
-{cat:"Energy & Work",formulas:[
+{cat:"PHYSICS",formulas:[
 {eq:"W = Fd·cosθ",desc:"Work done by force",vars:"F=force, d=distance, θ=angle between F and d"},
 {eq:"KE = ½mv²",desc:"Kinetic energy",vars:"m=mass, v=velocity"},
 {eq:"PE = mgh",desc:"Gravitational PE",vars:"m=mass, g=9.8, h=height"},
 {eq:"PE = ½kx²",desc:"Elastic PE (spring)",vars:"k=spring constant, x=displacement"},
 {eq:"P = W/t = Fv",desc:"Power",vars:"W=work, t=time, F=force, v=velocity"}
 ]},
-{cat:"Fluids",formulas:[
+{cat:"PHYSICS",formulas:[
 {eq:"P = F/A",desc:"Pressure",vars:"F=force, A=area. Units: Pascal (Pa)"},
 {eq:"P = ρgh",desc:"Hydrostatic pressure",vars:"ρ=density, g=9.8, h=depth"},
 {eq:"F_b = ρ_fluid · V · g",desc:"Buoyancy (Archimedes)",vars:"V=volume displaced"},
 {eq:"A₁v₁ = A₂v₂",desc:"Continuity equation",vars:"A=cross-sectional area, v=velocity"},
 {eq:"P + ½ρv² + ρgh = const",desc:"Bernoulli's equation",vars:"Pressure + kinetic + potential energy per volume"}
 ]},
-{cat:"Waves & Optics",formulas:[
+{cat:"PHYSICS",formulas:[
 {eq:"v = fλ",desc:"Wave speed",vars:"f=frequency(Hz), λ=wavelength(m)"},
 {eq:"1/f = 1/dₒ + 1/dᵢ",desc:"Thin lens/mirror equation",vars:"f=focal length, dₒ=object dist, dᵢ=image dist"},
 {eq:"m = -dᵢ/dₒ = hᵢ/hₒ",desc:"Magnification",vars:"Negative m = inverted image"},
 {eq:"n₁sinθ₁ = n₂sinθ₂",desc:"Snell's law (refraction)",vars:"n=index of refraction, θ=angle from normal"}
 ]},
-{cat:"Electricity",formulas:[
+{cat:"PHYSICS",formulas:[
 {eq:"F = kq₁q₂/r²",desc:"Coulomb's law",vars:"k=8.99×10⁹, q=charge(C), r=distance"},
 {eq:"V = IR",desc:"Ohm's law",vars:"V=voltage, I=current(A), R=resistance(Ω)"},
 {eq:"P = IV = I²R = V²/R",desc:"Electrical power",vars:"P in Watts"},
@@ -1185,43 +1185,43 @@ var REF_FORMULAS={
 ]}
 ],
 "Gen Chem":[
-{cat:"Thermodynamics",formulas:[
+{cat:"PHYSICS",formulas:[
 {eq:"ΔG = ΔH - TΔS",desc:"Gibbs free energy",vars:"ΔG<0 spontaneous. T in Kelvin"},
 {eq:"ΔG° = -RTlnKeq",desc:"Standard free energy & equilibrium",vars:"R=8.314 J/(mol·K)"},
 {eq:"q = mcΔT",desc:"Heat transfer",vars:"m=mass, c=specific heat, ΔT=temp change"},
 {eq:"q = nΔH",desc:"Heat from reaction",vars:"n=moles, ΔH=enthalpy change"}
 ]},
-{cat:"Equilibrium & Acids",formulas:[
+{cat:"GEN_CHEM",formulas:[
 {eq:"pH = -log[H⁺]",desc:"pH definition",vars:"Lower pH = more acidic"},
 {eq:"pH = pKa + log([A⁻]/[HA])",desc:"Henderson-Hasselbalch",vars:"At half-equivalence: pH = pKa"},
 {eq:"Ka × Kb = Kw = 10⁻¹⁴",desc:"Acid-base relationship",vars:"Strong acid → large Ka"},
 {eq:"pI = (pKa₁ + pKa₂)/2",desc:"Isoelectric point",vars:"Use the two pKas that flank the zwitterion"}
 ]},
-{cat:"Electrochemistry",formulas:[
+{cat:"GEN_CHEM",formulas:[
 {eq:"E°cell = E°cathode - E°anode",desc:"Standard cell potential",vars:"Positive E° = spontaneous"},
 {eq:"ΔG° = -nFE°",desc:"Free energy from cell potential",vars:"n=mol e⁻, F=96485 C/mol"},
 {eq:"E = E° - (RT/nF)lnQ",desc:"Nernst equation",vars:"At 25°C: E = E° - (0.0592/n)logQ"}
 ]},
-{cat:"Gas Laws",formulas:[
+{cat:"GEN_CHEM",formulas:[
 {eq:"PV = nRT",desc:"Ideal gas law",vars:"R=0.0821 L·atm/(mol·K) or 8.314 J/(mol·K)"},
 {eq:"P₁V₁/T₁ = P₂V₂/T₂",desc:"Combined gas law",vars:"T must be in Kelvin"},
 {eq:"Ptotal = P₁ + P₂ + ...",desc:"Dalton's law",vars:"Partial pressures of gas mixture"}
 ]}
 ],
 "Biochem":[
-{cat:"Enzyme Kinetics",formulas:[
+{cat:"ENZYME_KINETICS",formulas:[
 {eq:"v = Vmax[S]/(Km + [S])",desc:"Michaelis-Menten",vars:"Km = [S] at half-Vmax"},
 {eq:"1/v = (Km/Vmax)(1/[S]) + 1/Vmax",desc:"Lineweaver-Burk",vars:"y-int=1/Vmax, x-int=-1/Km, slope=Km/Vmax"},
 {eq:"kcat = Vmax/[E]total",desc:"Turnover number",vars:"Reactions per enzyme per second"},
 {eq:"Efficiency = kcat/Km",desc:"Catalytic efficiency",vars:"Higher = better enzyme"}
 ]},
-{cat:"Bioenergetics",formulas:[
+{cat:"PHYSICS",formulas:[
 {eq:"ATP yield ≈ 30-32 per glucose",desc:"Aerobic respiration total",vars:"10 NADH(×2.5) + 2 FADH2(×1.5) + 4 ATP"},
 {eq:"ΔG = ΔG° + RTln(Q)",desc:"Actual free energy",vars:"Q=reaction quotient at current concentrations"}
 ]}
 ],
 "Psych/Soc":[
-{cat:"Key Equations",formulas:[
+{cat:"PHYSICS",formulas:[
 {eq:"p² + 2pq + q² = 1",desc:"Hardy-Weinberg genotypes",vars:"p=dominant freq, q=recessive freq"},
 {eq:"p + q = 1",desc:"Hardy-Weinberg alleles",vars:"q²=affected frequency (often given)"},
 {eq:"Carrier freq = 2pq",desc:"Heterozygote frequency",vars:"Usually much larger than q²"}
