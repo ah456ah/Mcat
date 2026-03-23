@@ -53,6 +53,27 @@ function todayStr() {
   return new Date().toISOString().slice(0, 10);
 }
 
+// === API KEY PERSISTENCE ===
+// Encode/decode for obfuscation in cloud storage (not plaintext)
+function encodeKey(key) { try { return btoa(key.split("").reverse().join("")); } catch(e) { return ""; } }
+function decodeKey(encoded) { try { return atob(encoded).split("").reverse().join(""); } catch(e) { return ""; } }
+function getApiKey() { try { return localStorage.getItem("mcat_ai_key") || ""; } catch(e) { return ""; } }
+function setApiKey(key) { try { if (key) localStorage.setItem("mcat_ai_key", key); else localStorage.removeItem("mcat_ai_key"); } catch(e) {} }
+function restoreApiKeyFromCloud(cloudData) {
+  // If localStorage has no key but cloud does, restore it
+  if (!getApiKey() && cloudData && cloudData._ak) {
+    var decoded = decodeKey(cloudData._ak);
+    if (decoded) setApiKey(decoded);
+  }
+}
+function saveApiKeyToCloud(key, pin, cloudData) {
+  // Persist encoded key to cloud alongside user data
+  var encoded = key ? encodeKey(key) : "";
+  var updated = Object.assign({}, cloudData, { _ak: encoded });
+  saveToCloud(pin, updated);
+  return updated;
+}
+
 // Merge wrong-answer explanations from WX_DATA into questions
 if (typeof WX_DATA !== "undefined") {
   QS.forEach(function (q) {
@@ -1228,8 +1249,7 @@ function buildDailyPlan(data) {
 
 // === AI TEACH ENGINE ===
 async function callTeachAI(messages, systemPrompt) {
-  var apiKey = "";
-  try { apiKey = localStorage.getItem("mcat_ai_key") || ""; } catch(e) {}
+  var apiKey = getApiKey();
   if (!apiKey) {
     return "⚠️ API key not set. Tap the ⚙️ button on the AI Tutor screen to enter your Anthropic API key. You can get one free at console.anthropic.com.";
   }
@@ -1320,6 +1340,7 @@ function PinScreen(_ref) {
     loadFromCloud(p).then(function (d) {
       rememberPin(p);
       var merged = Object.assign({}, DD, d || {});
+      restoreApiKeyFromCloud(merged);
       onLogin(p, merged);
     }).catch(function () {
       setLoading(false);
@@ -2912,16 +2933,16 @@ function Game(_ref2) {
           React.createElement("div", { style: { flex: 1 } }),
           React.createElement("span", { style: { fontSize: 11, color: TC.dim } }, "\u{1F9D1}\u200D\u{1F3EB} AI Tutor"),
           React.createElement("button", { onClick: function() {
-            var current = "";
-            try { current = localStorage.getItem("mcat_ai_key") || ""; } catch(e) {}
+            var current = getApiKey();
             var masked = current ? current.substring(0, 8) + "..." + current.slice(-4) : "(not set)";
             var msg = "Current key: " + masked + "\n\nEnter your Anthropic API key.\nGet one free at console.anthropic.com\n\nPaste key (or blank to clear):";
             var key = prompt(msg, "");
             if (key !== null) {
               try { 
-                if (key.trim()) localStorage.setItem("mcat_ai_key", key.trim());
-                else localStorage.removeItem("mcat_ai_key");
-                alert(key.trim() ? "API key saved!" : "API key cleared.");
+                setApiKey(key.trim());
+                dirtyRef.current = true;
+                setData(function(d) { return Object.assign({}, d, { _ak: key.trim() ? encodeKey(key.trim()) : "" }); });
+                alert(key.trim() ? "API key saved & synced!" : "API key cleared.");
               } catch(e) { alert("Could not save key: " + e.message); }
             }
           }, style: { fontSize: 14, padding: "4px 8px", background: TC.card, border: "1px solid " + TC.cbr, borderRadius: 6, color: TC.dim, flexShrink: 0 } }, "\u2699\uFE0F")
@@ -3245,7 +3266,7 @@ function Game(_ref2) {
           // AI STUDY COACH
           (function() {
             var hasKey = false;
-            try { hasKey = !!localStorage.getItem("mcat_ai_key"); } catch(e) {}
+            hasKey = !!getApiKey();
             var today = todayStr();
             var cached = coachDate === today && coachText;
             if (cached) {
@@ -6451,7 +6472,7 @@ function Game(_ref2) {
     // AI Explain button (shown after answer submitted, for standard MC questions)
     sr && q.type !== "match" && q.type !== "order" && q.type !== "label" && thinkDelay <= 0 ? (function() {
       var hasKey = false;
-      try { hasKey = !!localStorage.getItem("mcat_ai_key"); } catch(e) {}
+      hasKey = !!getApiKey();
       if (aiExplain.text && aiExplain.qId === q.id) {
         // Render AI explanation
         return React.createElement("div", { style: { padding: "12px 14px", background: "linear-gradient(135deg, rgba(102,126,234,.04), rgba(118,75,162,.03))", borderLeft: "3px solid #764ba2", borderRadius: 10, marginBottom: 8, fontSize: 12 + fz, color: TC.muted, lineHeight: 1.7 } },
@@ -6642,7 +6663,7 @@ function Game(_ref2) {
     // AI SESSION DEBRIEF
     sTotal >= 3 ? (function() {
       var hasKey = false;
-      try { hasKey = !!localStorage.getItem("mcat_ai_key"); } catch(e) {}
+      hasKey = !!getApiKey();
       if (debriefText) {
         return React.createElement("div", { style: { textAlign: "left", marginBottom: 14 } },
           React.createElement("div", { style: { padding: "14px 16px", background: "linear-gradient(135deg, rgba(102,126,234,.08), rgba(118,75,162,.06))", border: "1px solid rgba(102,126,234,.2)", borderRadius: 12, fontSize: 12 + fz, color: TC.muted, lineHeight: 1.7 } },
