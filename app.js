@@ -8480,7 +8480,7 @@ function generateFlashcards(data) {
   if (data && data.questionStats) {
     QS.forEach(function(q) {
       var st = data.questionStats[q.id];
-      if (st && st.seen >= 2 && st.correct < st.seen * 0.5) {
+      if (st && st.seen >= 2 && st.correct < st.seen * 0.5 && q.o && q.a !== undefined) {
         var id = "fc_q_" + q.id;
         var front = q.q.length > 100 ? q.q.substring(0, 97) + "..." : q.q;
         var back = q.o[q.a];
