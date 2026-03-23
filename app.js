@@ -2406,18 +2406,9 @@ function Game(_ref2) {
     setTeachTag(tag || null);
     setTeachQContext(qContext || null);
     setTeachMessages([]);
-    setTeachLoading(true);
+    setTeachLoading(false);
     setTeachInput("");
     setScr("teach");
-    var sysPrompt = buildTeachSystemPrompt(tag, qContext);
-    var firstMsg = qContext
-      ? "I just got a question wrong about " + (tag || "this topic") + ". Can you help me understand what I got wrong and why the correct answer is right?"
-      : "I'm studying " + (tag || "for the MCAT") + ". Can you teach me the key concepts I need to know?";
-    var msgs = [{ role: "user", content: firstMsg }];
-    callTeachAI(msgs, sysPrompt).then(function(reply) {
-      setTeachMessages([{ role: "user", content: firstMsg }, { role: "assistant", content: reply }]);
-      setTeachLoading(false);
-    });
   }
   function sendTeachMessage(directMsg) {
     var userMsg = directMsg || teachInput.trim();
@@ -2924,15 +2915,39 @@ function Game(_ref2) {
           React.createElement("div", { style: { fontSize: 16 + fz, fontWeight: 800, color: fg, marginTop: 6 } }, teachTag ? "Learning: " + teachTag : "MCAT Tutor"),
           teachQContext ? React.createElement("div", { style: { fontSize: 10 + fz, color: "#e63946", marginTop: 4 } }, "\u274C Reviewing a missed question") : null
         ),
-        // Messages
+        // Messages area OR welcome landing
+        teachMessages.length === 0 && !teachLoading ? React.createElement("div", { style: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, padding: "10px 0" } },
+          // Context card (if from wrong answer)
+          teachQContext ? React.createElement("div", { style: { width: "100%", padding: "12px 14px", background: "rgba(230,57,70,.06)", border: "1px solid rgba(230,57,70,.15)", borderRadius: 12, marginBottom: 4, fontSize: 11 + fz, lineHeight: 1.6 } },
+            React.createElement("div", { style: { fontWeight: 700, color: "#e63946", marginBottom: 4 } }, "\u274C You missed this question:"),
+            React.createElement("div", { style: { color: TC.muted, marginBottom: 2 } }, teachQContext.stem && teachQContext.stem.length > 120 ? teachQContext.stem.substring(0, 120) + "..." : teachQContext.stem),
+            React.createElement("div", { style: { fontSize: 10 + fz, color: TC.dim } }, "Your answer: ", teachQContext.picked),
+            React.createElement("div", { style: { fontSize: 10 + fz, color: "#4ade80" } }, "Correct: ", teachQContext.correct)
+          ) : null,
+          React.createElement("div", { style: { fontSize: 12 + fz, color: TC.dim, textAlign: "center", marginBottom: 4 } }, teachQContext ? "Choose how you'd like help:" : "What would you like to learn?"),
+          // Starter quick actions
+          (teachQContext ? [
+            { label: "\u{1F50D} Explain what I got wrong", msg: "I just got a question wrong about " + (teachTag || "this topic") + ". The question was: " + (teachQContext.stem || "") + "\nI picked: " + (teachQContext.picked || "") + "\nCorrect answer: " + (teachQContext.correct || "") + "\nCan you explain why my answer was wrong and why the correct answer is right?" },
+            { label: "\u{1F4DA} Teach me this concept from scratch", msg: "I'm struggling with " + (teachTag || "this topic") + ". Can you teach me the key concepts from scratch, assuming I know nothing?" },
+            { label: "\u{1F3AF} Give me a similar practice question", msg: "I just missed a question about " + (teachTag || "this topic") + ". Give me a similar practice question to test if I understand the concept now." },
+            { label: "\u26A0\uFE0F What are common traps here?", msg: "What are the most common MCAT traps and mistakes for " + (teachTag || "this topic") + "?" }
+          ] : [
+            { label: "\u{1F4DA} Teach me the key concepts", msg: "I'm studying " + (teachTag || "for the MCAT") + ". Can you teach me the most important concepts I need to know?" },
+            { label: "\u{1F3AF} Quiz me on this topic", msg: "Give me a challenging practice question about " + (teachTag || "a random MCAT topic") + " and let me try to answer it." },
+            { label: "\u26A0\uFE0F Common MCAT traps", msg: "What are the most common MCAT traps and mistakes for " + (teachTag || "high-yield topics") + "?" },
+            { label: "\u{1F517} How topics connect", msg: "How does " + (teachTag || "biochemistry") + " connect to other MCAT sections? Show me the cross-topic links." }
+          ]).map(function(a, i) {
+            return React.createElement("button", { key: i, onClick: function() { sendTeachMessage(a.msg); }, style: { width: "100%", padding: "12px 14px", textAlign: "left", borderRadius: 12, border: "1px solid rgba(102,126,234,.2)", background: "rgba(102,126,234,.04)", fontSize: 12 + fz, color: "#667eea", fontWeight: 600 } }, a.label);
+          })
+        ) :
         React.createElement("div", { ref: teachScrollRef, style: { flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 10, marginBottom: 12, paddingBottom: 8 } },
-          teachMessages.filter(function(m, i) { return i > 0; }).map(function(m, i) {
+          teachMessages.map(function(m, i) {
             var isUser = m.role === "user";
             return React.createElement("div", { key: i, style: { alignSelf: isUser ? "flex-end" : "flex-start", maxWidth: "88%", padding: "10px 14px", borderRadius: isUser ? "14px 14px 4px 14px" : "14px 14px 14px 4px", background: isUser ? "rgba(102,126,234,.15)" : TC.card, border: "1px solid " + (isUser ? "rgba(102,126,234,.25)" : TC.cbr), fontSize: 12 + fz, lineHeight: 1.65, color: isUser ? fg : TC.muted, whiteSpace: "pre-wrap" } }, isUser ? m.content : renderMarkdown(m.content));
           }),
           teachLoading ? React.createElement("div", { style: { alignSelf: "flex-start", padding: "10px 14px", borderRadius: "14px 14px 14px 4px", background: TC.card, border: "1px solid " + TC.cbr, fontSize: 12 + fz, color: TC.dim } }, React.createElement("span", { style: { animation: "pu 1.2s infinite" } }, "\u{1F9D1}\u200D\u{1F3EB} Thinking...")) : null
         ),
-        // Quick action buttons
+        // Quick action buttons (after conversation started)
         !teachLoading && teachMessages.length >= 2 ? React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 } },
           React.createElement("button", { onClick: function() { sendTeachMessage("Give me a practice problem to test my understanding."); }, style: { padding: "6px 10px", borderRadius: 16, fontSize: 10 + fz, border: "1px solid rgba(102,126,234,.25)", background: "rgba(102,126,234,.08)", color: "#667eea", fontWeight: 600 } }, "\u{1F3AF} Quiz Me"),
           React.createElement("button", { onClick: function() { sendTeachMessage("Can you explain that with a simple analogy?"); }, style: { padding: "6px 10px", borderRadius: 16, fontSize: 10 + fz, border: "1px solid rgba(102,126,234,.25)", background: "rgba(102,126,234,.08)", color: "#667eea", fontWeight: 600 } }, "\u{1F4A1} Simplify"),
