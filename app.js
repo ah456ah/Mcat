@@ -1306,6 +1306,152 @@ function countQsDoneToday(data, qIds) {
   }).length;
 }
 
+function calcReadinessScore(data) {
+  var totalQs = QS.length;
+  var seen = 0, seenCorrect = 0, box3plus = 0;
+  Object.keys(data.questionStats || {}).forEach(function(id) {
+    var s = data.questionStats[id];
+    if (s && s.seen > 0) {
+      seen++;
+      seenCorrect += s.correct || 0;
+      if ((s.box || 1) >= 3) box3plus++;
+    }
+  });
+  // 1. Accuracy (40%)
+  var accuracy = seen > 0 ? seenCorrect / (seen * (data.questionStats[Object.keys(data.questionStats)[0]] || {}).seen || seen) : 0;
+  // Simpler: use totalCorrect / totalAnswered
+  var accPct = data.totalAnswered > 0 ? data.totalCorrect / data.totalAnswered : 0;
+  var accScore = Math.min(100, accPct * 100) * 0.4;
+
+  // 2. SRS health (20%) — % of seen questions at box 3+
+  var srsScore = seen > 0 ? (box3plus / seen) * 100 * 0.2 : 0;
+
+  // 3. Coverage (20%) — % of questions seen at least once
+  var coverScore = (seen / totalQs) * 100 * 0.2;
+
+  // 4. Lessons completed (10%)
+  var totalMods = typeof MODULES !== "undefined" ? Object.keys(MODULES).length : 1;
+  var completedMods = Object.keys(data.moduleProgress || {}).filter(function(k) { return data.moduleProgress[k] && data.moduleProgress[k].completed; }).length;
+  var lessonScore = (completedMods / Math.max(totalMods, 1)) * 100 * 0.1;
+
+  // 5. Consistency (10%) — streak + weekly goal
+  var streakVal = Math.min(computeStreak(data), 14) / 14; // cap at 14 day streak
+  var weeklyQs = Object.values(data.weeklyProgress || {}).reduce(function(a,b){return a+b;}, 0);
+  var goalPct = Math.min(weeklyQs / Math.max(data.weeklyGoal || 100, 1), 1);
+  var consistScore = ((streakVal * 0.6 + goalPct * 0.4)) * 100 * 0.1;
+
+  var total = Math.round(accScore + srsScore + coverScore + lessonScore + consistScore);
+  total = Math.max(0, Math.min(100, total));
+
+  // Determine weakest factor for insight
+  var factors = [
+    { name: "accuracy", score: accScore / 0.4, weight: 40 },
+    { name: "SRS mastery", score: srsScore / 0.2, weight: 20 },
+    { name: "content coverage", score: coverScore / 0.2, weight: 20 },
+    { name: "lesson completion", score: lessonScore / 0.1, weight: 10 },
+    { name: "consistency", score: consistScore / 0.1, weight: 10 }
+  ];
+  factors.sort(function(a, b) { return a.score - b.score; });
+  var weakest = factors[0];
+  var potentialGain = Math.round((100 - weakest.score) * weakest.weight / 100);
+
+  return {
+    score: total,
+    color: total < 40 ? "#f87171" : total < 70 ? "#fb923c" : "#4ade80",
+    weakest: weakest.name,
+    potentialGain: potentialGain,
+    factors: factors
+  };
+}
+
+function getContextualCards(data) {
+  var cards = [];
+  var tc = getTagCounts(data);
+  var today = todayStr();
+
+  // 1. Stale concept cards — tags not reviewed in 7+ days
+  if (typeof CARDS !== "undefined") {
+    var cardTags = Object.keys(CARDS);
+    cardTags.forEach(function(tag) {
+      var info = tc[tag];
+      if (info && info.seen >= 5) {
+        // Check last review time
+        var lastSeen = 0;
+        QS.forEach(function(q) {
+          if ((q.tags||[]).indexOf(tag) >= 0) {
+            var s = data.questionStats[q.id];
+            if (s && s.lastSeen && s.lastSeen > lastSeen) lastSeen = s.lastSeen;
+          }
+        });
+        var daysSince = lastSeen > 0 ? Math.floor((Date.now() - lastSeen) / 86400000) : 999;
+        if (daysSince >= 7) {
+          cards.push({ priority: 80 + daysSince, icon: "\u{1F0CF}", text: "Haven't reviewed " + tag + " in " + daysSince + " days", action: "card", tag: tag, color: "#38bdf8" });
+        }
+      }
+    });
+  }
+
+  // 2. High accuracy tag with unseen hard Qs — challenge
+  Object.keys(tc).forEach(function(tag) {
+    var info = tc[tag];
+    if (info && info.seen >= 10 && (info.correct / info.seen) >= 0.85) {
+      var unseenHard = QS.filter(function(q) {
+        return (q.tags||[]).indexOf(tag) >= 0 && !data.questionStats[q.id] && (q.diff || 2) >= 3;
+      }).length;
+      if (unseenHard >= 3) {
+        cards.push({ priority: 70, icon: "\u{1F525}", text: "Mastered " + tag + " basics \u2014 " + unseenHard + " hard Qs waiting", action: "questions", tag: tag, diff: 3, color: "#f87171" });
+      }
+    }
+  });
+
+  // 3. Small SRS backlog
+  var dueCount = getDueCount(data);
+  if (dueCount > 0 && dueCount <= 10) {
+    var estMin = Math.max(1, Math.round(dueCount * 0.8));
+    cards.push({ priority: 90, icon: "\u{1F504}", text: dueCount + " spaced review Qs due \u2014 ~" + estMin + " min", action: "spaced", color: "#667eea" });
+  }
+
+  // 4. Partially-done module
+  if (typeof MODULES !== "undefined") {
+    Object.keys(MODULES).forEach(function(modKey) {
+      var mp = data.moduleProgress && data.moduleProgress[modKey];
+      if (mp && mp.step > 0 && !mp.completed) {
+        var totalSteps = MODULES[modKey].steps ? MODULES[modKey].steps.length : 1;
+        var pct = Math.round((mp.step / totalSteps) * 100);
+        cards.push({ priority: 85, icon: "\u{1F4DA}", text: modKey + " lesson is " + pct + "% done \u2014 finish it?", action: "lesson", tag: modKey, color: "#a78bfa" });
+      }
+    });
+  }
+
+  // Sort by priority desc, take top 3
+  cards.sort(function(a, b) { return b.priority - a.priority; });
+  return cards.slice(0, 3);
+}
+
+function calcPaceStatus(data) {
+  var testDate = data.testDate;
+  if (!testDate) return null;
+  var daysLeft = Math.max(0, Math.ceil((new Date(testDate).getTime() - Date.now()) / 86400000));
+  if (daysLeft <= 0) return { status: "past", label: "Test day!", color: "#f87171" };
+  var totalQs = QS.length;
+  var seen = Object.keys(data.questionStats || {}).length;
+  var unseenPct = (totalQs - seen) / totalQs;
+  var tc = getTagCounts(data);
+  var weakTagCount = Object.keys(tc).filter(function(t) { var info = tc[t]; return info.seen >= 5 && info.correct / info.seen < 0.7; }).length;
+  var completedMods = Object.keys(data.moduleProgress || {}).filter(function(k) { return data.moduleProgress[k] && data.moduleProgress[k].completed; }).length;
+  var totalMods = typeof MODULES !== "undefined" ? Object.keys(MODULES).length : 1;
+  var modPct = completedMods / totalMods;
+  // Scoring: how much work remains vs time available
+  var workScore = (unseenPct * 40) + (weakTagCount * 5) + ((1 - modPct) * 20);
+  var timeScore = daysLeft <= 14 ? 3 : daysLeft <= 30 ? 2 : daysLeft <= 60 ? 1 : 0;
+  // Behind if lots of work and little time
+  if (daysLeft <= 30 && workScore > 40) return { status: "behind", label: "Behind \u2014 increase daily volume", color: "#f87171", tip: "Focus on high-yield weak areas over new content." };
+  if (daysLeft <= 30 && workScore <= 40) return { status: "ok", label: "On track \u2014 stay consistent", color: "#4ade80", tip: "Keep reviewing weak spots and doing spaced review." };
+  if (daysLeft > 30 && workScore > 50) return { status: "behind", label: "Behind \u2014 pick up the pace", color: "#fb923c", tip: "More daily sessions needed to cover remaining content." };
+  if (daysLeft > 60 && workScore <= 50) return { status: "ahead", label: "Ahead \u2014 focus on weak spots", color: "#4ade80", tip: "Great pace! Prioritize your weakest tags." };
+  return { status: "ok", label: "On track", color: "#667eea", tip: "Balanced pace. Keep going!" };
+}
+
 function getTotalQsDoneToday(data) {
   var todayMs = new Date(); todayMs.setHours(0,0,0,0); todayMs = todayMs.getTime();
   var count = 0;
@@ -1708,6 +1854,12 @@ function Game(_ref2) {
   const [labelSubmitted, setLabelSubmitted] = useState(false);
   // AI EXPLAIN STATE
   const [aiExplain, setAiExplain] = useState({loading:false, text:null, qId:null});
+  // ADAPTIVE SESSION STATE
+  const [sessionRolling, setSessionRolling] = useState([]);  // last 5 answers: true/false
+  const [consecutiveWrong, setConsecutiveWrong] = useState(0);
+  const [rescueMode, setRescueMode] = useState(false);
+  const [rescueTag, setRescueTag] = useState(null);
+  const [difficultyMode, setDifficultyMode] = useState("normal"); // easy, normal, hard
   // AI DEBRIEF STATE
   const [debriefLoading, setDebriefLoading] = useState(false);
   const [debriefText, setDebriefText] = useState(null);
@@ -1848,6 +2000,7 @@ function Game(_ref2) {
     setFreeRecallRevealed(false);
     setAiExplain({loading:false, text:null, qId:null});
     qStartRef.current = Date.now();
+    setSessionRolling([]); setConsecutiveWrong(0); setRescueMode(false); setRescueTag(null); setDifficultyMode("normal");
     setScr("play");
   }
   function launchAfterCard() {
@@ -2151,6 +2304,35 @@ function Game(_ref2) {
       return t + 1;
     });
     setConf(confidence);
+    // === ADAPTIVE TRACKING ===
+    setSessionRolling(function(prev) { var n = prev.concat([correct]); return n.length > 5 ? n.slice(-5) : n; });
+    if (correct) {
+      setConsecutiveWrong(0);
+    } else {
+      setConsecutiveWrong(function(prev) {
+        var nv = prev + 1;
+        if (nv >= 3) {
+          // Trigger rescue mode — find common tag among recent wrongs
+          var recentWrongTags = {};
+          wrong.concat([q]).forEach(function(wq) { (wq.tags || []).forEach(function(t) { recentWrongTags[t] = (recentWrongTags[t]||0) + 1; }); });
+          var topTag = Object.keys(recentWrongTags).sort(function(a,b){ return recentWrongTags[b] - recentWrongTags[a]; })[0] || null;
+          setRescueTag(topTag);
+          setRescueMode(true);
+        }
+        return nv;
+      });
+    }
+    // Update difficulty mode based on rolling window
+    setSessionRolling(function(prev) {
+      var window = prev.concat([correct]).slice(-5);
+      if (window.length >= 3) {
+        var acc = window.filter(Boolean).length / window.length;
+        if (acc <= 0.4) setDifficultyMode("easy");
+        else if (acc >= 0.8) setDifficultyMode("hard");
+        else setDifficultyMode("normal");
+      }
+      return prev; // don't double-update, first setter already did it
+    });
     setQAnswered(function (p) {
       var n = Object.assign({}, p);
       n[qi] = true;
@@ -2454,33 +2636,73 @@ function Game(_ref2) {
       fin();
       return;
     }
-    // Find next unanswered, or wrap up
-    var next = -1;
-    for (var i = qi + 1; i < qs.length; i++) {
-      if (!qAnswered[i]) {
-        next = i;
-        break;
-      }
+    // Collect unanswered indices
+    var unanswered = [];
+    for (var i = 0; i < qs.length; i++) {
+      if (!qAnswered[i] && i !== qi) unanswered.push(i);
     }
-    if (next >= 0) {
-      goToQ(next);
-    } else {
-      var anyLeft = false;
-      for (var j = 0; j < qs.length; j++) {
-        if (!qAnswered[j]) {
-          anyLeft = true;
-          break;
-        }
-      }
-      if (!anyLeft) fin();else goToQ(qs.findIndex(function (_, k) {
-        return !qAnswered[k];
-      }));
+    if (unanswered.length === 0) { fin(); return; }
+
+    // ADAPTIVE SELECTION: reorder candidates by difficulty preference
+    // Section sim uses strict order — no adaptation
+    if (gm === "SECTION_SIM") {
+      var next = -1;
+      for (var si = qi + 1; si < qs.length; si++) { if (!qAnswered[si]) { next = si; break; } }
+      if (next >= 0) goToQ(next); else goToQ(unanswered[0]);
+      return;
     }
+
+    // For other modes, prefer forward progress but adapt difficulty
+    var forward = unanswered.filter(function(i) { return i > qi; });
+    var pool = forward.length > 0 ? forward : unanswered;
+
+    if (difficultyMode === "easy") {
+      // Prefer lower difficulty questions, or ones user got right before
+      pool.sort(function(a, b) {
+        var da = qs[a].diff || 2, db = qs[b].diff || 2;
+        var sa = data.questionStats[qs[a].id], sb = data.questionStats[qs[b].id];
+        var aEasy = da + (sa && sa.correct > 0 ? -1 : 0);
+        var bEasy = db + (sb && sb.correct > 0 ? -1 : 0);
+        return aEasy - bEasy;
+      });
+    } else if (difficultyMode === "hard") {
+      // Prefer higher difficulty or unseen questions
+      pool.sort(function(a, b) {
+        var da = qs[a].diff || 2, db = qs[b].diff || 2;
+        var sa = data.questionStats[qs[a].id], sb = data.questionStats[qs[b].id];
+        var aHard = da + (!sa ? 1 : 0);
+        var bHard = db + (!sb ? 1 : 0);
+        return bHard - aHard;
+      });
+    }
+    // else normal: just use forward order
+
+    goToQ(pool[0]);
   }
   function fin() {
     dirtyRef.current = true;
+    // Compute per-tag accuracy from this session for plan boosting
+    var finSessionTags = {};
+    var finWrongIds = {};
+    wrong.forEach(function(wq) { finWrongIds[wq.id] = true; });
+    qs.forEach(function(q, idx) {
+      if (qAnswered[idx] || idx === qi) {
+        var wasWrong = finWrongIds[q.id];
+        (q.tags || []).forEach(function(t) {
+          if (!finSessionTags[t]) finSessionTags[t] = { correct: 0, total: 0 };
+          finSessionTags[t].total++;
+          if (!wasWrong) finSessionTags[t].correct++;
+        });
+      }
+    });
+    // Tags with <60% accuracy in this session
+    var boostTags = Object.keys(finSessionTags).filter(function(t) {
+      var s = finSessionTags[t];
+      return s.total >= 2 && (s.correct / s.total) < 0.6;
+    });
+
     setData(function (d) {
-      return Object.assign({}, d, {
+      var newD = Object.assign({}, d, {
         simHistory: gm === "SECTION_SIM" ? (d.simHistory || []).concat([{
           date: Date.now(),
           section: simSection,
@@ -2498,6 +2720,37 @@ function Game(_ref2) {
           score: sScore
         }]).slice(-50)
       });
+      // Boost daily plan with weak session tags
+      if (boostTags.length > 0 && newD.dailyPlanSnapshot && newD.dailyPlanSnapshot.date === todayStr()) {
+        var snap = Object.assign({}, newD.dailyPlanSnapshot);
+        var existingBoosts = snap.sessionBoosts || [];
+        var existingLabels = {};
+        (snap.tasks || []).concat(existingBoosts).forEach(function(t) { if (t.label) existingLabels[t.label] = true; });
+        var newBoosts = [];
+        boostTags.forEach(function(tag) {
+          if (typeof MODULES !== "undefined" && MODULES[tag]) {
+            var mp = newD.moduleProgress && newD.moduleProgress[tag];
+            var label = "Review " + tag + " lesson";
+            if (!existingLabels[label] && !(mp && mp.completed)) {
+              newBoosts.push({ type: "lesson", label: label, icon: "\u{1F4DA}", moduleTag: tag, color: "#a78bfa", boosted: true });
+              existingLabels[label] = true;
+            }
+          }
+          if (typeof CARDS !== "undefined" && CARDS[tag]) {
+            var label2 = "Review " + tag + " cards";
+            if (!existingLabels[label2]) {
+              newBoosts.push({ type: "card", label: label2, icon: "\u{1F0CF}", cardTag: tag, color: "#38bdf8", boosted: true });
+              existingLabels[label2] = true;
+            }
+          }
+        });
+        if (newBoosts.length > 0) {
+          snap.sessionBoosts = existingBoosts.concat(newBoosts);
+          snap.tasks = (snap.tasks || []).concat(newBoosts);
+          newD.dailyPlanSnapshot = snap;
+        }
+      }
+      return newD;
     });
     setDebriefLoading(false);
     setDebriefText(null);
@@ -2555,6 +2808,7 @@ function Game(_ref2) {
     setQAnswered({}); setTL(null); setThinkDelay(0); setElaborativeDelay(0);
     setFreeRecallText(""); setFreeRecallRevealed(false);
     setAiExplain({loading:false, text:null, qId:null});
+    setSessionRolling([]); setConsecutiveWrong(0); setRescueMode(false); setRescueTag(null); setDifficultyMode("normal");
     qStartRef.current = Date.now();
     setScr("play");
   }
@@ -3250,7 +3504,7 @@ function Game(_ref2) {
         color: TC.dim,
         letterSpacing: 2
       }
-    }, "v14.0.0 ", "\u2022", " AI TUTOR ", "\u2022", " SECTION SIM")), dayStreak >= 1 && /*#__PURE__*/React.createElement("div", {
+    }, "v15.0.0 ", "\u2022", " AI TUTOR ", "\u2022", " SECTION SIM")), dayStreak >= 1 && /*#__PURE__*/React.createElement("div", {
       style: {
         marginBottom: 12,
         padding: "10px 14px",
@@ -3300,6 +3554,45 @@ function Game(_ref2) {
           /*#__PURE__*/React.createElement("span", { style: { fontSize: 11 + fz, fontWeight: 700, color: daysUntilTest <= 30 ? "#e85d2f" : "#667eea" } }, "\u{1F4C5} ", daysUntilTest, " days until MCAT"),
           /*#__PURE__*/React.createElement("button", { onClick: function() { var nd = prompt("Set MCAT date (YYYY-MM-DD):", testDate || ""); if (nd) { dirtyRef.current = true; setData(function(d) { return Object.assign({}, d, { testDate: nd }); }); } }, style: { fontSize: 9, color: TC.dim, padding: "3px 6px", border: "1px solid " + TC.cbr, borderRadius: 5 } }, "Edit")
         ) : /*#__PURE__*/React.createElement("button", { onClick: function() { var nd = prompt("Set your MCAT date (YYYY-MM-DD):"); if (nd) { dirtyRef.current = true; setData(function(d) { return Object.assign({}, d, { testDate: nd }); }); } }, style: { width: "100%", padding: "8px 12px", marginBottom: 8, background: TC.card, border: "1px solid " + TC.cbr, borderRadius: 10, fontSize: 11 + fz, color: TC.muted, textAlign: "center" } }, "\u{1F4C5} Set your MCAT test date"),
+        // READINESS SCORE RING
+        (function() {
+          var readiness = calcReadinessScore(data);
+          if (data.totalAnswered < 5) return null; // Don't show until some data exists
+          var r = 44, cx = 50, cy = 50, circ = 2 * Math.PI * r;
+          var offset = circ - (readiness.score / 100) * circ;
+          var strokeColor = readiness.color;
+          return React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 14, padding: "12px 14px", marginBottom: 8, background: "rgba(" + (strokeColor === "#f87171" ? "248,113,113" : strokeColor === "#fb923c" ? "251,146,60" : "74,222,128") + ",.04)", border: "1px solid rgba(" + (strokeColor === "#f87171" ? "248,113,113" : strokeColor === "#fb923c" ? "251,146,60" : "74,222,128") + ",.15)", borderRadius: 14 } },
+            // SVG ring
+            React.createElement("div", { style: { width: 70, height: 70, flexShrink: 0, position: "relative" } },
+              React.createElement("svg", { viewBox: "0 0 100 100", style: { width: "100%", height: "100%", transform: "rotate(-90deg)" } },
+                React.createElement("circle", { cx: cx, cy: cy, r: r, fill: "none", stroke: isDark ? "rgba(255,255,255,.06)" : "rgba(0,0,0,.06)", strokeWidth: 7 }),
+                React.createElement("circle", { cx: cx, cy: cy, r: r, fill: "none", stroke: strokeColor, strokeWidth: 7, strokeDasharray: circ, strokeDashoffset: offset, strokeLinecap: "round", style: { transition: "stroke-dashoffset 0.6s ease" } })
+              ),
+              React.createElement("div", { style: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column" } },
+                React.createElement("span", { style: { fontSize: 20, fontWeight: 900, color: strokeColor, lineHeight: 1 } }, readiness.score),
+                React.createElement("span", { style: { fontSize: 7, color: TC.dim, fontWeight: 600, letterSpacing: 0.5 } }, "READY")
+              )
+            ),
+            // Info
+            React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+              React.createElement("div", { style: { fontSize: 13 + fz, fontWeight: 800, color: fg, marginBottom: 3 } }, "MCAT Readiness"),
+              React.createElement("div", { style: { fontSize: 10 + fz, color: TC.muted, lineHeight: 1.5 } },
+                readiness.potentialGain > 3
+                  ? "Your " + readiness.weakest + " is pulling you down \u2014 " + readiness.potentialGain + "pts possible with focused review."
+                  : readiness.score >= 70 ? "Strong position! Keep reviewing weak spots." : "Build momentum with daily sessions."
+              )
+            )
+          );
+        })(),
+        // Pace indicator
+        (function() {
+          var pace = calcPaceStatus(data);
+          if (!pace) return null;
+          return React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, padding: "6px 12px", marginBottom: 8, background: "rgba(" + (pace.color === "#f87171" ? "248,113,113" : pace.color === "#fb923c" ? "251,146,60" : pace.color === "#4ade80" ? "74,222,128" : "102,126,234") + ",.06)", border: "1px solid rgba(" + (pace.color === "#f87171" ? "248,113,113" : pace.color === "#fb923c" ? "251,146,60" : pace.color === "#4ade80" ? "74,222,128" : "102,126,234") + ",.15)", borderRadius: 8 } },
+            React.createElement("span", { style: { fontSize: 10 + fz, fontWeight: 700, color: pace.color } }, pace.label),
+            pace.tip ? React.createElement("span", { style: { fontSize: 9, color: TC.dim, flex: 1, textAlign: "right" } }, pace.tip) : null
+          );
+        })(),
         // Smart Daily Plan card (v2 — snapshot-based with tasks)
         (function() {
           var tasks = plan.tasks || [];
@@ -3378,6 +3671,7 @@ function Game(_ref2) {
                       setQAnswered({}); setTL(null); setThinkDelay(0); setElaborativeDelay(0);
                       setFreeRecallText(""); setFreeRecallRevealed(false);
                       setAiExplain({loading:false, text:null, qId:null});
+                      setSessionRolling([]); setConsecutiveWrong(0); setRescueMode(false); setRescueTag(null); setDifficultyMode("normal");
                       qStartRef.current = Date.now();
                       setScr("play");
                     };
@@ -3446,19 +3740,68 @@ function Game(_ref2) {
               onClick: function() {
                 if (!hasKey) { setCoachText("\u26A0\uFE0F Set your API key in AI Tutor \u2699\uFE0F to use AI features."); setCoachDate(today); return; }
                 setCoachLoading(true);
-                var testDate = data.testDate;
-                var daysLeft = testDate ? Math.max(0, Math.ceil((new Date(testDate).getTime() - Date.now()) / 86400000)) : null;
-                var tc = getTagCounts(data);
-                var weakTags = Object.keys(tc).filter(function(t) { return tc[t].seen >= 3; }).map(function(t) { return { tag: t, pct: Math.round(tc[t].correct / tc[t].seen * 100) }; }).sort(function(a,b) { return a.pct - b.pct; }).slice(0, 3);
-                var weakStr = weakTags.map(function(t) { return t.tag + " (" + t.pct + "%)"; }).join(", ") || "not enough data yet";
-                var newRemaining = QS.filter(function(q) { return !data.questionStats[q.id]; }).length;
-                var userMsg = (daysLeft !== null ? "Days until MCAT: " + daysLeft + ". " : "No test date set. ") + "Study streak: " + computeStreak(data) + " days. Total Qs answered: " + (data.totalAnswered || 0) + ". Overall accuracy: " + (data.totalAnswered > 0 ? Math.round(data.totalCorrect / data.totalAnswered * 100) : 0) + "%. Today's study time: " + getStudyToday(data) + " min. Due for review: " + getDueCount(data) + ". Weakest tags: " + weakStr + ". Blind spots: " + getBlindSpotCount(data) + ". Unseen questions remaining: " + newRemaining + "/" + QS.length + ".";
-                var planInfo = (plan && plan.tasks) ? " Today's plan has " + plan.tasks.length + " tasks: " + plan.tasks.map(function(t){return t.label;}).join(", ") + "." : "";
-                var sysPrompt = "You are an MCAT study coach giving a brief, personalized daily recommendation. You know the student's stats and their current daily plan." + planInfo + " Be warm but direct. Give exactly 3 sentences: (1) What to prioritize today and why, referencing their plan tasks. (2) One specific weak area to focus on with a concrete action (e.g. review a specific concept card or lesson). (3) A brief motivational nudge tied to their progress. Use **bold** for the most important action. Keep it under 75 words total.";
+                var testDate2 = data.testDate;
+                var daysLeft = testDate2 ? Math.max(0, Math.ceil((new Date(testDate2).getTime() - Date.now()) / 86400000)) : null;
+                var tc2 = getTagCounts(data);
+                var weakTags2 = Object.keys(tc2).filter(function(t) { return tc2[t].seen >= 3; }).map(function(t) { return { tag: t, pct: Math.round(tc2[t].correct / tc2[t].seen * 100) }; }).sort(function(a,b) { return a.pct - b.pct; }).slice(0, 5);
+                var weakStr2 = weakTags2.map(function(t) { return t.tag + " (" + t.pct + "%)"; }).join(", ") || "not enough data yet";
+                var newRemaining2 = QS.filter(function(q2) { return !data.questionStats[q2.id]; }).length;
+                var availModules = typeof MODULES !== "undefined" ? Object.keys(MODULES) : [];
+                var availCards = typeof CARDS !== "undefined" ? Object.keys(CARDS) : [];
+                var completedMods = Object.keys(data.moduleProgress || {}).filter(function(k) { return data.moduleProgress[k] && data.moduleProgress[k].completed; });
+                var planInfo = (plan && plan.tasks) ? " Current plan tasks: " + plan.tasks.map(function(t){return t.label;}).join(", ") + "." : "";
+                var userMsg = (daysLeft !== null ? "Days until MCAT: " + daysLeft + ". " : "No test date set. ") + "Study streak: " + computeStreak(data) + " days. Total Qs answered: " + (data.totalAnswered || 0) + ". Overall accuracy: " + (data.totalAnswered > 0 ? Math.round(data.totalCorrect / data.totalAnswered * 100) : 0) + "%. Today's study time: " + getStudyToday(data) + " min. Due for review: " + getDueCount(data) + ". Weakest tags: " + weakStr2 + ". Blind spots: " + getBlindSpotCount(data) + ". Unseen questions remaining: " + newRemaining2 + "/" + QS.length + "." + planInfo + " Available lessons: " + availModules.join(", ") + ". Completed lessons: " + completedMods.join(", ") + ". Available concept cards: " + availCards.join(", ") + ".";
+                var sysPrompt = "You are an MCAT study coach. Respond with ONLY a JSON object (no markdown, no backticks, no other text). The JSON must have exactly this structure: {\"advice\": \"3 sentences of personalized advice using **bold** for key actions. Reference specific tags and lessons.\", \"tasks\": [{\"type\": \"lesson\", \"tag\": \"exact tag name\"}, {\"type\": \"card\", \"tag\": \"exact tag name\"}, {\"type\": \"questions\", \"tag\": \"exact tag name\", \"count\": 10}]}. Include 1-3 tasks in the tasks array. Only suggest lessons from the available lessons list. Only suggest cards from the available cards list. For question tasks, pick from the weak tags list. The advice field should be warm, direct, under 75 words.";
                 callTeachAI([{role:"user", content: userMsg}], sysPrompt).then(function(reply) {
                   setCoachLoading(false);
-                  setCoachText(reply);
-                  setCoachDate(today);
+                  // Try to parse structured response
+                  var parsed = null;
+                  try {
+                    var cleaned = reply.replace(/```json|```/g, "").trim();
+                    parsed = JSON.parse(cleaned);
+                  } catch(e) { parsed = null; }
+                  if (parsed && parsed.advice) {
+                    setCoachText(parsed.advice);
+                    setCoachDate(today);
+                    // Inject tasks into the plan
+                    if (parsed.tasks && parsed.tasks.length > 0) {
+                      dirtyRef.current = true;
+                      setData(function(dd) {
+                        var snap = Object.assign({}, dd.dailyPlanSnapshot || {});
+                        var existingLabels = {};
+                        (snap.tasks || []).forEach(function(t2) { if (t2.label) existingLabels[t2.label] = true; });
+                        var newTasks = [];
+                        parsed.tasks.forEach(function(pt) {
+                          if (pt.type === "lesson" && typeof MODULES !== "undefined" && MODULES[pt.tag]) {
+                            var label = "Review " + pt.tag + " lesson";
+                            if (!existingLabels[label]) { newTasks.push({ type: "lesson", label: label, icon: "\u{1F4DA}", moduleTag: pt.tag, color: "#a78bfa", aiCoach: true }); existingLabels[label] = true; }
+                          } else if (pt.type === "card" && typeof CARDS !== "undefined" && CARDS[pt.tag]) {
+                            var label2 = "Review " + pt.tag + " cards";
+                            if (!existingLabels[label2]) { newTasks.push({ type: "card", label: label2, icon: "\u{1F0CF}", cardTag: pt.tag, color: "#38bdf8", aiCoach: true }); existingLabels[label2] = true; }
+                          } else if (pt.type === "questions" && pt.tag) {
+                            var qPool2 = QS.filter(function(q3) { return (q3.tags||[]).indexOf(pt.tag)>=0; });
+                            if (qPool2.length > 0) {
+                              var label3 = "Practice " + pt.tag + " (" + Math.min(pt.count||10, qPool2.length) + " Qs)";
+                              if (!existingLabels[label3]) {
+                                newTasks.push({ type: "questions", label: label3, icon: "\u{1F3AF}", ids: qPool2.slice(0, pt.count||10).map(function(q4){return q4.id;}), color: "#f87171", aiCoach: true });
+                                existingLabels[label3] = true;
+                              }
+                            }
+                          }
+                        });
+                        if (newTasks.length > 0) {
+                          snap.tasks = (snap.tasks || []).concat(newTasks);
+                          snap.coachTasks = newTasks;
+                          setCoachText((parsed.advice || "") + "\n\n\u2705 **Added " + newTasks.length + " task" + (newTasks.length > 1 ? "s" : "") + " to your plan.**");
+                        }
+                        return Object.assign({}, dd, { dailyPlanSnapshot: snap });
+                      });
+                    }
+                  } else {
+                    // Fallback: treat as plain text
+                    setCoachText(reply);
+                    setCoachDate(today);
+                  }
                 });
               },
               style: { display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", padding: "9px 12px", marginTop: 10, background: "rgba(118,75,162,.06)", border: "1.5px solid rgba(118,75,162,.2)", borderRadius: 8 }
@@ -3480,7 +3823,34 @@ function Game(_ref2) {
           );
         })()
       );
-    }(), /*#__PURE__*/React.createElement("div", {
+    }(),
+    // CONTEXTUAL ACTION CARDS
+    (function() {
+      var ctxCards = getContextualCards(data);
+      if (ctxCards.length === 0) return null;
+      return React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 } },
+        ctxCards.map(function(card, ci) {
+          return React.createElement("button", {
+            key: ci,
+            onClick: function() {
+              if (card.action === "card") { setShowConceptCard(card.tag); }
+              else if (card.action === "lesson") { setModuleTag(card.tag); setModuleStep(0); setModuleCheckSel(null); setModuleCheckDone(false); setScr("module"); }
+              else if (card.action === "spaced") { startGame("SPACED_REVIEW", []); }
+              else if (card.action === "questions") {
+                var pool = QS.filter(function(q) { return (q.tags||[]).indexOf(card.tag)>=0 && (!card.diff || (q.diff||2) >= card.diff); });
+                if (pool.length > 0) startGame("TAG_PRACTICE", [], card.tag);
+              }
+            },
+            style: { display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: "rgba(" + (card.color === "#38bdf8" ? "56,189,248" : card.color === "#f87171" ? "248,113,113" : card.color === "#667eea" ? "102,126,234" : "167,139,250") + ",.05)", border: "1px solid rgba(" + (card.color === "#38bdf8" ? "56,189,248" : card.color === "#f87171" ? "248,113,113" : card.color === "#667eea" ? "102,126,234" : "167,139,250") + ",.15)", borderRadius: 10, textAlign: "left", cursor: "pointer", width: "100%" }
+          },
+            React.createElement("span", { style: { fontSize: 16, flexShrink: 0 } }, card.icon),
+            React.createElement("span", { style: { fontSize: 11 + fz, color: TC.muted, flex: 1, lineHeight: 1.4 } }, card.text),
+            React.createElement("span", { style: { fontSize: 10, color: card.color, fontWeight: 700, flexShrink: 0 } }, "\u25B6")
+          );
+        })
+      );
+    })(),
+    /*#__PURE__*/React.createElement("div", {
       style: {
         ...TS.sb,
         background: TC.sbg,
@@ -4484,7 +4854,40 @@ function Game(_ref2) {
         color: fg,
         margin: "0 0 14px"
       }
-    }, "\u{1F4CA}", " Stats"), /*#__PURE__*/React.createElement("div", {
+    }, "\u{1F4CA}", " Stats"),
+    // CATEGORY MASTERY OVERVIEW
+    React.createElement("div", { style: { marginBottom: 14 } },
+      React.createElement("div", { style: { fontSize: 12 + fz, fontWeight: 700, color: fg, marginBottom: 8 } }, "\u{1F3AF} Category Mastery"),
+      React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } },
+        Object.keys(CATS).map(function(catKey) {
+          var catInfo = CATS[catKey];
+          var catQs = QS.filter(function(q) { return q.cat === catKey; });
+          var catSeen2 = 0, catCorrect2 = 0;
+          catQs.forEach(function(q) { var s = data.questionStats[q.id]; if (s && s.seen > 0) { catSeen2 += s.seen; catCorrect2 += s.correct || 0; } });
+          var catAcc2 = catSeen2 > 0 ? Math.round(catCorrect2 / catSeen2 * 100) : 0;
+          var catSeenCount2 = catQs.filter(function(q) { return data.questionStats[q.id] && data.questionStats[q.id].seen > 0; }).length;
+          var barColor2 = catAcc2 >= 80 ? "#4ade80" : catAcc2 >= 60 ? "#fb923c" : catAcc2 > 0 ? "#f87171" : TC.dim;
+          var catTc2 = getTagCounts(data);
+          var weakInCat2 = Object.keys(catTc2).filter(function(t) {
+            var ti2 = catTc2[t]; return ti2.seen >= 3 && (ti2.correct / ti2.seen) < 0.7 && QS.some(function(q) { return q.cat === catKey && (q.tags||[]).indexOf(t) >= 0; });
+          }).slice(0, 3);
+          return React.createElement("div", { key: catKey, style: { padding: "10px 12px", background: TC.card, border: "1px solid " + TC.cbr, borderRadius: 10 } },
+            React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 } },
+              React.createElement("span", { style: { fontSize: 11 + fz, fontWeight: 700, color: fg } }, catInfo.icon + " " + catInfo.name),
+              React.createElement("span", { style: { fontSize: 11, fontWeight: 700, color: barColor2 } }, catAcc2 > 0 ? catAcc2 + "%" : "--")
+            ),
+            React.createElement("div", { style: { width: "100%", height: 5, background: isDark ? "rgba(255,255,255,.06)" : "rgba(0,0,0,.06)", borderRadius: 3, overflow: "hidden", marginBottom: 4 } },
+              React.createElement("div", { style: { width: Math.max(catAcc2, 1) + "%", height: "100%", borderRadius: 3, background: barColor2, transition: "width 0.4s" } })
+            ),
+            React.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 9, color: TC.dim } },
+              React.createElement("span", null, catSeenCount2 + "/" + catQs.length + " Qs seen"),
+              weakInCat2.length > 0 ? React.createElement("span", { style: { color: "#f87171" } }, "Weak: " + weakInCat2.join(", ")) : catSeen2 > 0 ? React.createElement("span", { style: { color: "#4ade80" } }, "No weak tags") : null
+            )
+          );
+        })
+      )
+    ),
+    /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         gap: 2,
@@ -5622,6 +6025,36 @@ function Game(_ref2) {
 
   // === PLAY ===
   if (scr === "play") {
+    // RESCUE MODE OVERLAY
+    if (rescueMode && rescueTag) {
+      var hasCard = typeof CARDS !== "undefined" && !!CARDS[rescueTag];
+      var hasLesson = typeof MODULES !== "undefined" && !!MODULES[rescueTag];
+      return React.createElement("div", { style: { ...S.c, background: bg, color: fg } },
+        React.createElement(SB, null),
+        React.createElement("div", { style: { ...S.i, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "60vh", textAlign: "center", padding: "20px" } },
+          React.createElement("div", { style: { fontSize: 48, marginBottom: 16 } }, "\u{1F4AA}"),
+          React.createElement("h2", { style: { fontSize: 18 + fz, fontWeight: 800, color: fg, marginBottom: 8 } }, "Let\u2019s pause and review"),
+          React.createElement("p", { style: { fontSize: 13 + fz, color: TC.muted, marginBottom: 6, lineHeight: 1.6 } },
+            "You\u2019ve missed 3+ in a row. The common topic is:"
+          ),
+          React.createElement("div", { style: { fontSize: 15 + fz, fontWeight: 700, color: "#667eea", padding: "8px 16px", background: "rgba(102,126,234,.1)", borderRadius: 10, marginBottom: 20 } }, rescueTag),
+          React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10, width: "100%", maxWidth: 300 } },
+            hasLesson ? React.createElement("button", {
+              onClick: function() { setRescueMode(false); setConsecutiveWrong(0); setModuleTag(rescueTag); setModuleStep(0); setModuleCheckSel(null); setModuleCheckDone(false); setScr("module"); },
+              style: { ...S.btn, fontSize: 13 + fz, background: "linear-gradient(135deg, #a78bfa, #667eea)" }
+            }, "\u{1F4DA} Review " + rescueTag + " lesson") : null,
+            hasCard ? React.createElement("button", {
+              onClick: function() { setRescueMode(false); setConsecutiveWrong(0); setShowConceptCard(rescueTag); },
+              style: { ...S.btn, fontSize: 13 + fz, background: "linear-gradient(135deg, #38bdf8, #667eea)" }
+            }, "\u{1F0CF} Review " + rescueTag + " cards") : null,
+            React.createElement("button", {
+              onClick: function() { setRescueMode(false); setConsecutiveWrong(0); setDifficultyMode("easy"); },
+              style: { padding: "12px 20px", background: TC.sbg, border: "1px solid " + TC.cbr, borderRadius: 10, fontSize: 13 + fz, fontWeight: 700, color: TC.muted, cursor: "pointer" }
+            }, "\u27A1\uFE0F Continue (easier Qs next)")
+          )
+        )
+      );
+    }
     var q = qs[qi];
     if (!q) {
       setScr("results");
@@ -5637,6 +6070,7 @@ function Game(_ref2) {
     var isTimed = MODES[gm] && MODES[gm].timed;
     var answeredCount = Object.keys(qAnswered).length;
     var totalCount = qs.length;
+    var diffLabel = difficultyMode === "easy" ? "\u{1F7E2}" : difficultyMode === "hard" ? "\u{1F534}" : "";
 
     // Pause overlay
     if (paused) return /*#__PURE__*/React.createElement("div", {
@@ -5794,7 +6228,17 @@ function Game(_ref2) {
         borderRadius: 12,
         flexShrink: 0
       }
-    }, "\u2B50", sScore)), /*#__PURE__*/React.createElement("div", {
+    }, "\u2B50", sScore), difficultyMode !== "normal" ? React.createElement("span", {
+      style: {
+        fontSize: 9,
+        fontWeight: 700,
+        color: difficultyMode === "easy" ? "#4ade80" : "#f87171",
+        padding: "2px 8px",
+        background: difficultyMode === "easy" ? "rgba(74,222,128,.12)" : "rgba(248,113,113,.12)",
+        borderRadius: 12,
+        flexShrink: 0
+      }
+    }, difficultyMode === "easy" ? "\u{1F7E2} Easier" : "\u{1F534} Harder") : null), /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         gap: 3,
@@ -6660,7 +7104,22 @@ function Game(_ref2) {
         // Render AI explanation
         return React.createElement("div", { style: { padding: "12px 14px", background: "linear-gradient(135deg, rgba(102,126,234,.04), rgba(118,75,162,.03))", borderLeft: "3px solid #764ba2", borderRadius: 10, marginBottom: 8, fontSize: 12 + fz, color: TC.muted, lineHeight: 1.7 } },
           React.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: "#764ba2", marginBottom: 6, letterSpacing: 1 } }, "\u{1F916} AI EXPLANATION"),
-          React.createElement("div", { style: { whiteSpace: "pre-wrap" } }, renderMd(aiExplain.text))
+          React.createElement("div", { style: { whiteSpace: "pre-wrap" } }, renderMd(aiExplain.text)),
+          React.createElement("button", {
+            onClick: function() {
+              setAiExplain({loading: true, text: null, qId: q.id});
+              var labels = ["A","B","C","D"];
+              var optionsText = q.o.map(function(o, oi) { return labels[oi] + ") " + o; }).join("\n");
+              var pickedLabel = sel !== null && sel >= 0 ? labels[sel] : "none";
+              var correctLabel = labels[q.a];
+              var userMsg = "Question: " + q.q + "\n\nOptions:\n" + optionsText + "\nStudent picked: " + pickedLabel + "\nCorrect answer: " + correctLabel + " \u2014 " + q.o[q.a] + "\nTags: " + (q.tags || []).join(", ") + "\n\nPrevious explanation the student already saw: " + (aiExplain.text || q.ex || "none");
+              var sysPrompt = "The student already saw an explanation but it didn\u2019t click. Try a COMPLETELY DIFFERENT angle. Use an analogy, a visual metaphor, a real-world parallel, or connect it to everyday intuition. Do NOT repeat the previous explanation. Be concise (3-4 sentences max). Use **bold** for the key insight. Start with a fresh analogy right away, no preamble.";
+              callTeachAI([{role:"user", content: userMsg}], sysPrompt).then(function(reply) {
+                setAiExplain({loading: false, text: reply, qId: q.id});
+              });
+            },
+            style: { display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", padding: "7px 10px", marginTop: 8, background: "rgba(118,75,162,.04)", border: "1px solid rgba(118,75,162,.15)", borderRadius: 8, fontSize: 11 + fz, fontWeight: 600, color: "#a78bfa", cursor: "pointer" }
+          }, "\u{1F500} Explain differently")
         );
       }
       if (aiExplain.loading && aiExplain.qId === q.id) {
@@ -6843,6 +7302,82 @@ function Game(_ref2) {
         }
       }, "Est. section score: ", p2.low, "-", p2.high) : null;
     }()),
+    // WEAK TAG ACTIONS + PRACTICE BUTTON
+    wrong.length > 0 ? (function() {
+      // Compute per-tag accuracy from THIS session
+      var sessionTagStats = {};
+      qs.forEach(function(q, idx) {
+        if (!qAnswered[idx] && idx !== qi) return; // skip unanswered
+        (q.tags || []).forEach(function(t) {
+          if (!sessionTagStats[t]) sessionTagStats[t] = { correct: 0, total: 0 };
+          sessionTagStats[t].total++;
+        });
+      });
+      // Count correct from wrong list
+      var wrongIds = {};
+      wrong.forEach(function(wq) { wrongIds[wq.id] = true; });
+      qs.forEach(function(q, idx) {
+        if (qAnswered[idx] || idx === qi) {
+          var wasWrong = wrongIds[q.id];
+          (q.tags || []).forEach(function(t) {
+            if (sessionTagStats[t] && !wasWrong) sessionTagStats[t].correct++;
+          });
+        }
+      });
+      var weakTags = Object.keys(sessionTagStats).filter(function(t) {
+        var s = sessionTagStats[t];
+        return s.total >= 2 && (s.correct / s.total) < 0.6;
+      }).sort(function(a, b) {
+        return (sessionTagStats[a].correct / sessionTagStats[a].total) - (sessionTagStats[b].correct / sessionTagStats[b].total);
+      }).slice(0, 4);
+
+      if (weakTags.length === 0) return null;
+
+      return React.createElement("div", { style: { textAlign: "left", marginBottom: 14 } },
+        React.createElement("div", { style: { padding: "14px 16px", background: "rgba(248,113,113,.06)", border: "1px solid rgba(248,113,113,.15)", borderRadius: 12 } },
+          React.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: "#f87171", marginBottom: 10, letterSpacing: 1 } }, "\u{1F3AF} WEAK AREAS — TAP TO REVIEW"),
+          React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } },
+            weakTags.map(function(tag) {
+              var s = sessionTagStats[tag];
+              var pct = Math.round(s.correct / s.total * 100);
+              var hasCard = typeof CARDS !== "undefined" && !!CARDS[tag];
+              var hasLesson = typeof MODULES !== "undefined" && !!MODULES[tag];
+              return React.createElement("div", { key: tag, style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } },
+                React.createElement("span", { style: { fontSize: 11 + fz, color: TC.muted, flex: 1, minWidth: 80 } }, tag),
+                React.createElement("span", { style: { fontSize: 10, fontWeight: 700, color: "#f87171", marginRight: 4 } }, pct + "%"),
+                hasCard ? React.createElement("button", {
+                  onClick: function() { setShowConceptCard(tag); },
+                  style: { fontSize: 9 + fz, padding: "3px 8px", background: "rgba(56,189,248,.1)", border: "1px solid rgba(56,189,248,.25)", borderRadius: 5, color: "#38bdf8", fontWeight: 600 }
+                }, "\u{1F0CF} Cards") : null,
+                hasLesson ? React.createElement("button", {
+                  onClick: function() { setModuleTag(tag); setModuleStep(0); setModuleCheckSel(null); setModuleCheckDone(false); setScr("module"); },
+                  style: { fontSize: 9 + fz, padding: "3px 8px", background: "rgba(167,139,250,.1)", border: "1px solid rgba(167,139,250,.25)", borderRadius: 5, color: "#a78bfa", fontWeight: 600 }
+                }, "\u{1F4DA} Lesson") : null
+              );
+            })
+          ),
+          // Practice weak areas button
+          React.createElement("button", {
+            onClick: function() {
+              var weakPool = QS.filter(function(q) { return weakTags.some(function(t) { return (q.tags||[]).indexOf(t)>=0; }); });
+              if (weakPool.length === 0) return;
+              var built = buildQSet(weakPool.slice(0, 15), "MARATHON", data);
+              setQs(built); setQI(0); setSel(null); setSR(false); setSScore(0); setSC(0); setST(0); setWrong([]);
+              setGM("MARATHON"); setLives(3); setStreak(0); setConf(null); setAwaitConf(false);
+              setMatchSel(null); setMatchDone([]); setMatchResults([]); setHintUsed(false);
+              setEliminated([]); setRevealed(false); setPassOpen(true); setPaused(false);
+              setQAnswered({}); setTL(null); setThinkDelay(0); setElaborativeDelay(0);
+              setFreeRecallText(""); setFreeRecallRevealed(false);
+              setAiExplain({loading:false, text:null, qId:null});
+              setSessionRolling([]); setConsecutiveWrong(0); setRescueMode(false); setRescueTag(null); setDifficultyMode("normal");
+              qStartRef.current = Date.now();
+              setScr("play");
+            },
+            style: { ...S.btn, fontSize: 12 + fz, marginTop: 10, background: "linear-gradient(135deg, #f87171, #fb923c)" }
+          }, "\u{1F525} Practice these weak areas (" + weakTags.length + " topics)")
+        )
+      );
+    })() : null,
     // AI SESSION DEBRIEF
     sTotal >= 3 ? (function() {
       var hasKey = false;
@@ -6871,10 +7406,10 @@ function Game(_ref2) {
           React.createElement("span", { style: { fontSize: 12 + fz, color: "#667eea", animation: "pu 1.2s infinite" } }, "\u{1F9E0} Analyzing your session...")
         );
       }
-      return React.createElement("button", {
-        onClick: function() {
-          if (!hasKey) { setDebriefText("\u26A0\uFE0F Set your API key in AI Tutor \u2699\uFE0F to use AI features."); return; }
-          setDebriefLoading(true);
+      // Auto-trigger debrief if API key is set
+      if (hasKey && !debriefLoading && !debriefText) {
+        setDebriefLoading(true);
+        setTimeout(function() {
           var calData = data.calibration || {high:{total:0,correct:0},med:{total:0,correct:0},low:{total:0,correct:0}};
           var calStr = "Confidence calibration: High confidence " + (calData.high.total > 0 ? Math.round(calData.high.correct/calData.high.total*100) + "% correct" : "no data") + ", Medium " + (calData.med.total > 0 ? Math.round(calData.med.correct/calData.med.total*100) + "% correct" : "no data") + ", Low " + (calData.low.total > 0 ? Math.round(calData.low.correct/calData.low.total*100) + "% correct" : "no data");
           var wrongDetails = wrong.map(function(wq, i) {
@@ -6887,11 +7422,18 @@ function Game(_ref2) {
             setDebriefLoading(false);
             setDebriefText(reply);
           });
+        }, 100);
+      }
+      return React.createElement("button", {
+        onClick: function() {
+          if (!hasKey) { setDebriefText("\u26A0\uFE0F Set your API key in AI Tutor \u2699\uFE0F to use AI features."); return; }
+          setDebriefLoading(true);
+          setDebriefText(null);
         },
         style: { display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", padding: "12px 16px", marginBottom: 14, background: "linear-gradient(135deg, rgba(102,126,234,.08), rgba(118,75,162,.06))", border: "1.5px solid rgba(102,126,234,.25)", borderRadius: 12 }
       },
         React.createElement("span", { style: { fontSize: 18 } }, "\u{1F9E0}"),
-        React.createElement("span", { style: { fontSize: 13 + fz, fontWeight: 700, color: "#667eea" } }, "AI Session Debrief")
+        React.createElement("span", { style: { fontSize: 13 + fz, fontWeight: 700, color: "#667eea" } }, hasKey ? "\u{1F9E0} Generating debrief..." : "AI Session Debrief")
       );
     })() : null,
     wrong.length > 0 && /*#__PURE__*/React.createElement("div", {
