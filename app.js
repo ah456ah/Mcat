@@ -1197,6 +1197,9 @@ function buildQSet(pool, mode, data) {
         }))
       });
     }
+    if (q.type === "order" || q.type === "label") {
+      return Object.assign({}, q);
+    }
     var ct = q.o[q.a];
     var idx = q.o.map(function (_, i) {
       return i;
@@ -1826,9 +1829,11 @@ function Game(_ref2) {
     var secCats = Object.keys(CATS).filter(function (k) {
       return CATS[k].sec === sec;
     });
+    // MCAT-realistic: only standard MC questions (exclude match/order/label)
     var pool = QS.filter(function (q) {
-      return secCats.indexOf(q.cat) >= 0;
+      return secCats.indexOf(q.cat) >= 0 && q.type !== "match" && q.type !== "order" && q.type !== "label";
     });
+    if (pool.length === 0) { alert("Not enough questions for this section."); return; }
     // Pick complete passages (all Qs from a passage together), then fill with standalone
     var passageMap = {};
     pool.filter(function (q) {
@@ -1838,15 +1843,17 @@ function Game(_ref2) {
       passageMap[q.pass].push(q);
     });
     var passageKeys = shuf(Object.keys(passageMap));
-    var standQs = shuf(pool.filter(function (q) {
-      return !q.pass;
-    }));
+    // Standalone: prioritize MCAT-format questions (data interpretation, NOT/EXCEPT, two-step)
+    var standAll = pool.filter(function (q) { return !q.pass; });
+    var standFmt = shuf(standAll.filter(function (q) { return q.fmt === "data" || q.fmt === "except" || q.fmt === "twostep"; }));
+    var standReg = shuf(standAll.filter(function (q) { return !q.fmt; }));
+    var standQs = standFmt.concat(standReg); // MCAT-format standalone questions first
     var picked = [];
     // Scale question count: target real MCAT count (59 for science, 53 for CARS)
-    // but cap at available questions
     var realTarget = sec === "CARS" ? 53 : 59;
     var targetCount = Math.min(realTarget, pool.length, 40); // cap at 40 for practical sessions
-    var passTarget = Math.round(targetCount * 0.7);
+    // MCAT is ~80% passage-based for science, 100% for CARS
+    var passTarget = sec === "CARS" ? targetCount : Math.round(targetCount * 0.85);
     // Add complete passages until we approach passage target
     passageKeys.forEach(function (key) {
       if (picked.filter(function (q) {
@@ -1857,7 +1864,7 @@ function Game(_ref2) {
         });
       }
     });
-    // Fill remaining with standalone
+    // Fill remaining with standalone (MCAT-format questions prioritized)
     var si = 0;
     while (picked.length < targetCount && si < standQs.length) {
       picked.push(standQs[si++]);
@@ -1876,6 +1883,9 @@ function Game(_ref2) {
             return p[1];
           }))
         });
+      }
+      if (q.type === "order" || q.type === "label") {
+        return Object.assign({}, q);
       }
       var ct = q.o[q.a];
       var idx = q.o.map(function (_, i) {
@@ -3168,7 +3178,7 @@ function Game(_ref2) {
         color: TC.dim,
         letterSpacing: 2
       }
-    }, "v13.1.2 ", "\u2022", " AI TUTOR ", "\u2022", " ANALYTICS")), dayStreak >= 1 && /*#__PURE__*/React.createElement("div", {
+    }, "v13.1.2 ", "\u2022", " AI TUTOR ", "\u2022", " SECTION SIM")), dayStreak >= 1 && /*#__PURE__*/React.createElement("div", {
       style: {
         marginBottom: 12,
         padding: "10px 14px",
@@ -3586,28 +3596,42 @@ function Game(_ref2) {
           /*#__PURE__*/React.createElement("span", { style: { fontSize: 10, color: x.n ? TC.muted : TC.dim } }, x.l)));
     })) : null,
     // --- CHALLENGES (collapsed by default) ---
-    /*#__PURE__*/React.createElement("button", {
-      onClick: function() { setHomeSections(function(p) { return Object.assign({}, p, { challenges: !p.challenges }); }); },
-      style: { width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", marginBottom: homeSections.challenges ? 6 : 10, background: TC.card, border: "1px solid " + TC.cbr, borderRadius: 10 }
-    },
-      /*#__PURE__*/React.createElement("span", { style: { fontSize: 12 + fz, fontWeight: 700, color: fg } }, "\u2694\uFE0F Challenges & Simulations"),
-      /*#__PURE__*/React.createElement("span", { style: { fontSize: 10, color: TC.dim } }, homeSections.challenges ? "\u25B2" : "\u25BC")
+    // === SECTION SIMULATION CARD ===
+    React.createElement("div", { style: { padding: "14px 16px", marginBottom: 12, background: "rgba(255,150,50,.04)", border: "1px solid rgba(255,150,50,.15)", borderRadius: 14 } },
+      React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 } },
+        React.createElement("span", { style: { fontSize: 13 + fz, fontWeight: 800, color: fg } }, "\u{1F3AF} Section Simulation"),
+        React.createElement("span", { style: { fontSize: 9, color: TC.dim } }, "Timed \u2022 No feedback \u2022 Free nav")
+      ),
+      React.createElement("div", { style: { fontSize: 10, color: TC.muted, marginBottom: 10, lineHeight: 1.5 } }, "Full MCAT-style section practice. Passage-heavy, timed, no instant feedback \u2014 just like test day."),
+      React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } },
+        ["Bio/Biochem", "Chem/Phys", "Psych/Soc", "CARS"].map(function(sec) {
+          var secColors = { "Bio/Biochem": "#2a9d8f", "Chem/Phys": "#457b9d", "Psych/Soc": "#e76f51", "CARS": "#9b5de5" };
+          var secIcons = { "Bio/Biochem": "\u{1F9EC}", "Chem/Phys": "\u2697\uFE0F", "Psych/Soc": "\u{1F9E0}", "CARS": "\u{1F4D6}" };
+          var secCats = Object.keys(CATS).filter(function(k) { return CATS[k].sec === sec; });
+          var secPool = QS.filter(function(q) { return secCats.indexOf(q.cat) >= 0 && q.type !== "match" && q.type !== "order" && q.type !== "label"; });
+          var passCount = secPool.filter(function(q) { return q.pass; }).length;
+          var a = getSectionAccEMA(data, sec);
+          var p = a !== null ? predictScore(a) : null;
+          var c = a === null ? TC.dim : a >= 80 ? "#4ade80" : a >= 65 ? "#fbbf24" : "#f87171";
+          var simsDone = (data.simHistory || []).filter(function(s) { return s.section === sec; }).length;
+          return React.createElement("button", {
+            key: sec,
+            onClick: function() { startSectionSim(sec); },
+            style: { display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: TC.card, border: "1px solid " + TC.cbr, borderRadius: 10, borderLeft: "3px solid " + (secColors[sec] || "#667eea"), textAlign: "left", width: "100%" }
+          },
+            React.createElement("span", { style: { fontSize: 18, width: 28, textAlign: "center", flexShrink: 0 } }, secIcons[sec]),
+            React.createElement("div", { style: { flex: 1 } },
+              React.createElement("div", { style: { fontSize: 12 + fz, fontWeight: 700, color: fg } }, sec),
+              React.createElement("div", { style: { fontSize: 9, color: TC.dim } }, secPool.length + " Qs \u2022 " + passCount + " passage-based" + (simsDone > 0 ? " \u2022 " + simsDone + " sim" + (simsDone > 1 ? "s" : "") + " done" : ""))
+            ),
+            React.createElement("div", { style: { textAlign: "right", flexShrink: 0 } },
+              React.createElement("div", { style: { fontSize: 14, fontWeight: 900, color: c } }, a !== null ? a + "%" : "--"),
+              p ? React.createElement("div", { style: { fontSize: 8, color: TC.dim } }, p.low + "-" + p.high) : null
+            )
+          );
+        })
+      )
     ),
-    homeSections.challenges ? /*#__PURE__*/React.createElement("div", {
-      style: { display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }
-    }, ["BLITZ", "MARATHON", "BOSS_BATTLE", "SECTION_SIM"].map(function (k) {
-      return /*#__PURE__*/React.createElement("button", {
-        key: k,
-        style: Object.assign({}, TS.mc, { background: TC.card, border: "1px solid " + TC.cbr }),
-        onClick: function () {
-          if (k === "SECTION_SIM") { setScr("section_pick"); return; }
-          setGM(k); setScr("select_cats");
-        }
-      }, /*#__PURE__*/React.createElement("span", { style: { fontSize: 20, width: 30, textAlign: "center" } }, MODES[k].icon),
-        /*#__PURE__*/React.createElement("div", null,
-          /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: fg, display: "block" } }, MODES[k].name),
-          /*#__PURE__*/React.createElement("span", { style: { fontSize: 10, color: TC.dim } }, MODES[k].desc)));
-    })) : null,
     // --- AI Tutor button ---
     /*#__PURE__*/React.createElement("button", {
       onClick: function() { launchTeach(null, null); },
