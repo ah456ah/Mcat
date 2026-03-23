@@ -1228,10 +1228,20 @@ function buildDailyPlan(data) {
 
 // === AI TEACH ENGINE ===
 async function callTeachAI(messages, systemPrompt) {
+  var apiKey = "";
+  try { apiKey = localStorage.getItem("mcat_ai_key") || ""; } catch(e) {}
+  if (!apiKey) {
+    return "⚠️ API key not set. Tap the ⚙️ button on the AI Tutor screen to enter your Anthropic API key. You can get one free at console.anthropic.com.";
+  }
   try {
     var resp = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true"
+      },
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
         max_tokens: 1000,
@@ -1239,13 +1249,24 @@ async function callTeachAI(messages, systemPrompt) {
         messages: messages
       })
     });
+    if (!resp.ok) {
+      var errBody = "";
+      try { errBody = (await resp.json()).error?.message || ""; } catch(e2) {}
+      if (resp.status === 401) return "⚠️ Invalid API key. Check your key in the ⚙️ settings on this screen.";
+      if (resp.status === 429) return "⚠️ Rate limited. Wait a moment and try again.";
+      if (resp.status === 529) return "⚠️ API is overloaded. Try again in a few seconds.";
+      return "⚠️ API error (" + resp.status + "): " + (errBody || "Unknown error");
+    }
     var d = await resp.json();
     if (d && d.content) {
       return d.content.filter(function(b) { return b.type === "text"; }).map(function(b) { return b.text; }).join("\n");
     }
     return "Sorry, I couldn't generate a response. Try again.";
   } catch(e) {
-    return "Connection error. Check your internet and try again.";
+    if (e.message && e.message.includes("Failed to fetch")) {
+      return "⚠️ Connection failed. Check your internet connection or try again.";
+    }
+    return "⚠️ Error: " + (e.message || "Unknown error");
   }
 }
 
@@ -2881,7 +2902,21 @@ function Game(_ref2) {
         React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 12 } },
           React.createElement("button", { style: { ...TS.bk, color: TC.muted, flexShrink: 0 }, onClick: function() { setScr("home"); } }, "< Back"),
           React.createElement("div", { style: { flex: 1 } }),
-          React.createElement("span", { style: { fontSize: 11, color: TC.dim } }, "\u{1F9D1}\u200D\u{1F3EB} AI Tutor")
+          React.createElement("span", { style: { fontSize: 11, color: TC.dim } }, "\u{1F9D1}\u200D\u{1F3EB} AI Tutor"),
+          React.createElement("button", { onClick: function() {
+            var current = "";
+            try { current = localStorage.getItem("mcat_ai_key") || ""; } catch(e) {}
+            var masked = current ? current.substring(0, 8) + "..." + current.slice(-4) : "(not set)";
+            var msg = "Current key: " + masked + "\n\nEnter your Anthropic API key.\nGet one free at console.anthropic.com\n\nPaste key (or blank to clear):";
+            var key = prompt(msg, "");
+            if (key !== null) {
+              try { 
+                if (key.trim()) localStorage.setItem("mcat_ai_key", key.trim());
+                else localStorage.removeItem("mcat_ai_key");
+                alert(key.trim() ? "API key saved!" : "API key cleared.");
+              } catch(e) { alert("Could not save key: " + e.message); }
+            }
+          }, style: { fontSize: 14, padding: "4px 8px", background: TC.card, border: "1px solid " + TC.cbr, borderRadius: 6, color: TC.dim, flexShrink: 0 } }, "\u2699\uFE0F")
         ),
         // Header
         React.createElement("div", { style: { textAlign: "center", marginBottom: 16, padding: "14px 16px", background: "linear-gradient(135deg, rgba(102,126,234,.08), rgba(118,75,162,.06))", border: "1px solid rgba(102,126,234,.2)", borderRadius: 14 } },
