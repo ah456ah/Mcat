@@ -6739,7 +6739,7 @@ function Game(_ref2) {
       ),
       // V18: Notes button (floating)
       React.createElement("button", { onClick: function() {
-        var t = studySubTab === "cards" && openCard ? openCard : studySubTab === "modules" && moduleTag ? moduleTag : "General";
+        var t = studySubTab === "cards" && openCard ? openCard : studySubTab === "lessons" && moduleTag ? moduleTag : "General";
         setNotesTopic(t); setNotesText((data.notes||{})[t] || ""); setNotesOpen(true);
       }, style: { position: "fixed", bottom: 72, right: 16, width: 44, height: 44, borderRadius: 22, background: "linear-gradient(135deg,#667eea,#764ba2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, color: "#fff", boxShadow: "0 2px 10px rgba(102,126,234,.4)", zIndex: 50, border: "none" } }, "\u{1F4DD}"),
       // Notes panel
