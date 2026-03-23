@@ -1616,6 +1616,15 @@ function Game(_ref2) {
   const [labelAssignments, setLabelAssignments] = useState({});
   const [labelSelecting, setLabelSelecting] = useState(null);
   const [labelSubmitted, setLabelSubmitted] = useState(false);
+  // AI EXPLAIN STATE
+  const [aiExplain, setAiExplain] = useState({loading:false, text:null, qId:null});
+  // AI DEBRIEF STATE
+  const [debriefLoading, setDebriefLoading] = useState(false);
+  const [debriefText, setDebriefText] = useState(null);
+  // AI COACH STATE
+  const [coachLoading, setCoachLoading] = useState(false);
+  const [coachText, setCoachText] = useState(null);
+  const [coachDate, setCoachDate] = useState("");
   var theme = data.theme || "dark";
   var fz = data.fontSize || 0;
   function toggleTheme() {
@@ -1747,6 +1756,7 @@ function Game(_ref2) {
     setElaborativeDelay(0);
     setFreeRecallText("");
     setFreeRecallRevealed(false);
+    setAiExplain({loading:false, text:null, qId:null});
     qStartRef.current = Date.now();
     setScr("play");
   }
@@ -1787,6 +1797,7 @@ function Game(_ref2) {
     setCarsReadTimer(null);
     setCarsReadActive(false);
     setHighlights({});
+    setAiExplain({loading:false, text:null, qId:null});
     qStartRef.current = Date.now();
     setScr("play");
   }
@@ -1891,6 +1902,7 @@ function Game(_ref2) {
     setSimTimer(Math.round(targetCount * (sec === "CARS" ? 102 : 97)));
     setSimAnswers({});
     setSimNavOpen(false);
+    setAiExplain({loading:false, text:null, qId:null});
     qStartRef.current = Date.now();
     setScr("play");
   }
@@ -2328,6 +2340,7 @@ function Game(_ref2) {
     setLabelAssignments({});
     setLabelSelecting(null);
     setLabelSubmitted(false);
+    setAiExplain({loading:false, text:null, qId:null});
     // Init order items for order questions
     var nextQ2 = qs[idx];
     if (nextQ2 && nextQ2.type === 'order') {
@@ -2388,6 +2401,8 @@ function Game(_ref2) {
         }]).slice(-50)
       });
     });
+    setDebriefLoading(false);
+    setDebriefText(null);
     setScr("results");
   }
   function toggleFlag(qid) {
@@ -2435,6 +2450,7 @@ function Game(_ref2) {
     setEliminated([]); setRevealed(false); setPassOpen(true); setPaused(false);
     setQAnswered({}); setTL(null); setThinkDelay(0); setElaborativeDelay(0);
     setFreeRecallText(""); setFreeRecallRevealed(false);
+    setAiExplain({loading:false, text:null, qId:null});
     qStartRef.current = Date.now();
     setScr("play");
   }
@@ -3130,7 +3146,7 @@ function Game(_ref2) {
         color: TC.dim,
         letterSpacing: 2
       }
-    }, "v13.0.0 ", "\u2022", " AI TUTOR ", "\u2022", " ANALYTICS")), dayStreak >= 1 && /*#__PURE__*/React.createElement("div", {
+    }, "v13.1.0 ", "\u2022", " AI TUTOR ", "\u2022", " ANALYTICS")), dayStreak >= 1 && /*#__PURE__*/React.createElement("div", {
       style: {
         marginBottom: 12,
         padding: "10px 14px",
@@ -3197,6 +3213,50 @@ function Game(_ref2) {
                 /*#__PURE__*/React.createElement("span", null, plan.unseen.length, " new questions")
               ) : null
             ),
+          // AI STUDY COACH
+          (function() {
+            var hasKey = false;
+            try { hasKey = !!localStorage.getItem("mcat_ai_key"); } catch(e) {}
+            var today = todayStr();
+            var cached = coachDate === today && coachText;
+            if (cached) {
+              return React.createElement("div", { style: { padding: "10px 12px", background: "rgba(118,75,162,.06)", borderRadius: 8, marginTop: 10, fontSize: 11 + fz, color: TC.muted, lineHeight: 1.6, position: "relative" } },
+                React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 } },
+                  React.createElement("span", { style: { fontSize: 9, fontWeight: 700, color: "#764ba2", letterSpacing: 1 } }, "\u{1F916} AI COACH"),
+                  React.createElement("button", { onClick: function() { setCoachText(null); setCoachDate(""); }, style: { fontSize: 10, color: TC.dim, padding: "2px 6px", border: "1px solid " + TC.cbr, borderRadius: 4, background: "transparent" } }, "\u{1F504}")
+                ),
+                React.createElement("div", { style: { whiteSpace: "pre-wrap" } }, renderMd(coachText))
+              );
+            }
+            if (coachLoading) {
+              return React.createElement("div", { style: { padding: "12px", background: "rgba(118,75,162,.06)", borderRadius: 8, marginTop: 10, textAlign: "center" } },
+                React.createElement("span", { style: { fontSize: 11 + fz, color: "#764ba2", animation: "pu 1.2s infinite" } }, "\u{1F916} Thinking...")
+              );
+            }
+            return React.createElement("button", {
+              onClick: function() {
+                if (!hasKey) { setCoachText("\u26A0\uFE0F Set your API key in AI Tutor \u2699\uFE0F to use AI features."); setCoachDate(today); return; }
+                setCoachLoading(true);
+                var testDate = data.testDate;
+                var daysLeft = testDate ? Math.max(0, Math.ceil((new Date(testDate).getTime() - Date.now()) / 86400000)) : null;
+                var tc = getTagCounts(data);
+                var weakTags = Object.keys(tc).filter(function(t) { return tc[t].seen >= 3; }).map(function(t) { return { tag: t, pct: Math.round(tc[t].correct / tc[t].seen * 100) }; }).sort(function(a,b) { return a.pct - b.pct; }).slice(0, 3);
+                var weakStr = weakTags.map(function(t) { return t.tag + " (" + t.pct + "%)"; }).join(", ") || "not enough data yet";
+                var newRemaining = QS.filter(function(q) { return !data.questionStats[q.id]; }).length;
+                var userMsg = (daysLeft !== null ? "Days until MCAT: " + daysLeft + ". " : "No test date set. ") + "Study streak: " + computeStreak(data) + " days. Total Qs answered: " + (data.totalAnswered || 0) + ". Overall accuracy: " + (data.totalAnswered > 0 ? Math.round(data.totalCorrect / data.totalAnswered * 100) : 0) + "%. Today's study time: " + getStudyToday(data) + " min. Due for review: " + getDueCount(data) + ". Weakest tags: " + weakStr + ". Blind spots: " + getBlindSpotCount(data) + ". Unseen questions remaining: " + newRemaining + "/" + QS.length + ".";
+                var sysPrompt = "You are an MCAT study coach giving a brief, personalized daily recommendation. You know the student's data. Be warm but direct. Give exactly 3 sentences: (1) What to prioritize today and why. (2) One specific weak area to focus on with a concrete action. (3) A brief motivational nudge tied to their progress. Use **bold** for the most important action. Keep it under 75 words total.";
+                callTeachAI([{role:"user", content: userMsg}], sysPrompt).then(function(reply) {
+                  setCoachLoading(false);
+                  setCoachText(reply);
+                  setCoachDate(today);
+                });
+              },
+              style: { display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", padding: "9px 12px", marginTop: 10, background: "rgba(118,75,162,.06)", border: "1.5px solid rgba(118,75,162,.2)", borderRadius: 8 }
+            },
+              React.createElement("span", { style: { fontSize: 13 } }, "\u{1F916}"),
+              React.createElement("span", { style: { fontSize: 11 + fz, fontWeight: 700, color: "#764ba2" } }, "What should I study?")
+            );
+          })(),
           plan.total > 0 ? /*#__PURE__*/React.createElement("button", { onClick: startSmartSession, style: { ...S.btn, fontSize: 13 + fz, marginTop: 10 } }, "\u{1F680} Start Smart Session (" + plan.total + " Qs)") : null
         )
       );
@@ -6518,6 +6578,42 @@ function Game(_ref2) {
       }),
       whyWrongSel !== null ? /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: TC.dim, marginTop: 6, fontStyle: "italic" } }, "\u2705 Logged — helps the app find the right review for you.") : null
     ) : null,
+    // AI Explain button (shown after answer submitted, for standard MC questions)
+    sr && q.type !== "match" && q.type !== "order" && q.type !== "label" && thinkDelay <= 0 ? (function() {
+      var hasKey = false;
+      try { hasKey = !!localStorage.getItem("mcat_ai_key"); } catch(e) {}
+      if (aiExplain.text && aiExplain.qId === q.id) {
+        // Render AI explanation
+        return React.createElement("div", { style: { padding: "12px 14px", background: "linear-gradient(135deg, rgba(102,126,234,.04), rgba(118,75,162,.03))", borderLeft: "3px solid #764ba2", borderRadius: 10, marginBottom: 8, fontSize: 12 + fz, color: TC.muted, lineHeight: 1.7 } },
+          React.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: "#764ba2", marginBottom: 6, letterSpacing: 1 } }, "\u{1F916} AI EXPLANATION"),
+          React.createElement("div", { style: { whiteSpace: "pre-wrap" } }, renderMd(aiExplain.text))
+        );
+      }
+      if (aiExplain.loading && aiExplain.qId === q.id) {
+        return React.createElement("div", { style: { padding: "12px 14px", background: "rgba(102,126,234,.04)", borderLeft: "3px solid #764ba2", borderRadius: 10, marginBottom: 8, textAlign: "center" } },
+          React.createElement("span", { style: { fontSize: 12 + fz, color: "#764ba2", animation: "pu 1.2s infinite" } }, "\u{1F916} Generating explanation...")
+        );
+      }
+      return React.createElement("button", {
+        onClick: function() {
+          if (!hasKey) { setAiExplain({loading: false, text: "\u26A0\uFE0F Set your API key in AI Tutor \u2699\uFE0F to use AI features.", qId: q.id}); return; }
+          setAiExplain({loading: true, text: null, qId: q.id});
+          var labels = ["A","B","C","D"];
+          var optionsText = q.o.map(function(o, i) { return labels[i] + ") " + o; }).join("\n");
+          var pickedLabel = sel !== null && sel >= 0 ? labels[sel] : "none (timed out)";
+          var correctLabel = labels[q.a];
+          var userMsg = "Question: " + q.q + "\n\nOptions:\n" + optionsText + "\n\nStudent picked: " + pickedLabel + (sel !== null && sel >= 0 ? " — " + q.o[sel] : "") + "\nCorrect answer: " + correctLabel + " — " + q.o[q.a] + "\nTags: " + (q.tags || []).join(", ") + (q.ex ? "\nExisting explanation: " + q.ex : "");
+          var sysPrompt = "You are an expert MCAT tutor. A student just answered a question. Give a focused, concise explanation (under 200 words). Start with WHY the correct answer is right, then explain WHY each wrong answer is wrong in 1 sentence each. Use **bold** for key terms. End with one 'MCAT Pearl' — the single most important takeaway for test day. Do not use bullet points.";
+          callTeachAI([{role:"user", content: userMsg}], sysPrompt).then(function(reply) {
+            setAiExplain({loading: false, text: reply, qId: q.id});
+          });
+        },
+        style: { display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", padding: "10px 14px", marginBottom: 8, background: "rgba(118,75,162,.06)", border: "1.5px solid rgba(118,75,162,.2)", borderRadius: 10 }
+      },
+        React.createElement("span", { style: { fontSize: 14 } }, "\u{1F916}"),
+        React.createElement("span", { style: { fontSize: 12 + fz, fontWeight: 700, color: "#764ba2" } }, "AI Explain")
+      );
+    })() : null,
     // Teach Me button (shown after wrong answer, when explanation visible)
     sr && sel !== q.a && thinkDelay <= 0 ? /*#__PURE__*/React.createElement("button", {
       onClick: function() {
@@ -6672,7 +6768,59 @@ function Game(_ref2) {
           marginTop: 4
         }
       }, "Est. section score: ", p2.low, "-", p2.high) : null;
-    }()), wrong.length > 0 && /*#__PURE__*/React.createElement("div", {
+    }()),
+    // AI SESSION DEBRIEF
+    sTotal >= 3 ? (function() {
+      var hasKey = false;
+      try { hasKey = !!localStorage.getItem("mcat_ai_key"); } catch(e) {}
+      if (debriefText) {
+        return React.createElement("div", { style: { textAlign: "left", marginBottom: 14 } },
+          React.createElement("div", { style: { padding: "14px 16px", background: "linear-gradient(135deg, rgba(102,126,234,.08), rgba(118,75,162,.06))", border: "1px solid rgba(102,126,234,.2)", borderRadius: 12, fontSize: 12 + fz, color: TC.muted, lineHeight: 1.7 } },
+            React.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: "#667eea", marginBottom: 8, letterSpacing: 1 } }, "\u{1F9E0} AI SESSION DEBRIEF"),
+            React.createElement("div", { style: { whiteSpace: "pre-wrap" } }, renderMd(debriefText)),
+            React.createElement("button", {
+              onClick: function() {
+                var sessionSummary = "Session: " + (MODES[gm]||{}).name + ", " + sCorrect + "/" + sTotal + " correct (" + pct + "%). ";
+                if (wrong.length > 0) { sessionSummary += "Missed topics: " + wrong.map(function(wq){return (wq.tags||[]).join(", ");}).join("; "); }
+                launchTeach(null, { stem: sessionSummary, picked: "N/A", correct: "N/A", explanation: debriefText });
+              },
+              style: { display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", padding: "8px 12px", marginTop: 10, background: "rgba(102,126,234,.06)", border: "1px solid rgba(102,126,234,.2)", borderRadius: 8 }
+            },
+              React.createElement("span", { style: { fontSize: 12 } }, "\u{1F4AC}"),
+              React.createElement("span", { style: { fontSize: 11 + fz, fontWeight: 600, color: "#667eea" } }, "Discuss with AI Tutor")
+            )
+          )
+        );
+      }
+      if (debriefLoading) {
+        return React.createElement("div", { style: { padding: "16px", background: "linear-gradient(135deg, rgba(102,126,234,.06), rgba(118,75,162,.04))", border: "1px solid rgba(102,126,234,.15)", borderRadius: 12, marginBottom: 14, textAlign: "center" } },
+          React.createElement("span", { style: { fontSize: 12 + fz, color: "#667eea", animation: "pu 1.2s infinite" } }, "\u{1F9E0} Analyzing your session...")
+        );
+      }
+      return React.createElement("button", {
+        onClick: function() {
+          if (!hasKey) { setDebriefText("\u26A0\uFE0F Set your API key in AI Tutor \u2699\uFE0F to use AI features."); return; }
+          setDebriefLoading(true);
+          var calData = data.calibration || {high:{total:0,correct:0},med:{total:0,correct:0},low:{total:0,correct:0}};
+          var calStr = "Confidence calibration: High confidence " + (calData.high.total > 0 ? Math.round(calData.high.correct/calData.high.total*100) + "% correct" : "no data") + ", Medium " + (calData.med.total > 0 ? Math.round(calData.med.correct/calData.med.total*100) + "% correct" : "no data") + ", Low " + (calData.low.total > 0 ? Math.round(calData.low.correct/calData.low.total*100) + "% correct" : "no data");
+          var wrongDetails = wrong.map(function(wq, i) {
+            var pickedIdx = data.questionStats[wq.id] ? data.questionStats[wq.id].lastEliminations : null;
+            return "Q" + (i+1) + ": " + (wq.q.length > 100 ? wq.q.substring(0,100) + "..." : wq.q) + " | Correct: " + wq.o[wq.a] + " | Tags: " + (wq.tags||[]).join(", ");
+          }).join("\n");
+          var userMsg = "Game mode: " + ((MODES[gm]||{}).name || gm) + "\nScore: " + sCorrect + "/" + sTotal + " (" + pct + "%)\n\n" + calStr + "\n\nWrong answers:\n" + (wrongDetails || "None — perfect score!") + "\n\nOverall stats: " + data.totalAnswered + " total Qs, " + (data.totalAnswered > 0 ? Math.round(data.totalCorrect/data.totalAnswered*100) : 0) + "% lifetime accuracy.";
+          var sysPrompt = "You are an elite MCAT tutor doing a post-session performance review. Be direct, specific, and actionable. Structure your response in exactly 3 short sections: (1) **Pattern Analysis** — identify the 1-2 most significant patterns in what the student got wrong (topic confusion, careless errors, passage misreading, etc.). (2) **Targeted Fix** — give ONE specific, concrete study action they should do today (not generic advice like 'review more'). (3) **Confidence Check** — comment on their calibration: are they overconfident in areas they're weak, or underconfident where they're strong? Keep total response under 250 words. Use **bold** for emphasis. Do not use bullet points or numbered lists.";
+          callTeachAI([{role:"user", content: userMsg}], sysPrompt).then(function(reply) {
+            setDebriefLoading(false);
+            setDebriefText(reply);
+          });
+        },
+        style: { display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", padding: "12px 16px", marginBottom: 14, background: "linear-gradient(135deg, rgba(102,126,234,.08), rgba(118,75,162,.06))", border: "1.5px solid rgba(102,126,234,.25)", borderRadius: 12 }
+      },
+        React.createElement("span", { style: { fontSize: 18 } }, "\u{1F9E0}"),
+        React.createElement("span", { style: { fontSize: 13 + fz, fontWeight: 700, color: "#667eea" } }, "AI Session Debrief")
+      );
+    })() : null,
+    wrong.length > 0 && /*#__PURE__*/React.createElement("div", {
       style: {
         textAlign: "left",
         marginBottom: 14
