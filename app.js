@@ -1219,9 +1219,9 @@ function buildQSet(pool, mode, data) {
     });
   });
 }
-// === SMART DAILY PLAN ===
+// === SMART DAILY PLAN (v2 — snapshot-based) ===
 function buildDailyPlan(data) {
-  var plan = { review: [], weak: [], unseen: [], total: 0 };
+  var plan = { review: [], weak: [], unseen: [], total: 0, tasks: [], weakTags: [] };
   // 1. Spaced review due
   var dueQs = QS.filter(function(q) { return isDue(data, q.id); });
   plan.review = dueQs.slice(0, 15);
@@ -1245,9 +1245,75 @@ function buildDailyPlan(data) {
   // 3. New/unseen
   var unseenQs = QS.filter(function(q) { return !data.questionStats[q.id] && !weakIds[q.id]; });
   plan.unseen = unseenQs.slice(0, 5);
+  // 4. Build task list (questions + lessons + cards)
+  var tasks = [];
+  if (plan.review.length > 0) tasks.push({ type: "questions", label: "Spaced review", icon: "\u{1F504}", ids: plan.review.map(function(q){return q.id;}), color: "#667eea" });
+  if (plan.weak.length > 0) tasks.push({ type: "questions", label: "Weak-topic Qs" + (weakTags.length > 0 ? " (" + weakTags.slice(0,2).join(", ") + ")" : ""), icon: "\u{1F3AF}", ids: plan.weak.map(function(q){return q.id;}), color: "#f87171" });
+  if (plan.unseen.length > 0) tasks.push({ type: "questions", label: "New questions", icon: "\u2728", ids: plan.unseen.map(function(q){return q.id;}), color: "#4ade80" });
+  // 5. Add lesson tasks for weak tags with unfinished modules
+  if (typeof MODULES !== "undefined") {
+    weakTags.forEach(function(tag) {
+      if (MODULES[tag] && !(data.moduleProgress && data.moduleProgress[tag] && data.moduleProgress[tag].completed)) {
+        tasks.push({ type: "lesson", label: "Review " + tag + " lesson", icon: "\u{1F4DA}", moduleTag: tag, color: "#a78bfa" });
+      }
+    });
+  }
+  // 6. Add concept card review tasks for weak tags
+  if (typeof CARDS !== "undefined") {
+    weakTags.slice(0, 2).forEach(function(tag) {
+      if (CARDS[tag]) {
+        tasks.push({ type: "card", label: "Review " + tag + " cards", icon: "\u{1F0CF}", cardTag: tag, color: "#38bdf8" });
+      }
+    });
+  }
+  // 7. Add study time goal
+  tasks.push({ type: "time", label: "Study 30+ minutes today", icon: "\u23F1\uFE0F", targetMin: 30, color: "#fb923c" });
+  plan.tasks = tasks;
   plan.total = plan.review.length + plan.weak.length + plan.unseen.length;
   plan.pool = plan.review.concat(plan.weak).concat(plan.unseen);
   return plan;
+}
+
+// Snapshot system: freeze today's plan so it doesn't shift on re-render
+function getDailySnapshot(data, forceRebuild) {
+  var today = todayStr();
+  var snap = data.dailyPlanSnapshot;
+  if (!forceRebuild && snap && snap.date === today) {
+    // Rehydrate question references from stored IDs
+    var idSet = {};
+    (snap.tasks || []).forEach(function(t) { if (t.ids) t.ids.forEach(function(id) { idSet[id] = true; }); });
+    snap.pool = QS.filter(function(q) { return idSet[q.id]; });
+    return snap;
+  }
+  // Build fresh
+  var plan = buildDailyPlan(data);
+  var snapshot = {
+    date: today,
+    tasks: plan.tasks,
+    pool: plan.pool,
+    weakTags: plan.weakTags,
+    totalQs: plan.total,
+    createdAt: Date.now()
+  };
+  return snapshot;
+}
+
+function countQsDoneToday(data, qIds) {
+  var todayMs = new Date(); todayMs.setHours(0,0,0,0); todayMs = todayMs.getTime();
+  return (qIds || []).filter(function(id) {
+    var s = data.questionStats[id];
+    return s && s.lastSeen && s.lastSeen >= todayMs;
+  }).length;
+}
+
+function getTotalQsDoneToday(data) {
+  var todayMs = new Date(); todayMs.setHours(0,0,0,0); todayMs = todayMs.getTime();
+  var count = 0;
+  Object.keys(data.questionStats || {}).forEach(function(id) {
+    var s = data.questionStats[id];
+    if (s && s.lastSeen && s.lastSeen >= todayMs) count++;
+  });
+  return count;
 }
 
 // === AI TEACH ENGINE ===
@@ -2472,9 +2538,15 @@ function Game(_ref2) {
     });
   }
   function startSmartSession() {
-    var plan = buildDailyPlan(data);
-    if (plan.pool.length === 0) { alert("No questions available!"); return; }
-    var built = buildQSet(plan.pool, "MARATHON", data);
+    var snap = getDailySnapshot(data, false);
+    // Persist snapshot if new
+    if (!data.dailyPlanSnapshot || data.dailyPlanSnapshot.date !== todayStr()) {
+      dirtyRef.current = true;
+      setData(function(d) { return Object.assign({}, d, { dailyPlanSnapshot: snap }); });
+    }
+    var pool = (snap.pool && snap.pool.length > 0) ? snap.pool : QS.filter(function(q) { return isDue(data, q.id) || !data.questionStats[q.id]; }).slice(0, 25);
+    if (pool.length === 0) { alert("No questions available!"); return; }
+    var built = buildQSet(pool, "MARATHON", data);
     setQs(built);
     setQI(0); setSel(null); setSR(false); setSScore(0); setSC(0); setST(0); setWrong([]);
     setGM("MARATHON"); setLives(3); setStreak(0); setConf(null); setAwaitConf(false);
@@ -3178,7 +3250,7 @@ function Game(_ref2) {
         color: TC.dim,
         letterSpacing: 2
       }
-    }, "v13.1.2 ", "\u2022", " AI TUTOR ", "\u2022", " SECTION SIM")), dayStreak >= 1 && /*#__PURE__*/React.createElement("div", {
+    }, "v14.0.0 ", "\u2022", " AI TUTOR ", "\u2022", " SECTION SIM")), dayStreak >= 1 && /*#__PURE__*/React.createElement("div", {
       style: {
         marginBottom: 12,
         padding: "10px 14px",
@@ -3212,7 +3284,12 @@ function Game(_ref2) {
       }),
       /*#__PURE__*/React.createElement("span", null, "More")
     )) : null), function () {
-      var plan = buildDailyPlan(data);
+      var snap = getDailySnapshot(data, false);
+      // Auto-persist snapshot on first load of the day
+      if (!data.dailyPlanSnapshot || data.dailyPlanSnapshot.date !== todayStr()) {
+        setTimeout(function() { dirtyRef.current = true; setData(function(d) { return Object.assign({}, d, { dailyPlanSnapshot: snap }); }); }, 0);
+      }
+      var plan = snap; // alias for compatibility
       var stToday = getStudyToday(data);
       var stWeek = fmtTime(getStudyWeek(data));
       var testDate = data.testDate;
@@ -3223,55 +3300,127 @@ function Game(_ref2) {
           /*#__PURE__*/React.createElement("span", { style: { fontSize: 11 + fz, fontWeight: 700, color: daysUntilTest <= 30 ? "#e85d2f" : "#667eea" } }, "\u{1F4C5} ", daysUntilTest, " days until MCAT"),
           /*#__PURE__*/React.createElement("button", { onClick: function() { var nd = prompt("Set MCAT date (YYYY-MM-DD):", testDate || ""); if (nd) { dirtyRef.current = true; setData(function(d) { return Object.assign({}, d, { testDate: nd }); }); } }, style: { fontSize: 9, color: TC.dim, padding: "3px 6px", border: "1px solid " + TC.cbr, borderRadius: 5 } }, "Edit")
         ) : /*#__PURE__*/React.createElement("button", { onClick: function() { var nd = prompt("Set your MCAT date (YYYY-MM-DD):"); if (nd) { dirtyRef.current = true; setData(function(d) { return Object.assign({}, d, { testDate: nd }); }); } }, style: { width: "100%", padding: "8px 12px", marginBottom: 8, background: TC.card, border: "1px solid " + TC.cbr, borderRadius: 10, fontSize: 11 + fz, color: TC.muted, textAlign: "center" } }, "\u{1F4C5} Set your MCAT test date"),
-        // Smart Daily Plan card
+        // Smart Daily Plan card (v2 — snapshot-based with tasks)
         (function() {
-          // Calculate how many plan questions were done today
-          var todayStart = new Date(); todayStart.setHours(0,0,0,0); var todayMs = todayStart.getTime();
-          function countDoneToday(arr) {
-            return arr.filter(function(q) { var s = data.questionStats[q.id]; return s && s.lastSeen && s.lastSeen >= todayMs; }).length;
-          }
-          var reviewDone = countDoneToday(plan.review);
-          var weakDone = countDoneToday(plan.weak);
-          var unseenDone = countDoneToday(plan.unseen);
-          var totalDone = reviewDone + weakDone + unseenDone;
-          var progressPct = plan.total > 0 ? Math.min(100, Math.round(totalDone / plan.total * 100)) : 100;
-          var allDone = plan.total > 0 && totalDone >= plan.total;
+          var tasks = plan.tasks || [];
+          var totalQsDoneToday = getTotalQsDoneToday(data);
+          var stMinutes = getStudyToday(data);
+
+          // Calculate per-task completion
+          var taskStates = tasks.map(function(task) {
+            if (task.type === "questions") {
+              var done = countQsDoneToday(data, task.ids);
+              return { done: done, total: task.ids.length, complete: done >= task.ids.length };
+            } else if (task.type === "lesson") {
+              var mp = data.moduleProgress && data.moduleProgress[task.moduleTag];
+              var complete = !!(mp && mp.completed);
+              return { done: complete ? 1 : 0, total: 1, complete: complete };
+            } else if (task.type === "card") {
+              // Card reviewed = tapped today (we track via dailyPlanSnapshot.cardsDone)
+              var cd = (data.dailyPlanSnapshot && data.dailyPlanSnapshot.cardsDone) || {};
+              var complete = !!cd[task.cardTag];
+              return { done: complete ? 1 : 0, total: 1, complete: complete };
+            } else if (task.type === "time") {
+              var complete = stMinutes >= (task.targetMin || 30);
+              return { done: Math.min(stMinutes, task.targetMin || 30), total: task.targetMin || 30, complete: complete };
+            }
+            return { done: 0, total: 1, complete: false };
+          });
+
+          var completedTasks = taskStates.filter(function(s) { return s.complete; }).length;
+          var totalTasks = tasks.length;
+          var progressPct = totalTasks > 0 ? Math.min(100, Math.round(completedTasks / totalTasks * 100)) : 100;
+          var allDone = totalTasks > 0 && completedTasks >= totalTasks;
 
           return React.createElement("div", { style: { padding: "14px 16px", background: "linear-gradient(135deg, rgba(102,126,234,.08), rgba(74,222,128,.04))", border: "1px solid rgba(102,126,234,.2)", borderRadius: 14 } },
             // Header
             React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 } },
               React.createElement("span", { style: { fontSize: 14 + fz, fontWeight: 800, color: fg } }, "\u{1F9E0} Today\u2019s Plan"),
-              React.createElement("span", { style: { fontSize: 10, color: TC.dim } }, stToday + "min today \u2022 " + stWeek + " this week")
+              React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 1 } },
+                React.createElement("span", { style: { fontSize: 10, color: TC.dim } }, stToday + "min today \u2022 " + stWeek + " this week"),
+                totalQsDoneToday > 0 ? React.createElement("span", { style: { fontSize: 10, fontWeight: 700, color: "#667eea" } }, totalQsDoneToday + " Qs answered today") : null
+              )
             ),
             // Progress bar
-            plan.total > 0 ? React.createElement("div", { style: { marginBottom: 12 } },
+            totalTasks > 0 ? React.createElement("div", { style: { marginBottom: 12 } },
               React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 } },
-                React.createElement("span", { style: { fontSize: 10 + fz, fontWeight: 700, color: allDone ? "#4ade80" : "#667eea" } }, allDone ? "\u2705 Plan complete!" : totalDone + "/" + plan.total + " done"),
+                React.createElement("span", { style: { fontSize: 10 + fz, fontWeight: 700, color: allDone ? "#4ade80" : "#667eea" } }, allDone ? "\u2705 Plan complete!" : completedTasks + "/" + totalTasks + " tasks done"),
                 React.createElement("span", { style: { fontSize: 10, color: TC.dim } }, progressPct + "%")
               ),
               React.createElement("div", { style: { width: "100%", height: 6, background: isDark ? "rgba(255,255,255,.08)" : "rgba(0,0,0,.06)", borderRadius: 3, overflow: "hidden" } },
                 React.createElement("div", { style: { width: progressPct + "%", height: "100%", borderRadius: 3, background: allDone ? "#4ade80" : "linear-gradient(90deg, #667eea, #764ba2)", transition: "width 0.4s ease" } })
               )
             ) : null,
-            // Category breakdown with completion checkboxes
-            plan.total === 0
+            // Task list
+            totalTasks === 0
               ? React.createElement("div", { style: { fontSize: 12 + fz, color: "#4ade80", padding: "8px 0" } }, "\u2705 All caught up! Try New Questions or Boss Battle.")
-              : React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4 } },
-                plan.review.length > 0 ? React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, fontSize: 12 + fz, color: reviewDone >= plan.review.length ? "#4ade80" : TC.muted, opacity: reviewDone >= plan.review.length ? 0.7 : 1 } },
-                  React.createElement("span", { style: { width: 22, height: 22, borderRadius: 6, background: reviewDone >= plan.review.length ? "rgba(74,222,128,.15)" : "rgba(102,126,234,.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, flexShrink: 0 } }, reviewDone >= plan.review.length ? "\u2713" : "\u{1F504}"),
-                  React.createElement("span", { style: { flex: 1 } }, plan.review.length, " spaced review"),
-                  React.createElement("span", { style: { fontSize: 10, fontWeight: 600, color: reviewDone >= plan.review.length ? "#4ade80" : TC.dim } }, reviewDone + "/" + plan.review.length)
-                ) : null,
-                plan.weak.length > 0 ? React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, fontSize: 12 + fz, color: weakDone >= plan.weak.length ? "#4ade80" : TC.muted, opacity: weakDone >= plan.weak.length ? 0.7 : 1 } },
-                  React.createElement("span", { style: { width: 22, height: 22, borderRadius: 6, background: weakDone >= plan.weak.length ? "rgba(74,222,128,.15)" : "rgba(248,113,113,.12)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, flexShrink: 0 } }, weakDone >= plan.weak.length ? "\u2713" : "\u{1F3AF}"),
-                  React.createElement("span", { style: { flex: 1 } }, plan.weak.length, " weak-topic Qs", plan.weakTags && plan.weakTags.length > 0 ? " (" + plan.weakTags.slice(0,2).join(", ") + ")" : ""),
-                  React.createElement("span", { style: { fontSize: 10, fontWeight: 600, color: weakDone >= plan.weak.length ? "#4ade80" : TC.dim } }, weakDone + "/" + plan.weak.length)
-                ) : null,
-                plan.unseen.length > 0 ? React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, fontSize: 12 + fz, color: unseenDone >= plan.unseen.length ? "#4ade80" : TC.muted, opacity: unseenDone >= plan.unseen.length ? 0.7 : 1 } },
-                  React.createElement("span", { style: { width: 22, height: 22, borderRadius: 6, background: unseenDone >= plan.unseen.length ? "rgba(74,222,128,.15)" : "rgba(74,222,128,.12)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, flexShrink: 0 } }, unseenDone >= plan.unseen.length ? "\u2713" : "\u2728"),
-                  React.createElement("span", { style: { flex: 1 } }, plan.unseen.length, " new questions"),
-                  React.createElement("span", { style: { fontSize: 10, fontWeight: 600, color: unseenDone >= plan.unseen.length ? "#4ade80" : TC.dim } }, unseenDone + "/" + plan.unseen.length)
-                ) : null
+              : React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 5 } },
+                tasks.map(function(task, ti) {
+                  var ts = taskStates[ti];
+                  var isDone = ts.complete;
+                  // Build subtitle
+                  var subtitle = "";
+                  if (task.type === "questions") subtitle = ts.done + "/" + ts.total + " Qs";
+                  else if (task.type === "time") subtitle = ts.done + "/" + ts.total + " min";
+                  else subtitle = isDone ? "Done" : "Tap to start";
+
+                  // Click handler
+                  var onClick = null;
+                  if (task.type === "questions") {
+                    onClick = function() {
+                      var qPool = QS.filter(function(q) { return task.ids.indexOf(q.id) >= 0; });
+                      if (qPool.length === 0) return;
+                      var built = buildQSet(qPool, "MARATHON", data);
+                      setQs(built); setQI(0); setSel(null); setSR(false); setSScore(0); setSC(0); setST(0); setWrong([]);
+                      setGM("MARATHON"); setLives(3); setStreak(0); setConf(null); setAwaitConf(false);
+                      setMatchSel(null); setMatchDone([]); setMatchResults([]); setHintUsed(false);
+                      setEliminated([]); setRevealed(false); setPassOpen(true); setPaused(false);
+                      setQAnswered({}); setTL(null); setThinkDelay(0); setElaborativeDelay(0);
+                      setFreeRecallText(""); setFreeRecallRevealed(false);
+                      setAiExplain({loading:false, text:null, qId:null});
+                      qStartRef.current = Date.now();
+                      setScr("play");
+                    };
+                  } else if (task.type === "lesson") {
+                    onClick = function() {
+                      setModuleTag(task.moduleTag); setModuleStep(0); setModuleCheckSel(null); setModuleCheckDone(false); setScr("module");
+                    };
+                  } else if (task.type === "card") {
+                    onClick = function() {
+                      // Mark card as reviewed in snapshot
+                      dirtyRef.current = true;
+                      setData(function(d) {
+                        var newSnap = Object.assign({}, d.dailyPlanSnapshot || {});
+                        var cd = Object.assign({}, newSnap.cardsDone || {});
+                        cd[task.cardTag] = Date.now();
+                        newSnap.cardsDone = cd;
+                        return Object.assign({}, d, { dailyPlanSnapshot: newSnap });
+                      });
+                      setShowConceptCard(task.cardTag);
+                    };
+                  }
+
+                  return React.createElement("div", {
+                    key: ti,
+                    onClick: onClick,
+                    style: { display: "flex", alignItems: "center", gap: 8, fontSize: 12 + fz,
+                      color: isDone ? "#4ade80" : TC.muted,
+                      opacity: isDone ? 0.7 : 1,
+                      cursor: onClick ? "pointer" : "default",
+                      padding: "3px 0",
+                      textDecoration: isDone ? "line-through" : "none",
+                      textDecorationColor: "rgba(74,222,128,.4)"
+                    }
+                  },
+                    React.createElement("span", { style: { width: 22, height: 22, borderRadius: 6,
+                      background: isDone ? "rgba(74,222,128,.15)" : "rgba(" + (task.color === "#667eea" ? "102,126,234" : task.color === "#f87171" ? "248,113,113" : task.color === "#4ade80" ? "74,222,128" : task.color === "#a78bfa" ? "167,139,250" : task.color === "#38bdf8" ? "56,189,248" : "251,146,60") + ",.12)",
+                      display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, flexShrink: 0 } },
+                      isDone ? "\u2713" : task.icon
+                    ),
+                    React.createElement("span", { style: { flex: 1 } }, task.label),
+                    React.createElement("span", { style: { fontSize: 10, fontWeight: 600, color: isDone ? "#4ade80" : TC.dim } }, subtitle)
+                  );
+                })
               ),
           // AI STUDY COACH
           (function() {
@@ -3304,7 +3453,8 @@ function Game(_ref2) {
                 var weakStr = weakTags.map(function(t) { return t.tag + " (" + t.pct + "%)"; }).join(", ") || "not enough data yet";
                 var newRemaining = QS.filter(function(q) { return !data.questionStats[q.id]; }).length;
                 var userMsg = (daysLeft !== null ? "Days until MCAT: " + daysLeft + ". " : "No test date set. ") + "Study streak: " + computeStreak(data) + " days. Total Qs answered: " + (data.totalAnswered || 0) + ". Overall accuracy: " + (data.totalAnswered > 0 ? Math.round(data.totalCorrect / data.totalAnswered * 100) : 0) + "%. Today's study time: " + getStudyToday(data) + " min. Due for review: " + getDueCount(data) + ". Weakest tags: " + weakStr + ". Blind spots: " + getBlindSpotCount(data) + ". Unseen questions remaining: " + newRemaining + "/" + QS.length + ".";
-                var sysPrompt = "You are an MCAT study coach giving a brief, personalized daily recommendation. You know the student's data. Be warm but direct. Give exactly 3 sentences: (1) What to prioritize today and why. (2) One specific weak area to focus on with a concrete action. (3) A brief motivational nudge tied to their progress. Use **bold** for the most important action. Keep it under 75 words total.";
+                var planInfo = (plan && plan.tasks) ? " Today's plan has " + plan.tasks.length + " tasks: " + plan.tasks.map(function(t){return t.label;}).join(", ") + "." : "";
+                var sysPrompt = "You are an MCAT study coach giving a brief, personalized daily recommendation. You know the student's stats and their current daily plan." + planInfo + " Be warm but direct. Give exactly 3 sentences: (1) What to prioritize today and why, referencing their plan tasks. (2) One specific weak area to focus on with a concrete action (e.g. review a specific concept card or lesson). (3) A brief motivational nudge tied to their progress. Use **bold** for the most important action. Keep it under 75 words total.";
                 callTeachAI([{role:"user", content: userMsg}], sysPrompt).then(function(reply) {
                   setCoachLoading(false);
                   setCoachText(reply);
@@ -3317,7 +3467,16 @@ function Game(_ref2) {
               React.createElement("span", { style: { fontSize: 11 + fz, fontWeight: 700, color: "#764ba2" } }, "What should I study?")
             );
           })(),
-          plan.total > 0 ? /*#__PURE__*/React.createElement("button", { onClick: startSmartSession, style: { ...S.btn, fontSize: 13 + fz, marginTop: 10 } }, "\u{1F680} Start Smart Session (" + plan.total + " Qs)") : null
+          // Rebuild plan button
+          React.createElement("button", {
+            onClick: function() {
+              dirtyRef.current = true;
+              setData(function(d) { return Object.assign({}, d, { dailyPlanSnapshot: null }); });
+              setCoachText(null); setCoachDate("");
+            },
+            style: { display: "flex", alignItems: "center", justifyContent: "center", gap: 4, width: "100%", padding: "6px 8px", marginTop: 6, background: "transparent", border: "1px dashed " + TC.cbr, borderRadius: 6, fontSize: 10 + fz, color: TC.dim, cursor: "pointer" }
+          }, "\u{1F504} Rebuild today's plan"),
+          plan.totalQs > 0 ? /*#__PURE__*/React.createElement("button", { onClick: startSmartSession, style: { ...S.btn, fontSize: 13 + fz, marginTop: 10 } }, "\u{1F680} Start Smart Session (" + plan.totalQs + " Qs)") : null
           );
         })()
       );
