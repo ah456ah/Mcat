@@ -3983,7 +3983,7 @@ function Game(_ref2) {
 
         // ── Footer ──
         React.createElement("div", { style: { textAlign: "center", marginTop: 8, paddingBottom: 8 } },
-          React.createElement("span", { style: { fontSize: 9, color: TC.dim } }, QS.length + " Qs \u2022 " + ALL_TAGS.length + " tags \u2022 v20.0.2")
+          React.createElement("span", { style: { fontSize: 9, color: TC.dim } }, QS.length + " Qs \u2022 " + ALL_TAGS.length + " tags \u2022 v1.0.0")
         )
 
       ),
@@ -5933,7 +5933,7 @@ function Game(_ref2) {
           React.createElement("div", { style: { padding: "14px 16px", background: TC.card, border: "1px solid " + TC.cbr, borderRadius: 12 } },
             React.createElement("div", { style: { fontSize: 12 + fz, fontWeight: 700, marginBottom: 6, color: fg } }, "About"),
             React.createElement("div", { style: { fontSize: 11, color: TC.muted, lineHeight: 1.8 } },
-              "Version: v20.0.2", React.createElement("br"),
+              "Version: v1.0.0", React.createElement("br"),
               "Questions: " + QS.length, React.createElement("br"),
               React.createElement("a", { href: "https://github.com/ah456ah/Mcat", target: "_blank", style: { color: "#667eea" } }, "GitHub Repository")
             )
