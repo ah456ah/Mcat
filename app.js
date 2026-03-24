@@ -2083,6 +2083,48 @@ function Game(_ref2) {
     else if (scr === "tools_hub" || scr === "settings_screen" || scr === "formulas" || scr === "teach" || scr === "mistakes" || scr === "reference") setActiveTab("tools");
   }, [scr]);
 
+  // Browser back button support — push state on screen changes and handle popstate
+  const scrHistoryRef = useRef([]);
+  useEffect(function() {
+    var prev = scrHistoryRef.current;
+    // Only push if this is a forward navigation (not a popstate-triggered change)
+    if (!popstateNav.current) {
+      if (prev.length === 0 || prev[prev.length - 1] !== scr) {
+        history.pushState({ scr: scr }, "", "");
+        prev.push(scr);
+        if (prev.length > 50) prev.shift();
+      }
+    }
+    popstateNav.current = false;
+  }, [scr]);
+  const popstateNav = useRef(false);
+  useEffect(function() {
+    function onPop(e) {
+      var hist = scrHistoryRef.current;
+      if (hist.length > 1) {
+        hist.pop(); // remove current
+        var prevScr = hist[hist.length - 1] || "home";
+        popstateNav.current = true;
+        // If leaving play screen via back button, call fin logic
+        if (scr === "play" && prevScr !== "play") {
+          if (sTotal > 0) { fin(); return; }
+          else { setScr("home"); return; }
+        }
+        setScr(prevScr);
+      } else {
+        // At the beginning of history, go home
+        popstateNav.current = true;
+        if (scr === "play") {
+          if (sTotal > 0) { fin(); return; }
+          else { setScr("home"); return; }
+        }
+        setScr("home");
+      }
+    }
+    window.addEventListener("popstate", onPop);
+    return function() { window.removeEventListener("popstate", onPop); };
+  }, [scr, sTotal]);
+
   function startGame(mode, cats, tag) {
     var pool;
     if (MODES[mode].smart) {
@@ -2423,11 +2465,20 @@ function Game(_ref2) {
         var stm = addStudySeconds(d, elapsed);
         return Object.assign({}, d, { totalCorrect: d.totalCorrect + (correct ? 1 : 0), totalAnswered: d.totalAnswered + 1, questionStats: st, catTiming: ct, studyTime: stm });
       });
-      // Auto-advance to next unanswered question
+      // Auto-advance to next unanswered question (wrap around if needed)
       setSel(null); setEliminated([]); setRevealed(false); setPassOpen(true); setHintUsed(false); setConf(null); setAwaitConf(false);
+      setMatchSel(null); setMatchDone([]); setMatchResults([]); setOrderItems([]); setOrderSubmitted(false);
+      setLabelAssignments({}); setLabelSelecting(null); setLabelSubmitted(false);
+      setThinkDelay(0); setElaborativeDelay(0); setFreeRecallText(""); setFreeRecallRevealed(false);
       var nextIdx = -1;
+      // Look forward first
       for (var ni = qi + 1; ni < qs.length; ni++) { if (!qAnswered[ni]) { nextIdx = ni; break; } }
+      // Wrap around to beginning if nothing found forward
+      if (nextIdx < 0) {
+        for (var ni2 = 0; ni2 < qi; ni2++) { if (!qAnswered[ni2]) { nextIdx = ni2; break; } }
+      }
       if (nextIdx >= 0) { setQI(nextIdx); qStartRef.current = Date.now(); }
+      // If no unanswered questions remain, stay on current (user can submit section manually)
       return;
     }
     // Think delay: wrong answers get 4s delay before explanation shows
@@ -2757,7 +2808,7 @@ function Game(_ref2) {
     });
   }
   function goToQ(idx) {
-    if (idx < 0 || idx >= qs.length || idx === qi) return;
+    if (idx < 0 || idx >= qs.length) return;
     setQI(idx);
     setSel(gm === "SECTION_SIM" && simAnswers[idx] ? simAnswers[idx].sel : null);
     setSR(gm === "SECTION_SIM" ? false : !!qAnswered[idx]);
@@ -6510,6 +6561,12 @@ function Game(_ref2) {
               var borderColor = isCurrent ? "#667eea" : flagged ? "#f87171" : TC.cbr;
               return React.createElement("button", { key: idx, onClick: function() {
                 setQI(idx); setSel(simAnswers[idx] ? simAnswers[idx].sel : null); setSR(false); setSimGridOpen(false);
+                setEliminated([]); setHintUsed(false); setRevealed(false); setPassOpen(true); setAwaitConf(false);
+                setMatchSel(null); setMatchDone([]); setMatchResults([]);
+                setThinkDelay(0); setElaborativeDelay(0); setFreeRecallText(""); setFreeRecallRevealed(false);
+                setOrderItems([]); setOrderSubmitted(false); setLabelAssignments({}); setLabelSelecting(null); setLabelSubmitted(false);
+                setAiExplain({loading:false, text:null, qId:null}); setWhyWrongShown(false); setWhyWrongSel(null);
+                qStartRef.current = Date.now();
               }, style: { width: "100%", aspectRatio: "1", borderRadius: 6, background: bgColor, border: "1.5px solid " + borderColor, fontSize: 10, fontWeight: isCurrent ? 800 : 600, color: isCurrent ? "#fff" : fg, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" } },
                 idx + 1,
                 flagged ? React.createElement("span", { style: { position: "absolute", top: -2, right: -2, fontSize: 8 } }, "\u{1F6A9}") : null
@@ -7637,11 +7694,13 @@ function Game(_ref2) {
     ) : null,
     /*#__PURE__*/React.createElement("button", {
       onClick: nextQ,
-      style: {
-        ...S.btn,
-        fontSize: 13 + fz
-      }
-    }, answeredCount >= totalCount ? "See Results" : "Next"))));
+      disabled: thinkDelay > 0 || elaborativeDelay > 0,
+      style: Object.assign({}, S.btn, {
+        fontSize: 13 + fz,
+        opacity: (thinkDelay > 0 || elaborativeDelay > 0) ? 0.4 : 1,
+        cursor: (thinkDelay > 0 || elaborativeDelay > 0) ? "not-allowed" : "pointer"
+      })
+    }, (thinkDelay > 0 || elaborativeDelay > 0) ? "Wait " + (thinkDelay || elaborativeDelay) + "s..." : (answeredCount >= totalCount ? "See Results" : "Next")))));
   }
 
   // === RESULTS ===
