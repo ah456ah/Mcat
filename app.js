@@ -189,6 +189,12 @@ const MODES = {
     desc: "No timer, deep learning",
     time: null
   },
+  TODAYS_PLAN: {
+    name: "Today\u2019s Plan",
+    icon: "\u{1F9E0}",
+    desc: "Smart daily mix",
+    time: null
+  },
   BOSS_BATTLE: {
     name: "Boss Battle",
     icon: "\u{1F479}",
@@ -1256,9 +1262,9 @@ function buildDailyPlan(data) {
   plan.unseen = unseenQs.slice(0, 5);
   // 4. Build task list (questions + lessons + cards)
   var tasks = [];
-  if (plan.review.length > 0) tasks.push({ type: "questions", label: "Spaced review", icon: "\u{1F504}", ids: plan.review.map(function(q){return q.id;}), color: "#667eea" });
-  if (plan.weak.length > 0) tasks.push({ type: "questions", label: "Weak-topic Qs" + (weakTags.length > 0 ? " (" + weakTags.slice(0,2).join(", ") + ")" : ""), icon: "\u{1F3AF}", ids: plan.weak.map(function(q){return q.id;}), color: "#f87171" });
-  if (plan.unseen.length > 0) tasks.push({ type: "questions", label: "New questions", icon: "\u2728", ids: plan.unseen.map(function(q){return q.id;}), color: "#4ade80" });
+  if (plan.review.length > 0) tasks.push({ type: "questions", mode: "SPACED_REVIEW", label: "Spaced review", icon: "\u{1F504}", ids: plan.review.map(function(q){return q.id;}), color: "#667eea" });
+  if (plan.weak.length > 0) tasks.push({ type: "questions", mode: "WEAK_TOPICS", label: "Weak-topic Qs" + (weakTags.length > 0 ? " (" + weakTags.slice(0,2).join(", ") + ")" : ""), icon: "\u{1F3AF}", ids: plan.weak.map(function(q){return q.id;}), color: "#f87171" });
+  if (plan.unseen.length > 0) tasks.push({ type: "questions", mode: "NEW_QS", label: "New questions", icon: "\u2728", ids: plan.unseen.map(function(q){return q.id;}), color: "#4ade80" });
   // 5. Add lesson tasks for weak tags with unfinished modules
   if (typeof MODULES !== "undefined") {
     weakTags.forEach(function(tag) {
@@ -2835,6 +2841,11 @@ function Game(_ref2) {
     goToQ(pool[0]);
   }
   function fin() {
+    // If no questions were actually attempted, silently go home without logging anything
+    if (sTotal === 0) {
+      setScr("home");
+      return;
+    }
     dirtyRef.current = true;
     // Compute per-tag accuracy from this session for plan boosting
     var finSessionTags = {};
@@ -2954,10 +2965,10 @@ function Game(_ref2) {
     }
     var pool = (snap.pool && snap.pool.length > 0) ? snap.pool : QS.filter(function(q) { return isDue(data, q.id) || !data.questionStats[q.id]; }).slice(0, 25);
     if (pool.length === 0) { alert("No questions available!"); return; }
-    var built = buildQSet(pool, "MARATHON", data);
+    var built = buildQSet(pool, "TODAYS_PLAN", data);
     setQs(built);
     setQI(0); setSel(null); setSR(false); setSScore(0); setSC(0); setST(0); setWrong([]);
-    setGM("MARATHON"); setLives(3); setStreak(0); setConf(null); setAwaitConf(false);
+    setGM("TODAYS_PLAN"); setLives(3); setStreak(0); setConf(null); setAwaitConf(false);
     setMatchSel(null); setMatchDone([]); setMatchResults([]); setHintUsed(false);
     setEliminated([]); setRevealed(false); setPassOpen(true); setPaused(false);
     setQAnswered({}); setTL(null); setThinkDelay(0); setElaborativeDelay(0);
@@ -3451,7 +3462,7 @@ function Game(_ref2) {
     }
     return React.createElement("div", { style: { ...S.c, background: bg, color: fg } },
       React.createElement(SB, null),
-      React.createElement("div", { style: { maxWidth: 640, margin: "0 auto", padding: "16px 14px 120px", display: "flex", flexDirection: "column", minHeight: "100vh" } },
+      React.createElement("div", { style: { maxWidth: 760, margin: "0 auto", padding: "16px 14px 120px", display: "flex", flexDirection: "column", minHeight: "100vh" } },
         // Top bar
         React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 12 } },
           React.createElement("button", { style: { ...TS.bk, color: TC.muted, flexShrink: 0 }, onClick: function() { setScr("home"); } }, "< Back"),
@@ -3521,7 +3532,7 @@ function Game(_ref2) {
         ) : null,
         // Input bar (fixed at bottom)
         React.createElement("div", { style: { position: "fixed", bottom: 0, left: 0, right: 0, padding: "10px 14px", paddingBottom: "calc(10px + env(safe-area-inset-bottom))", background: bg, borderTop: "1px solid " + TC.cbr, zIndex: 100 } },
-          React.createElement("div", { style: { maxWidth: 640, margin: "0 auto", display: "flex", gap: 8 } },
+          React.createElement("div", { style: { maxWidth: 760, margin: "0 auto", display: "flex", gap: 8 } },
             React.createElement("input", {
               type: "text",
               value: teachInput,
@@ -3851,14 +3862,15 @@ function Game(_ref2) {
               var onClick = null;
               if (task.type === "questions") {
                 onClick = function() {
+                  var taskMode = task.mode || "MARATHON";
                   var qPool = QS.filter(function(q) { return task.ids.indexOf(q.id) >= 0; });
                   if (qPool.length === 0) return;
-                  var built = buildQSet(qPool, "MARATHON", data);
+                  var built = buildQSet(qPool, taskMode, data);
                   setQs(built); setQI(0); setSel(null); setSR(false); setSScore(0); setSC(0); setST(0); setWrong([]);
-                  setGM("MARATHON"); setLives(3); setStreak(0); setConf(null); setAwaitConf(false);
+                  setGM(taskMode); setLives(3); setStreak(0); setConf(null); setAwaitConf(false);
                   setMatchSel(null); setMatchDone([]); setMatchResults([]); setHintUsed(false);
                   setEliminated([]); setRevealed(false); setPassOpen(true); setPaused(false);
-                  setQAnswered({}); setTL(null); setThinkDelay(0); setElaborativeDelay(0);
+                  setQAnswered({}); setTL(MODES[taskMode] && MODES[taskMode].time || null); setThinkDelay(0); setElaborativeDelay(0);
                   setFreeRecallText(""); setFreeRecallRevealed(false);
                   setAiExplain({loading:false, text:null, qId:null});
                   setSessionRolling([]); setConsecutiveWrong(0); setRescueMode(false); setRescueTag(null); setDifficultyMode("normal");
@@ -3880,24 +3892,57 @@ function Game(_ref2) {
               );
             })
           ),
-          // AI Coach + Rebuild row
+          // Focus Tip + Refresh Plan row
           React.createElement("div", { style: { display: "flex", gap: 6, marginTop: 10 } },
             React.createElement("button", { onClick: function() {
-              if (!getApiKey()) { setCoachText("\u26A0\uFE0F Set your API key in Settings to use AI features."); setCoachDate(todayStr()); return; }
-              setCoachLoading(true);
+              // Compute a specific, actionable recommendation
               var tc2 = getTagCounts(data);
-              var weakTags2 = Object.keys(tc2).filter(function(t) { return tc2[t].seen >= 3; }).map(function(t) { return { tag: t, pct: Math.round(tc2[t].correct / tc2[t].seen * 100) }; }).sort(function(a,b) { return a.pct - b.pct; }).slice(0, 5);
-              var weakStr2 = weakTags2.map(function(t) { return t.tag + " (" + t.pct + "%)"; }).join(", ") || "not enough data yet";
-              var userMsg = (daysUntilTest !== null ? "Days until MCAT: " + daysUntilTest + ". " : "") + "Streak: " + dayStreak + "d. Answered: " + (data.totalAnswered || 0) + ". Accuracy: " + acc + "%. Today: " + stToday + "min. Due: " + dueC + ". Weak: " + weakStr2 + ".";
-              var sysP = "You are an MCAT study coach. Give 2-3 sentences of warm, direct advice. Use **bold** for key actions. Reference specific weak areas. Under 60 words.";
-              callTeachAI([{role:"user", content: userMsg}], sysP).then(function(reply) { setCoachLoading(false); setCoachText(reply); setCoachDate(todayStr()); });
-            }, style: { flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 4, padding: "7px 10px", background: "rgba(118,75,162,.06)", border: "1px solid rgba(118,75,162,.18)", borderRadius: 8, fontSize: 10 + fz, fontWeight: 600, color: "#a78bfa" } },
-              coachLoading ? "\u{1F916} Thinking..." : "\u{1F916} AI Coach"
+              var weakTags2 = Object.keys(tc2).filter(function(t) { return tc2[t].seen >= 3; }).map(function(t) { return { tag: t, pct: Math.round(tc2[t].correct / tc2[t].seen * 100), seen: tc2[t].seen }; }).sort(function(a,b) { return a.pct - b.pct; });
+              var incompleteTasks = tasks.filter(function(t, i) { return !taskStates[i].complete; });
+              // If API key, use AI for a richer recommendation
+              if (getApiKey()) {
+                setCoachLoading(true);
+                var weakStr2 = weakTags2.slice(0, 5).map(function(t) { return t.tag + " (" + t.pct + "%, " + t.seen + " Qs)"; }).join(", ") || "not enough data";
+                var doneStr = completedTasks + "/" + totalTasks + " tasks done today";
+                var remainStr = incompleteTasks.map(function(t) { return t.label; }).join(", ") || "all done";
+                var userMsg = "Student stats — " + (daysUntilTest !== null ? "Days until MCAT: " + daysUntilTest + ". " : "") + "Streak: " + dayStreak + "d. Total answered: " + (data.totalAnswered || 0) + ". Overall accuracy: " + acc + "%. Today's study time: " + stToday + "min. Due for review: " + dueC + " Qs. " + doneStr + ". Remaining: " + remainStr + ". Weakest tags: " + weakStr2 + ".";
+                var sysP = "You are an expert MCAT tutor. Based on this student's data, give ONE specific action they should take RIGHT NOW and explain WHY in 1-2 sentences. Be direct and concrete — name the specific topic, mode, or task. If all tasks are done, suggest what to study tomorrow. Under 50 words. Use **bold** for the key action.";
+                callTeachAI([{role:"user", content: userMsg}], sysP).then(function(reply) { setCoachLoading(false); setCoachText(reply); setCoachDate(todayStr()); });
+              } else {
+                // Local fallback: compute recommendation without AI
+                var tip = "";
+                if (incompleteTasks.length > 0) {
+                  var next = incompleteTasks[0];
+                  if (next.type === "questions" && next.mode === "SPACED_REVIEW") {
+                    tip = "\u{1F3AF} **Start your spaced review** \u2014 you have " + (taskStates[tasks.indexOf(next)].total - taskStates[tasks.indexOf(next)].done) + " questions due. Reviewing before they fade is the highest-impact thing you can do right now.";
+                  } else if (next.type === "questions" && next.mode === "WEAK_TOPICS") {
+                    tip = "\u{1F3AF} **Hit your weak-topic questions** \u2014 " + (weakTags2.length > 0 ? "your " + weakTags2[0].tag + " is at " + weakTags2[0].pct + "%. Targeted practice here has the biggest score impact." : "focused practice on weak areas gives the best score boost.");
+                  } else if (next.type === "questions") {
+                    tip = "\u{1F3AF} **Try the new questions** \u2014 expanding to unseen material prevents blind spots on test day.";
+                  } else if (next.type === "lesson") {
+                    tip = "\u{1F4DA} **Review the " + (next.moduleTag || "next") + " lesson** \u2014 building the concept foundation before more questions will improve retention.";
+                  } else {
+                    tip = "\u{1F3AF} **Complete your next task: " + next.label + "** \u2014 staying consistent with your daily plan is the strongest predictor of score improvement.";
+                  }
+                } else if (weakTags2.length > 0 && weakTags2[0].pct < 60) {
+                  tip = "\u2705 Plan complete! For bonus points, drill **" + weakTags2[0].tag + "** (" + weakTags2[0].pct + "%) \u2014 it\u2019s your biggest opportunity for score gains.";
+                } else if (dueC > 0) {
+                  tip = "\u2705 Plan complete! You still have **" + dueC + " spaced review questions** due \u2014 knocking these out will lock in what you\u2019ve learned.";
+                } else {
+                  tip = "\u2705 Incredible work \u2014 plan complete, reviews done, and no critical weak spots. **Rest and let your brain consolidate.** Come back tomorrow.";
+                }
+                setCoachText(tip); setCoachDate(todayStr());
+              }
+            }, style: { flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 4, padding: "7px 10px", background: "rgba(102,126,234,.06)", border: "1px solid rgba(102,126,234,.18)", borderRadius: 8, fontSize: 10 + fz, fontWeight: 600, color: "#667eea" } },
+              coachLoading ? "\u{1F3AF} Thinking..." : "\u{1F3AF} What to Focus On"
             ),
-            React.createElement("button", { onClick: function() { dirtyRef.current = true; setData(function(d) { return Object.assign({}, d, { dailyPlanSnapshot: null }); }); setCoachText(null); setCoachDate(""); }, style: { padding: "7px 10px", background: "transparent", border: "1px dashed " + TC.cbr, borderRadius: 8, fontSize: 10 + fz, color: TC.dim } }, "\u{1F504}")
+            React.createElement("button", { onClick: function() {
+              if (!confirm("Regenerate today\u2019s plan? This replaces your current tasks with a fresh set based on your latest progress.")) return;
+              dirtyRef.current = true; setData(function(d) { return Object.assign({}, d, { dailyPlanSnapshot: null }); }); setCoachText(null); setCoachDate("");
+            }, style: { display: "flex", alignItems: "center", gap: 4, padding: "7px 10px", background: "transparent", border: "1px dashed " + TC.cbr, borderRadius: 8, fontSize: 10 + fz, color: TC.dim } }, "\u{1F504} Refresh Plan")
           ),
-          // Coach response (if cached)
-          coachText && coachDate === todayStr() ? React.createElement("div", { style: { padding: "10px 12px", background: "rgba(118,75,162,.04)", borderRadius: 8, marginTop: 8, fontSize: 11 + fz, color: TC.muted, lineHeight: 1.6 } },
+          // Focus tip response (if cached for today)
+          coachText && coachDate === todayStr() ? React.createElement("div", { style: { padding: "10px 12px", background: "rgba(102,126,234,.04)", borderRadius: 8, marginTop: 8, fontSize: 11 + fz, color: TC.muted, lineHeight: 1.6 } },
             React.createElement("div", { style: { whiteSpace: "pre-wrap" } }, renderMd(coachText))
           ) : null
         ) : null,
@@ -3938,7 +3983,7 @@ function Game(_ref2) {
 
         // ── Footer ──
         React.createElement("div", { style: { textAlign: "center", marginTop: 8, paddingBottom: 8 } },
-          React.createElement("span", { style: { fontSize: 9, color: TC.dim } }, QS.length + " Qs \u2022 " + ALL_TAGS.length + " tags \u2022 v20.0.1")
+          React.createElement("span", { style: { fontSize: 9, color: TC.dim } }, QS.length + " Qs \u2022 " + ALL_TAGS.length + " tags \u2022 v20.0.2")
         )
 
       ),
@@ -5888,7 +5933,7 @@ function Game(_ref2) {
           React.createElement("div", { style: { padding: "14px 16px", background: TC.card, border: "1px solid " + TC.cbr, borderRadius: 12 } },
             React.createElement("div", { style: { fontSize: 12 + fz, fontWeight: 700, marginBottom: 6, color: fg } }, "About"),
             React.createElement("div", { style: { fontSize: 11, color: TC.muted, lineHeight: 1.8 } },
-              "Version: v20.0.1", React.createElement("br"),
+              "Version: v20.0.2", React.createElement("br"),
               "Questions: " + QS.length, React.createElement("br"),
               React.createElement("a", { href: "https://github.com/ah456ah/Mcat", target: "_blank", style: { color: "#667eea" } }, "GitHub Repository")
             )
@@ -5972,7 +6017,7 @@ function Game(_ref2) {
     var currentCard = fcCards[fcIndex];
     if (!currentCard) { setScr("flashcard_done"); }
     return React.createElement("div", { style: { ...S.c, background: bg, color: fg, paddingBottom: 40 }, className: "screen-fade" },
-      React.createElement("div", { style: { maxWidth: 640, margin: "0 auto", padding: "16px 16px 40px", display: "flex", flexDirection: "column", alignItems: "center", minHeight: "100vh" } },
+      React.createElement("div", { style: { maxWidth: 760, margin: "0 auto", padding: "16px 16px 40px", display: "flex", flexDirection: "column", alignItems: "center", minHeight: "100vh" } },
         // Top bar
         React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", marginBottom: 16 } },
           React.createElement("button", { onClick: function() { setScr("study_hub"); setStudySubTab("flashcards"); }, style: { fontSize: 11, color: TC.muted } }, "\u2190 Back"),
@@ -6027,7 +6072,7 @@ function Game(_ref2) {
   // === V18: FLASHCARD DONE SCREEN ===
   if (scr === "flashcard_done") {
     return React.createElement("div", { style: { ...S.c, background: bg, color: fg }, className: "screen-fade" },
-      React.createElement("div", { style: { maxWidth: 640, margin: "0 auto", padding: "40px 16px", textAlign: "center" } },
+      React.createElement("div", { style: { maxWidth: 760, margin: "0 auto", padding: "40px 16px", textAlign: "center" } },
         React.createElement("div", { style: { fontSize: 48, marginBottom: 12 } }, "\u{1F389}"),
         React.createElement("h2", { style: { fontSize: 20 + fz, fontWeight: 800, color: fg, marginBottom: 16 } }, "Session Complete!"),
         React.createElement("div", { style: { display: "flex", justifyContent: "center", gap: 20, marginBottom: 24 } },
@@ -6450,7 +6495,7 @@ function Game(_ref2) {
     // V19: SIM GRID OVERLAY
     if (simGridOpen && gm === "SECTION_SIM") {
       return React.createElement("div", { style: { ...S.c, background: bg, color: fg } },
-        React.createElement("div", { style: { maxWidth: 640, margin: "0 auto", padding: "16px" } },
+        React.createElement("div", { style: { maxWidth: 760, margin: "0 auto", padding: "16px" } },
           React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 } },
             React.createElement("span", { style: { fontSize: 14 + fz, fontWeight: 800, color: fg } }, "Question Navigator"),
             React.createElement("button", { onClick: function() { setSimGridOpen(false); }, style: { fontSize: 14, color: TC.muted, padding: "4px 8px" } }, "\u2715")
@@ -6487,7 +6532,7 @@ function Game(_ref2) {
       } : {})
     }, /*#__PURE__*/React.createElement(SB, null), /*#__PURE__*/React.createElement("div", {
       style: {
-        maxWidth: 640,
+        maxWidth: 760,
         margin: "0 auto",
         padding: "10px 14px 2px"
       }
@@ -6644,7 +6689,7 @@ function Game(_ref2) {
         textAlign: "center",
         fontSize: 14 + fz,
         fontWeight: 800,
-        maxWidth: 640,
+        maxWidth: 760,
         margin: "2px auto",
         color: simTimer < 300 ? "#ff4444" : simTimer < 600 ? "#fbbf24" : "#88ff88"
       }
@@ -6680,7 +6725,7 @@ function Game(_ref2) {
         textAlign: "center",
         fontSize: 16 + fz,
         fontWeight: 800,
-        maxWidth: 640,
+        maxWidth: 760,
         margin: "2px auto",
         color: low ? "#ff4444" : "#88ff88",
         animation: low ? "pu .8s infinite" : "none"
@@ -6703,7 +6748,7 @@ function Game(_ref2) {
       }, "\u2764\uFE0F");
     })), /*#__PURE__*/React.createElement("div", {
       style: {
-        maxWidth: 640,
+        maxWidth: 760,
         margin: "0 auto",
         padding: "3px 14px 6px",
         display: "flex",
@@ -6754,7 +6799,7 @@ function Game(_ref2) {
       }, t);
     })), passageData && /*#__PURE__*/React.createElement("div", {
       style: {
-        maxWidth: 640,
+        maxWidth: 760,
         margin: "0 auto",
         padding: "0 14px 8px"
       }
@@ -6787,24 +6832,88 @@ function Game(_ref2) {
         fontSize: 12 + fz,
         lineHeight: 1.7,
         color: TC.muted,
-        maxHeight: 300,
+        maxHeight: 400,
         overflowY: "auto",
         WebkitOverflowScrolling: "touch",
         position: "relative"
       }
     }, /*#__PURE__*/React.createElement("div", { style: { fontSize: 8, color: TC.dim, marginBottom: 6, textAlign: "right" } }, "\u{1F58D}\uFE0F Tap text to highlight"),
-    passageData.text.split(/(?<=[.!?])\s+/).map(function (sent, si) {
-      var hKey = (q.pass || "") + "-" + si;
-      var isHL = !!(highlights[hKey]);
-      return /*#__PURE__*/React.createElement("span", {
-        key: si,
-        onClick: function () { setHighlights(function (prev) { var n = Object.assign({}, prev); if (n[hKey]) { delete n[hKey]; } else { n[hKey] = true; } return n; }); },
-        style: { cursor: "pointer", background: isHL ? "rgba(250,204,21,.25)" : "transparent", borderRadius: isHL ? 3 : 0, padding: isHL ? "1px 0" : 0, transition: "background .15s" }
-      }, sent, " ");
-    }))),
+    (function() {
+      var rawText = passageData.text;
+      var paragraphs = rawText.split(/\n\n/);
+      var globalSI = 0;
+      return paragraphs.map(function(para, pi) {
+        // Check if this paragraph is a table
+        var tableMatch = para.match(/^\[TABLE\](.*?)\[\/TABLE\]$/);
+        if (tableMatch) {
+          var parts = tableMatch[1].split("[ROW]");
+          var headers = parts[0].split("|");
+          var rows = parts.slice(1).map(function(r) { return r.split("|"); });
+          globalSI++;
+          return React.createElement("table", {
+            key: "tbl-" + pi,
+            style: {
+              width: "100%", borderCollapse: "collapse", margin: "10px 0",
+              fontSize: 11 + fz, lineHeight: 1.4
+            }
+          },
+            React.createElement("thead", null,
+              React.createElement("tr", null,
+                headers.map(function(h, hi) {
+                  return React.createElement("th", {
+                    key: hi,
+                    style: {
+                      padding: "6px 8px", textAlign: "left",
+                      borderBottom: "2px solid rgba(102,126,234,.35)",
+                      color: "#667eea", fontWeight: 700, fontSize: 10 + fz,
+                      whiteSpace: "nowrap"
+                    }
+                  }, h);
+                })
+              )
+            ),
+            React.createElement("tbody", null,
+              rows.map(function(row, ri) {
+                return React.createElement("tr", {
+                  key: ri,
+                  style: { background: ri % 2 === 0 ? "transparent" : "rgba(102,126,234,.04)" }
+                },
+                  row.map(function(cell, ci) {
+                    return React.createElement("td", {
+                      key: ci,
+                      style: {
+                        padding: "5px 8px",
+                        borderBottom: "1px solid " + (isDark ? "rgba(255,255,255,.06)" : "rgba(0,0,0,.06)"),
+                        color: TC.muted, fontSize: 11 + fz
+                      }
+                    }, cell);
+                  })
+                );
+              })
+            )
+          );
+        }
+        // Regular paragraph: split into sentences for highlighting
+        var sents = para.split(/(?<=[.!?])\s+/);
+        var sentEls = sents.map(function(sent, si) {
+          var idx = globalSI++;
+          var hKey = (q.pass || "") + "-" + idx;
+          var isHL = !!(highlights[hKey]);
+          return React.createElement("span", {
+            key: idx,
+            onClick: function() { setHighlights(function(prev) { var n = Object.assign({}, prev); if (n[hKey]) delete n[hKey]; else n[hKey] = true; return n; }); },
+            style: { cursor: "pointer", background: isHL ? "rgba(250,204,21,.25)" : "transparent", borderRadius: isHL ? 3 : 0, padding: isHL ? "1px 0" : 0, transition: "background .15s" }
+          }, sent, " ");
+        });
+        return React.createElement("p", {
+          key: "p-" + pi,
+          style: { margin: paragraphs.length > 1 ? "0 0 10px" : 0, lineHeight: 1.7 }
+        }, sentEls);
+      });
+    })())),
     passageData&&!passOpen&&!sr?React.createElement("div",{style:{position:"fixed",bottom:70,right:14,zIndex:90}},React.createElement("button",{onClick:function(){setPassOpen(true)},style:{padding:"8px 14px",borderRadius:20,background:"rgba(102,126,234,.9)",color:"#fff",fontSize:11+fz,fontWeight:700,boxShadow:"0 2px 12px rgba(102,126,234,.4)",border:"none"}},"\u{1F4C4} Show Passage")):null, /*#__PURE__*/React.createElement("div", {
       style: {
-        maxWidth: 640,
+        maxWidth: 760,
         margin: "0 auto",
         padding: "0 14px 10px"
       }
@@ -6841,7 +6950,7 @@ function Game(_ref2) {
       }, part);
     }))), isMatch && !sr && /*#__PURE__*/React.createElement("div", {
       style: {
-        maxWidth: 640,
+        maxWidth: 760,
         margin: "0 auto",
         padding: "0 14px"
       }
@@ -6907,7 +7016,7 @@ function Game(_ref2) {
       }, r);
     })))), isMatch && sr && /*#__PURE__*/React.createElement("div", {
       style: {
-        maxWidth: 640,
+        maxWidth: 760,
         margin: "12px auto 0",
         padding: "0 14px 24px",
         animation: "sU .3s"
@@ -6980,7 +7089,7 @@ function Game(_ref2) {
     }, answeredCount >= totalCount ? "See Results" : "Next")),
     // === ORDER QUESTION RENDERING ===
     isOrder && /*#__PURE__*/React.createElement("div", {
-      style: { maxWidth: 640, margin: "0 auto", padding: "0 14px 24px" }
+      style: { maxWidth: 760, margin: "0 auto", padding: "0 14px 24px" }
     },
       React.createElement("div", { style: { fontSize: 11 + fz, color: TC.dim, marginBottom: 8, textAlign: "center" } }, "\u2195\uFE0F Use arrows to reorder"),
       React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4 } },
@@ -7006,7 +7115,7 @@ function Game(_ref2) {
     ),
     // === LABEL QUESTION RENDERING ===
     isLabel && /*#__PURE__*/React.createElement("div", {
-      style: { maxWidth: 640, margin: "0 auto", padding: "0 14px 24px" }
+      style: { maxWidth: 760, margin: "0 auto", padding: "0 14px 24px" }
     },
       // SVG Diagram
       q.diagram ? React.createElement("div", { style: { marginBottom: 12, background: TC.card, borderRadius: 12, padding: 12, border: "1px solid " + TC.cbr } },
@@ -7072,7 +7181,7 @@ function Game(_ref2) {
     ),
     !isMatch && !isOrder && !isLabel && (data.thinkFirst && !revealed && !sr && sel === null && !freeRecallRevealed ? /*#__PURE__*/React.createElement("div", {
       style: {
-        maxWidth: 640,
+        maxWidth: 760,
         margin: "0 auto",
         padding: "0 14px",
         textAlign: "center"
@@ -7117,7 +7226,7 @@ function Game(_ref2) {
       }
     }, "\u{1F914} Show Answer Choices")) : /*#__PURE__*/React.createElement("div", {
       style: {
-        maxWidth: 640,
+        maxWidth: 760,
         margin: "0 auto",
         padding: "0 14px",
         display: "flex",
@@ -7219,7 +7328,7 @@ function Game(_ref2) {
       }, opt)));
     }))), !isMatch && !isOrder && !isLabel && !sr && !awaitConf && sel === null && !hintUsed && (!data.thinkFirst || revealed || freeRecallRevealed) && /*#__PURE__*/React.createElement("div", {
       style: {
-        maxWidth: 640,
+        maxWidth: 760,
         margin: "8px auto 0",
         padding: "0 14px"
       }
@@ -7237,7 +7346,7 @@ function Game(_ref2) {
       }
     }, "\u{1F4A1}", " 50/50")), !isMatch && !isOrder && !isLabel && sel !== null && !sr && !awaitConf && /*#__PURE__*/React.createElement("div", {
       style: {
-        maxWidth: 640,
+        maxWidth: 760,
         margin: "8px auto 0",
         padding: "0 14px",
         animation: "sU .2s"
@@ -7292,7 +7401,7 @@ function Game(_ref2) {
       }
     }, "\u{1F60E}", " Confident"))), !isMatch && !isOrder && !isLabel && sr && /*#__PURE__*/React.createElement("div", {
       style: {
-        maxWidth: 640,
+        maxWidth: 760,
         margin: "10px auto 0",
         padding: "0 14px 24px",
         animation: "sU .3s"
@@ -7729,9 +7838,9 @@ function Game(_ref2) {
             onClick: function() {
               var weakPool = QS.filter(function(q) { return weakTags.some(function(t) { return (q.tags||[]).indexOf(t)>=0; }); });
               if (weakPool.length === 0) return;
-              var built = buildQSet(weakPool.slice(0, 15), "MARATHON", data);
+              var built = buildQSet(weakPool.slice(0, 15), "WEAK_TOPICS", data);
               setQs(built); setQI(0); setSel(null); setSR(false); setSScore(0); setSC(0); setST(0); setWrong([]);
-              setGM("MARATHON"); setLives(3); setStreak(0); setConf(null); setAwaitConf(false);
+              setGM("WEAK_TOPICS"); setLives(3); setStreak(0); setConf(null); setAwaitConf(false);
               setMatchSel(null); setMatchDone([]); setMatchResults([]); setHintUsed(false);
               setEliminated([]); setRevealed(false); setPassOpen(true); setPaused(false);
               setQAnswered({}); setTL(null); setThinkDelay(0); setElaborativeDelay(0);
@@ -8295,7 +8404,7 @@ const S = {
     overflowX: "hidden"
   },
   i: {
-    maxWidth: 640,
+    maxWidth: 760,
     margin: "0 auto",
     padding: "24px 16px 40px"
   },
