@@ -3619,835 +3619,334 @@ function Game(_ref2) {
 
   // === HOME ===
   if (scr === "home") {
-    return /*#__PURE__*/React.createElement("div", {
-      style: {
-        ...S.c,
-        background: bg,
-        color: fg,
-        paddingBottom: 80
-      },
-      className: "screen-fade"
-    }, /*#__PURE__*/React.createElement(SB, null), /*#__PURE__*/React.createElement("div", {
-      style: S.i
-    }, /*#__PURE__*/React.createElement("div", { style: { marginBottom: 16 } },
-      React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 2 } },
-        React.createElement("div", { style: { fontSize: 16 + fz, fontWeight: 800, color: fg } }, getGreeting(data.userName)),
-        React.createElement("div", { title: _aiStatus === "ok" ? "AI connected" : _aiStatus === "no_key" ? "No API key" : _aiStatus === "error" ? "AI error" : "AI unknown", style: { width: 8, height: 8, borderRadius: 4, background: _aiStatus === "ok" ? "#4ade80" : !getApiKey() ? "#f87171" : _aiStatus === "error" ? "#fbbf24" : TC.dim, flexShrink: 0, boxShadow: _aiStatus === "ok" ? "0 0 6px rgba(74,222,128,.4)" : "none" } })
-      ),
-      React.createElement("div", { style: { fontSize: 10, color: TC.dim } }, new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })),
-      dayStreak >= 1 ? React.createElement("span", { style: { fontSize: 10, color: "#ff9933", fontWeight: 700, marginLeft: 0, display: "block", marginTop: 4 } }, "\u{1F525} " + dayStreak + "-day streak" + (dayStreak >= 3 ? " (+10% XP)" : "")) : null
-    ),
-    // V20: Daily Challenge
-    (function() {
-      var dc = getDailyChallenge(data);
-      if (!dc) return null;
-      var q = QS.find(function(x) { return x.id === dc.id; });
-      if (!q) return null;
-      if (dc.done) return React.createElement("div", { style: { padding: "10px 14px", marginBottom: 10, background: "rgba(74,222,128,.06)", border: "1px solid rgba(74,222,128,.2)", borderRadius: 10, display: "flex", alignItems: "center", gap: 8 } },
-        React.createElement("span", { style: { fontSize: 18 } }, "\u2705"),
-        React.createElement("span", { style: { fontSize: 11 + fz, color: "#4ade80", fontWeight: 600 } }, "Daily Challenge Complete! +50 XP")
-      );
-      return React.createElement("button", { onClick: function() {
-        dirtyRef.current = true;
-        setData(function(d) { return Object.assign({}, d, { dailyChallengeDate: todayStr(), dailyChallengeId: dc.id }); });
-        startGame("MARATHON", [], (q.tags||[])[0]);
-      }, style: { display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "12px 14px", marginBottom: 10, background: "linear-gradient(135deg, rgba(255,200,50,.08), rgba(255,150,50,.06))", border: "1.5px solid rgba(255,200,50,.25)", borderRadius: 12, textAlign: "left" } },
-        React.createElement("span", { style: { fontSize: 24 } }, "\u{1F3C6}"),
-        React.createElement("div", { style: { flex: 1 } },
-          React.createElement("div", { style: { fontSize: 12 + fz, fontWeight: 700, color: "#fbbf24" } }, "Daily Challenge"),
-          React.createElement("div", { style: { fontSize: 10, color: TC.muted } }, q.q.substring(0, 60) + "..."),
-          React.createElement("div", { style: { fontSize: 9, color: "#fbbf24", fontWeight: 600, marginTop: 2 } }, "+50 XP bonus")
-        )
-      );
-    })(),
-    // Quick-start buttons row
-    React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 14, overflowX: "auto" } },
-      React.createElement("button", { onClick: function() { startGame("QUICK_5", []); }, style: { flex: "0 0 auto", padding: "10px 14px", background: "linear-gradient(135deg,rgba(102,126,234,.1),rgba(118,75,162,.1))", border: "1px solid rgba(102,126,234,.2)", borderRadius: 10, textAlign: "center" } },
-        React.createElement("div", { style: { fontSize: 16 } }, "\u26A1"),
-        React.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: "#667eea", marginTop: 2 } }, "Quick 5")
-      ),
-      dueC > 0 ? React.createElement("button", { onClick: function() { startGame("SPACED_REVIEW", []); }, style: { flex: "0 0 auto", padding: "10px 14px", background: "rgba(74,222,128,.06)", border: "1px solid rgba(74,222,128,.2)", borderRadius: 10, textAlign: "center" } },
-        React.createElement("div", { style: { fontSize: 16 } }, "\u{1F9E0}"),
-        React.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: "#4ade80", marginTop: 2 } }, dueC + " Due")
-      ) : null,
-      React.createElement("button", { onClick: function() { var modes = Object.keys(MODES); var rk = modes[Math.floor(Math.random()*modes.length)]; if (MODES[rk].smart) startGame(rk, []); else startGame(rk, Object.keys(CATS)); }, style: { flex: "0 0 auto", padding: "10px 14px", background: "rgba(251,146,60,.06)", border: "1px solid rgba(251,146,60,.2)", borderRadius: 10, textAlign: "center" } },
-        React.createElement("div", { style: { fontSize: 16 } }, "\u{1F3B2}"),
-        React.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: "#fb923c", marginTop: 2 } }, "Surprise")
-      )
-    ),
-    // V19: Performance Insights
-    (function() {
-      var insights = generateInsights(data);
-      if (insights.length === 0) return null;
-      return React.createElement("div", { style: { marginBottom: 14 } },
-        insights.map(function(ins, ii) {
-          return React.createElement("div", { key: ii, style: { display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", marginBottom: 4, background: ins.type === "positive" ? "rgba(74,222,128,.05)" : ins.type === "warning" ? "rgba(248,113,113,.05)" : "rgba(102,126,234,.05)", border: "1px solid " + (ins.type === "positive" ? "rgba(74,222,128,.15)" : ins.type === "warning" ? "rgba(248,113,113,.15)" : "rgba(102,126,234,.15)"), borderRadius: 8 } },
-            React.createElement("span", { style: { fontSize: 14, flexShrink: 0 } }, ins.icon),
-            React.createElement("span", { style: { fontSize: 10 + fz, color: TC.muted, flex: 1, lineHeight: 1.4 } }, ins.text)
-          );
-        })
-      );
-    })(),
-    // Weekly progress ring
-    (function() {
-      var weeklyQs = getWeeklyQsAnswered(data);
-      var goal = data.weeklyGoal || 100;
-      var pct = Math.min(Math.round(weeklyQs / goal * 100), 100);
-      return React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 14, padding: "12px 14px", background: TC.card, border: "1px solid " + TC.cbr, borderRadius: 12, marginBottom: 14 } },
-        React.createElement(ProgressRing, { pct: pct, size: 56, stroke: 5, color: pct >= 100 ? "#4ade80" : "#667eea", trackColor: isDark ? "rgba(255,255,255,.06)" : "rgba(0,0,0,.06)" },
-          React.createElement("span", { style: { fontSize: 14, fontWeight: 800, color: pct >= 100 ? "#4ade80" : "#667eea" } }, pct + "%")
-        ),
-        React.createElement("div", { style: { flex: 1 } },
-          React.createElement("div", { style: { fontSize: 12 + fz, fontWeight: 700, color: fg } }, "Weekly Goal"),
-          React.createElement("div", { style: { fontSize: 10, color: TC.muted } }, weeklyQs + " / " + goal + " questions this week"),
-          React.createElement("div", { style: { height: 4, background: isDark ? "rgba(255,255,255,.06)" : "rgba(0,0,0,.06)", borderRadius: 2, marginTop: 4, overflow: "hidden" } },
-            React.createElement("div", { style: { height: "100%", width: pct + "%", background: pct >= 100 ? "#4ade80" : "linear-gradient(90deg,#667eea,#764ba2)", borderRadius: 2, transition: "width .3s" } })
+    // ── COMPUTED VALUES ──
+    var stToday = getStudyToday(data);
+    var weeklyQs = getWeeklyQsAnswered(data);
+    var goal = data.weeklyGoal || 100;
+    var weeklyPct = Math.min(Math.round(weeklyQs / goal * 100), 100);
+    var totalQsToday = getTotalQsDoneToday(data);
+    var dc = getDailyChallenge(data);
+    var dcQ = dc ? QS.find(function(x) { return x.id === dc.id; }) : null;
+    var readiness = calcReadinessScore(data);
+    var testDate = data.testDate;
+    var daysUntilTest = testDate ? Math.max(0, Math.ceil((new Date(testDate).getTime() - Date.now()) / 86400000)) : null;
+    var snap = getDailySnapshot(data, false);
+    if (!data.dailyPlanSnapshot || data.dailyPlanSnapshot.date !== todayStr()) {
+      setTimeout(function() { dirtyRef.current = true; setData(function(d) { return Object.assign({}, d, { dailyPlanSnapshot: snap }); }); }, 0);
+    }
+    var plan = snap;
+    var tasks = plan.tasks || [];
+    var taskStates = tasks.map(function(task) {
+      if (task.type === "questions") { var done = countQsDoneToday(data, task.ids); return { done: done, total: task.ids.length, complete: done >= task.ids.length }; }
+      else if (task.type === "lesson") { var mp = data.moduleProgress && data.moduleProgress[task.moduleTag]; return { done: mp && mp.completed ? 1 : 0, total: 1, complete: !!(mp && mp.completed) }; }
+      else if (task.type === "card") { var cd = (data.dailyPlanSnapshot && data.dailyPlanSnapshot.cardsDone) || {}; return { done: cd[task.cardTag] ? 1 : 0, total: 1, complete: !!cd[task.cardTag] }; }
+      else if (task.type === "time") { return { done: Math.min(stToday, task.targetMin || 30), total: task.targetMin || 30, complete: stToday >= (task.targetMin || 30) }; }
+      return { done: 0, total: 1, complete: false };
+    });
+    var completedTasks = taskStates.filter(function(s) { return s.complete; }).length;
+    var totalTasks = tasks.length;
+    var planPct = totalTasks > 0 ? Math.min(100, Math.round(completedTasks / totalTasks * 100)) : 100;
+    var allDone = totalTasks > 0 && completedTasks >= totalTasks;
+    var insights = generateInsights(data);
+
+    // ── STYLE HELPERS ──
+    var cardStyle = { padding: "14px 16px", background: TC.card, border: "1px solid " + TC.cbr, borderRadius: 14, marginBottom: 12 };
+    var glowCard = function(color, rgbStr) { return { padding: "14px 16px", background: "rgba(" + rgbStr + ",.04)", border: "1px solid rgba(" + rgbStr + ",.18)", borderRadius: 14, marginBottom: 12 }; };
+    var secColors = { "Bio/Biochem": "#2a9d8f", "Chem/Phys": "#457b9d", "Psych/Soc": "#e76f51", "CARS": "#9b5de5" };
+    var secShort = { "Bio/Biochem": "B/B", "Chem/Phys": "C/P", "Psych/Soc": "P/S", "CARS": "CARS" };
+
+    return React.createElement("div", { style: { ...S.c, background: bg, color: fg, paddingBottom: 80 }, className: "screen-fade" },
+      React.createElement(SB, null),
+      React.createElement("div", { style: S.i },
+
+        // ════════════════════════════════════════════
+        // §1  HEADER — greeting, date, streak, AI dot
+        // ════════════════════════════════════════════
+        React.createElement("div", { style: { marginBottom: 20, paddingTop: 4 } },
+          React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 3 } },
+            React.createElement("div", { style: { fontSize: 18 + fz, fontWeight: 800, color: fg, letterSpacing: -0.3 } }, getGreeting(data.userName)),
+            React.createElement("div", { title: _aiStatus === "ok" ? "AI connected" : _aiStatus === "no_key" ? "No API key" : "AI status", style: { width: 7, height: 7, borderRadius: 4, background: _aiStatus === "ok" ? "#4ade80" : !getApiKey() ? "#f87171" : "#fbbf24", flexShrink: 0, boxShadow: _aiStatus === "ok" ? "0 0 6px rgba(74,222,128,.4)" : "none" } })
+          ),
+          React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, fontSize: 11, color: TC.dim } },
+            React.createElement("span", null, new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })),
+            dayStreak >= 1 ? React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 3, color: "#ff9933", fontWeight: 700, fontSize: 11 } }, "\u{1F525} " + dayStreak + "d") : null,
+            daysUntilTest !== null ? React.createElement("span", { style: { color: daysUntilTest <= 30 ? "#e85d2f" : "#667eea", fontWeight: 600, fontSize: 11 } }, "\u{1F4C5} " + daysUntilTest + "d left") : null
           )
-        )
-      );
-    })(),
-    /*#__PURE__*/React.createElement("div", {
-      style: {
-        textAlign: "center",
-        marginBottom: 20
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 42
-      }
-    }, "\u{1F9EC}"), /*#__PURE__*/React.createElement("h1", {
-      style: {
-        ...S.t,
-        color: fg
-      }
-    }, "MCAT", /*#__PURE__*/React.createElement("span", {
-      style: S.a
-    }, "QUEST")), /*#__PURE__*/React.createElement("p", {
-      style: {
-        fontSize: 10,
-        color: TC.dim,
-        letterSpacing: 2
-      }
-    }, "v20.0.1 ", "\u2022", " AI TUTOR ", "\u2022", " SECTION SIM")), dayStreak >= 1 && /*#__PURE__*/React.createElement("div", {
-      style: {
-        marginBottom: 12,
-        padding: "10px 14px",
-        background: "linear-gradient(135deg,rgba(255,150,50,.06),rgba(255,100,0,.04))",
-        border: "1px solid rgba(255,150,50,.2)",
-        borderRadius: 12
-      }
-    }, /*#__PURE__*/React.createElement("button", { onClick: function() { setHomeSections(function(p) { return Object.assign({}, p, { activity: !p.activity }); }); }, style: { width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: homeSections.activity ? 8 : 0, background: "transparent", padding: 0 } },
-      /*#__PURE__*/React.createElement("span", { style: { fontSize: 13, fontWeight: 800, color: "#ff9933" } }, "\u{1F525} ", dayStreak, "-day streak!", dayStreak >= 3 ? " (+10% XP)" : ""),
-      /*#__PURE__*/React.createElement("span", { style: { fontSize: 9, color: TC.dim } }, homeSections.activity ? "\u25B2" : "\u25BC 30d")
-    ),
-    homeSections.activity ? React.createElement(React.Fragment, null,
-    // 30-day mini calendar
-    /*#__PURE__*/React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 2 } },
-      buildHeatmap(data.studyTime, 30).map(function (c) {
-        var intensity = c.mins === 0 ? 0 : c.mins < 10 ? 1 : c.mins < 30 ? 2 : c.mins < 60 ? 3 : 4;
-        var colors = [TC.sbg, "rgba(255,150,50,.15)", "rgba(255,150,50,.3)", "rgba(255,150,50,.55)", "rgba(255,150,50,.85)"];
-        var isToday = c.key === new Date().toISOString().slice(0, 10);
-        return /*#__PURE__*/React.createElement("div", {
-          key: c.key,
-          title: c.key + ": " + c.mins + " min",
-          style: { width: 16, height: 16, borderRadius: 3, background: colors[intensity], fontSize: 7, display: "flex", alignItems: "center", justifyContent: "center", color: intensity >= 3 ? "#fff" : TC.dim, border: isToday ? "1.5px solid #ff9933" : "none", fontWeight: isToday ? 700 : 400 }
-        }, c.day);
-      })
-    ),
-    /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 4, marginTop: 4, fontSize: 8, color: TC.dim, alignItems: "center" } },
-      /*#__PURE__*/React.createElement("span", null, "Less"),
-      [0,1,2,3,4].map(function(i) {
-        var colors = [TC.sbg, "rgba(255,150,50,.15)", "rgba(255,150,50,.3)", "rgba(255,150,50,.55)", "rgba(255,150,50,.85)"];
-        return /*#__PURE__*/React.createElement("div", { key: i, style: { width: 8, height: 8, borderRadius: 2, background: colors[i] } });
-      }),
-      /*#__PURE__*/React.createElement("span", null, "More")
-    )) : null), function () {
-      var snap = getDailySnapshot(data, false);
-      // Auto-persist snapshot on first load of the day
-      if (!data.dailyPlanSnapshot || data.dailyPlanSnapshot.date !== todayStr()) {
-        setTimeout(function() { dirtyRef.current = true; setData(function(d) { return Object.assign({}, d, { dailyPlanSnapshot: snap }); }); }, 0);
-      }
-      var plan = snap; // alias for compatibility
-      var stToday = getStudyToday(data);
-      var stWeek = fmtTime(getStudyWeek(data));
-      var testDate = data.testDate;
-      var daysUntilTest = testDate ? Math.max(0, Math.ceil((new Date(testDate).getTime() - Date.now()) / 86400000)) : null;
-      return /*#__PURE__*/React.createElement("div", { style: { marginBottom: 14 } },
-        // Test date countdown
-        daysUntilTest !== null ? /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", marginBottom: 8, background: daysUntilTest <= 30 ? "rgba(232,93,47,.08)" : "rgba(102,126,234,.06)", border: "1px solid " + (daysUntilTest <= 30 ? "rgba(232,93,47,.2)" : "rgba(102,126,234,.15)"), borderRadius: 10 } },
-          /*#__PURE__*/React.createElement("span", { style: { fontSize: 11 + fz, fontWeight: 700, color: daysUntilTest <= 30 ? "#e85d2f" : "#667eea" } }, "\u{1F4C5} ", daysUntilTest, " days until MCAT"),
-          /*#__PURE__*/React.createElement("button", { onClick: function() { var nd = prompt("Set MCAT date (YYYY-MM-DD):", testDate || ""); if (nd) { dirtyRef.current = true; setData(function(d) { return Object.assign({}, d, { testDate: nd }); }); } }, style: { fontSize: 9, color: TC.dim, padding: "3px 6px", border: "1px solid " + TC.cbr, borderRadius: 5 } }, "Edit")
-        ) : /*#__PURE__*/React.createElement("button", { onClick: function() { var nd = prompt("Set your MCAT date (YYYY-MM-DD):"); if (nd) { dirtyRef.current = true; setData(function(d) { return Object.assign({}, d, { testDate: nd }); }); } }, style: { width: "100%", padding: "8px 12px", marginBottom: 8, background: TC.card, border: "1px solid " + TC.cbr, borderRadius: 10, fontSize: 11 + fz, color: TC.muted, textAlign: "center" } }, "\u{1F4C5} Set your MCAT test date"),
-        // READINESS SCORE RING
-        (function() {
-          var readiness = calcReadinessScore(data);
-          if (data.totalAnswered < 5) return null; // Don't show until some data exists
-          var r = 44, cx = 50, cy = 50, circ = 2 * Math.PI * r;
-          var offset = circ - (readiness.score / 100) * circ;
-          var strokeColor = readiness.color;
-          return React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 14, padding: "12px 14px", marginBottom: 8, background: "rgba(" + (strokeColor === "#f87171" ? "248,113,113" : strokeColor === "#fb923c" ? "251,146,60" : "74,222,128") + ",.04)", border: "1px solid rgba(" + (strokeColor === "#f87171" ? "248,113,113" : strokeColor === "#fb923c" ? "251,146,60" : "74,222,128") + ",.15)", borderRadius: 14 } },
-            // SVG ring
-            React.createElement("div", { style: { width: 70, height: 70, flexShrink: 0, position: "relative" } },
-              React.createElement("svg", { viewBox: "0 0 100 100", style: { width: "100%", height: "100%", transform: "rotate(-90deg)" } },
-                React.createElement("circle", { cx: cx, cy: cy, r: r, fill: "none", stroke: isDark ? "rgba(255,255,255,.06)" : "rgba(0,0,0,.06)", strokeWidth: 7 }),
-                React.createElement("circle", { cx: cx, cy: cy, r: r, fill: "none", stroke: strokeColor, strokeWidth: 7, strokeDasharray: circ, strokeDashoffset: offset, strokeLinecap: "round", style: { transition: "stroke-dashoffset 0.6s ease" } })
-              ),
-              React.createElement("div", { style: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column" } },
-                React.createElement("span", { style: { fontSize: 20, fontWeight: 900, color: strokeColor, lineHeight: 1 } }, readiness.score),
-                React.createElement("span", { style: { fontSize: 7, color: TC.dim, fontWeight: 600, letterSpacing: 0.5 } }, "READY")
-              )
-            ),
-            // Info
-            React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-              React.createElement("div", { style: { fontSize: 13 + fz, fontWeight: 800, color: fg, marginBottom: 3 } }, "MCAT Readiness"),
-              React.createElement("div", { style: { fontSize: 10 + fz, color: TC.muted, lineHeight: 1.5 } },
-                readiness.potentialGain > 3
-                  ? "Your " + readiness.weakest + " is pulling you down \u2014 " + readiness.potentialGain + "pts possible with focused review."
-                  : readiness.score >= 70 ? "Strong position! Keep reviewing weak spots." : "Build momentum with daily sessions."
-              )
-            )
-          );
-        })(),
-        // Pace indicator
-        (function() {
-          var pace = calcPaceStatus(data);
-          if (!pace) return null;
-          return React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, padding: "6px 12px", marginBottom: 8, background: "rgba(" + (pace.color === "#f87171" ? "248,113,113" : pace.color === "#fb923c" ? "251,146,60" : pace.color === "#4ade80" ? "74,222,128" : "102,126,234") + ",.06)", border: "1px solid rgba(" + (pace.color === "#f87171" ? "248,113,113" : pace.color === "#fb923c" ? "251,146,60" : pace.color === "#4ade80" ? "74,222,128" : "102,126,234") + ",.15)", borderRadius: 8 } },
-            React.createElement("span", { style: { fontSize: 10 + fz, fontWeight: 700, color: pace.color } }, pace.label),
-            pace.tip ? React.createElement("span", { style: { fontSize: 9, color: TC.dim, flex: 1, textAlign: "right" } }, pace.tip) : null
-          );
-        })(),
-        // Smart Daily Plan card (v2 — snapshot-based with tasks)
-        (function() {
-          var tasks = plan.tasks || [];
-          var totalQsDoneToday = getTotalQsDoneToday(data);
-          var stMinutes = getStudyToday(data);
-
-          // Calculate per-task completion
-          var taskStates = tasks.map(function(task) {
-            if (task.type === "questions") {
-              var done = countQsDoneToday(data, task.ids);
-              return { done: done, total: task.ids.length, complete: done >= task.ids.length };
-            } else if (task.type === "lesson") {
-              var mp = data.moduleProgress && data.moduleProgress[task.moduleTag];
-              var complete = !!(mp && mp.completed);
-              return { done: complete ? 1 : 0, total: 1, complete: complete };
-            } else if (task.type === "card") {
-              // Card reviewed = tapped today (we track via dailyPlanSnapshot.cardsDone)
-              var cd = (data.dailyPlanSnapshot && data.dailyPlanSnapshot.cardsDone) || {};
-              var complete = !!cd[task.cardTag];
-              return { done: complete ? 1 : 0, total: 1, complete: complete };
-            } else if (task.type === "time") {
-              var complete = stMinutes >= (task.targetMin || 30);
-              return { done: Math.min(stMinutes, task.targetMin || 30), total: task.targetMin || 30, complete: complete };
-            }
-            return { done: 0, total: 1, complete: false };
-          });
-
-          var completedTasks = taskStates.filter(function(s) { return s.complete; }).length;
-          var totalTasks = tasks.length;
-          var progressPct = totalTasks > 0 ? Math.min(100, Math.round(completedTasks / totalTasks * 100)) : 100;
-          var allDone = totalTasks > 0 && completedTasks >= totalTasks;
-
-          return React.createElement("div", { style: { padding: "14px 16px", background: "linear-gradient(135deg, rgba(102,126,234,.08), rgba(74,222,128,.04))", border: "1px solid rgba(102,126,234,.2)", borderRadius: 14 } },
-            // Header
-            React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 } },
-              React.createElement("span", { style: { fontSize: 14 + fz, fontWeight: 800, color: fg } }, "\u{1F9E0} Today\u2019s Plan"),
-              React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 1 } },
-                React.createElement("span", { style: { fontSize: 10, color: TC.dim } }, stToday + "min today \u2022 " + stWeek + " this week"),
-                totalQsDoneToday > 0 ? React.createElement("span", { style: { fontSize: 10, fontWeight: 700, color: "#667eea" } }, totalQsDoneToday + " Qs answered today") : null
-              )
-            ),
-            // Progress bar
-            totalTasks > 0 ? React.createElement("div", { style: { marginBottom: 12 } },
-              React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 } },
-                React.createElement("span", { style: { fontSize: 10 + fz, fontWeight: 700, color: allDone ? "#4ade80" : "#667eea" } }, allDone ? "\u2705 Plan complete!" : completedTasks + "/" + totalTasks + " tasks done"),
-                React.createElement("span", { style: { fontSize: 10, color: TC.dim } }, progressPct + "%")
-              ),
-              React.createElement("div", { style: { width: "100%", height: 6, background: isDark ? "rgba(255,255,255,.08)" : "rgba(0,0,0,.06)", borderRadius: 3, overflow: "hidden" } },
-                React.createElement("div", { style: { width: progressPct + "%", height: "100%", borderRadius: 3, background: allDone ? "#4ade80" : "linear-gradient(90deg, #667eea, #764ba2)", transition: "width 0.4s ease" } })
-              )
-            ) : null,
-            // Task list
-            totalTasks === 0
-              ? React.createElement("div", { style: { fontSize: 12 + fz, color: "#4ade80", padding: "8px 0" } }, "\u2705 All caught up! Try New Questions or Boss Battle.")
-              : React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 5 } },
-                tasks.map(function(task, ti) {
-                  var ts = taskStates[ti];
-                  var isDone = ts.complete;
-                  // Build subtitle
-                  var subtitle = "";
-                  if (task.type === "questions") subtitle = ts.done + "/" + ts.total + " Qs";
-                  else if (task.type === "time") subtitle = ts.done + "/" + ts.total + " min";
-                  else subtitle = isDone ? "Done" : "Tap to start";
-
-                  // Click handler
-                  var onClick = null;
-                  if (task.type === "questions") {
-                    onClick = function() {
-                      var qPool = QS.filter(function(q) { return task.ids.indexOf(q.id) >= 0; });
-                      if (qPool.length === 0) return;
-                      var built = buildQSet(qPool, "MARATHON", data);
-                      setQs(built); setQI(0); setSel(null); setSR(false); setSScore(0); setSC(0); setST(0); setWrong([]);
-                      setGM("MARATHON"); setLives(3); setStreak(0); setConf(null); setAwaitConf(false);
-                      setMatchSel(null); setMatchDone([]); setMatchResults([]); setHintUsed(false);
-                      setEliminated([]); setRevealed(false); setPassOpen(true); setPaused(false);
-                      setQAnswered({}); setTL(null); setThinkDelay(0); setElaborativeDelay(0);
-                      setFreeRecallText(""); setFreeRecallRevealed(false);
-                      setAiExplain({loading:false, text:null, qId:null});
-                      setSessionRolling([]); setConsecutiveWrong(0); setRescueMode(false); setRescueTag(null); setDifficultyMode("normal");
-                      qStartRef.current = Date.now();
-                      setScr("play");
-                    };
-                  } else if (task.type === "lesson") {
-                    onClick = function() {
-                      setModuleTag(task.moduleTag); setModuleStep(0); setModuleCheckSel(null); setModuleCheckDone(false); setScr("module");
-                    };
-                  } else if (task.type === "card") {
-                    onClick = function() {
-                      // Mark card as reviewed in snapshot
-                      dirtyRef.current = true;
-                      setData(function(d) {
-                        var newSnap = Object.assign({}, d.dailyPlanSnapshot || {});
-                        var cd = Object.assign({}, newSnap.cardsDone || {});
-                        cd[task.cardTag] = Date.now();
-                        newSnap.cardsDone = cd;
-                        return Object.assign({}, d, { dailyPlanSnapshot: newSnap });
-                      });
-                      setShowConceptCard(task.cardTag);
-                    };
-                  }
-
-                  return React.createElement("div", {
-                    key: ti,
-                    onClick: onClick,
-                    style: { display: "flex", alignItems: "center", gap: 8, fontSize: 12 + fz,
-                      color: isDone ? "#4ade80" : TC.muted,
-                      opacity: isDone ? 0.7 : 1,
-                      cursor: onClick ? "pointer" : "default",
-                      padding: "3px 0",
-                      textDecoration: isDone ? "line-through" : "none",
-                      textDecorationColor: "rgba(74,222,128,.4)"
-                    }
-                  },
-                    React.createElement("span", { style: { width: 22, height: 22, borderRadius: 6,
-                      background: isDone ? "rgba(74,222,128,.15)" : "rgba(" + (task.color === "#667eea" ? "102,126,234" : task.color === "#f87171" ? "248,113,113" : task.color === "#4ade80" ? "74,222,128" : task.color === "#a78bfa" ? "167,139,250" : task.color === "#38bdf8" ? "56,189,248" : "251,146,60") + ",.12)",
-                      display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, flexShrink: 0 } },
-                      isDone ? "\u2713" : task.icon
-                    ),
-                    React.createElement("span", { style: { flex: 1 } }, task.label),
-                    React.createElement("span", { style: { fontSize: 10, fontWeight: 600, color: isDone ? "#4ade80" : TC.dim } }, subtitle)
-                  );
-                })
-              ),
-          // AI STUDY COACH
-          (function() {
-            var hasKey = false;
-            hasKey = !!getApiKey();
-            var today = todayStr();
-            var cached = coachDate === today && coachText;
-            if (cached) {
-              return React.createElement("div", { style: { padding: "10px 12px", background: "rgba(118,75,162,.06)", borderRadius: 8, marginTop: 10, fontSize: 11 + fz, color: TC.muted, lineHeight: 1.6, position: "relative" } },
-                React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 } },
-                  React.createElement("span", { style: { fontSize: 9, fontWeight: 700, color: "#764ba2", letterSpacing: 1 } }, "\u{1F916} AI COACH"),
-                  React.createElement("button", { onClick: function() { setCoachText(null); setCoachDate(""); }, style: { fontSize: 10, color: TC.dim, padding: "2px 6px", border: "1px solid " + TC.cbr, borderRadius: 4, background: "transparent" } }, "\u{1F504}")
-                ),
-                React.createElement("div", { style: { whiteSpace: "pre-wrap" } }, renderMd(coachText))
-              );
-            }
-            if (coachLoading) {
-              return React.createElement("div", { style: { padding: "12px", background: "rgba(118,75,162,.06)", borderRadius: 8, marginTop: 10, textAlign: "center" } },
-                React.createElement("span", { style: { fontSize: 11 + fz, color: "#764ba2", animation: "pu 1.2s infinite" } }, "\u{1F916} Thinking...")
-              );
-            }
-            return React.createElement("button", {
-              onClick: function() {
-                if (!hasKey) { setCoachText("\u26A0\uFE0F Set your API key in AI Tutor \u2699\uFE0F to use AI features."); setCoachDate(today); return; }
-                setCoachLoading(true);
-                var testDate2 = data.testDate;
-                var daysLeft = testDate2 ? Math.max(0, Math.ceil((new Date(testDate2).getTime() - Date.now()) / 86400000)) : null;
-                var tc2 = getTagCounts(data);
-                var weakTags2 = Object.keys(tc2).filter(function(t) { return tc2[t].seen >= 3; }).map(function(t) { return { tag: t, pct: Math.round(tc2[t].correct / tc2[t].seen * 100) }; }).sort(function(a,b) { return a.pct - b.pct; }).slice(0, 5);
-                var weakStr2 = weakTags2.map(function(t) { return t.tag + " (" + t.pct + "%)"; }).join(", ") || "not enough data yet";
-                var newRemaining2 = QS.filter(function(q2) { return !data.questionStats[q2.id]; }).length;
-                var availModules = typeof MODULES !== "undefined" ? Object.keys(MODULES) : [];
-                var availCards = typeof CARDS !== "undefined" ? Object.keys(CARDS) : [];
-                var completedMods = Object.keys(data.moduleProgress || {}).filter(function(k) { return data.moduleProgress[k] && data.moduleProgress[k].completed; });
-                var planInfo = (plan && plan.tasks) ? " Current plan tasks: " + plan.tasks.map(function(t){return t.label;}).join(", ") + "." : "";
-                var userMsg = (daysLeft !== null ? "Days until MCAT: " + daysLeft + ". " : "No test date set. ") + "Study streak: " + computeStreak(data) + " days. Total Qs answered: " + (data.totalAnswered || 0) + ". Overall accuracy: " + (data.totalAnswered > 0 ? Math.round(data.totalCorrect / data.totalAnswered * 100) : 0) + "%. Today's study time: " + getStudyToday(data) + " min. Due for review: " + getDueCount(data) + ". Weakest tags: " + weakStr2 + ". Blind spots: " + getBlindSpotCount(data) + ". Unseen questions remaining: " + newRemaining2 + "/" + QS.length + "." + planInfo + " Available lessons: " + availModules.join(", ") + ". Completed lessons: " + completedMods.join(", ") + ". Available concept cards: " + availCards.join(", ") + ".";
-                var sysPrompt = "You are an MCAT study coach. Respond with ONLY a JSON object (no markdown, no backticks, no other text). The JSON must have exactly this structure: {\"advice\": \"3 sentences of personalized advice using **bold** for key actions. Reference specific tags and lessons.\", \"tasks\": [{\"type\": \"lesson\", \"tag\": \"exact tag name\"}, {\"type\": \"card\", \"tag\": \"exact tag name\"}, {\"type\": \"questions\", \"tag\": \"exact tag name\", \"count\": 10}]}. Include 1-3 tasks in the tasks array. Only suggest lessons from the available lessons list. Only suggest cards from the available cards list. For question tasks, pick from the weak tags list. The advice field should be warm, direct, under 75 words.";
-                callTeachAI([{role:"user", content: userMsg}], sysPrompt).then(function(reply) {
-                  setCoachLoading(false);
-                  // Try to parse structured response
-                  var parsed = null;
-                  try {
-                    var cleaned = reply.replace(/```json|```/g, "").trim();
-                    parsed = JSON.parse(cleaned);
-                  } catch(e) { parsed = null; }
-                  if (parsed && parsed.advice) {
-                    setCoachText(parsed.advice);
-                    setCoachDate(today);
-                    // Inject tasks into the plan
-                    if (parsed.tasks && parsed.tasks.length > 0) {
-                      dirtyRef.current = true;
-                      setData(function(dd) {
-                        var snap = Object.assign({}, dd.dailyPlanSnapshot || {});
-                        var existingLabels = {};
-                        (snap.tasks || []).forEach(function(t2) { if (t2.label) existingLabels[t2.label] = true; });
-                        var newTasks = [];
-                        parsed.tasks.forEach(function(pt) {
-                          if (pt.type === "lesson" && typeof MODULES !== "undefined" && MODULES[pt.tag]) {
-                            var label = "Review " + pt.tag + " lesson";
-                            if (!existingLabels[label]) { newTasks.push({ type: "lesson", label: label, icon: "\u{1F4DA}", moduleTag: pt.tag, color: "#a78bfa", aiCoach: true }); existingLabels[label] = true; }
-                          } else if (pt.type === "card" && typeof CARDS !== "undefined" && CARDS[pt.tag]) {
-                            var label2 = "Review " + pt.tag + " cards";
-                            if (!existingLabels[label2]) { newTasks.push({ type: "card", label: label2, icon: "\u{1F0CF}", cardTag: pt.tag, color: "#38bdf8", aiCoach: true }); existingLabels[label2] = true; }
-                          } else if (pt.type === "questions" && pt.tag) {
-                            var qPool2 = QS.filter(function(q3) { return (q3.tags||[]).indexOf(pt.tag)>=0; });
-                            if (qPool2.length > 0) {
-                              var label3 = "Practice " + pt.tag + " (" + Math.min(pt.count||10, qPool2.length) + " Qs)";
-                              if (!existingLabels[label3]) {
-                                newTasks.push({ type: "questions", label: label3, icon: "\u{1F3AF}", ids: qPool2.slice(0, pt.count||10).map(function(q4){return q4.id;}), color: "#f87171", aiCoach: true });
-                                existingLabels[label3] = true;
-                              }
-                            }
-                          }
-                        });
-                        if (newTasks.length > 0) {
-                          snap.tasks = (snap.tasks || []).concat(newTasks);
-                          snap.coachTasks = newTasks;
-                          setCoachText((parsed.advice || "") + "\n\n\u2705 **Added " + newTasks.length + " task" + (newTasks.length > 1 ? "s" : "") + " to your plan.**");
-                        }
-                        return Object.assign({}, dd, { dailyPlanSnapshot: snap });
-                      });
-                    }
-                  } else {
-                    // Fallback: treat as plain text
-                    setCoachText(reply);
-                    setCoachDate(today);
-                  }
-                });
-              },
-              style: { display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", padding: "9px 12px", marginTop: 10, background: "rgba(118,75,162,.06)", border: "1.5px solid rgba(118,75,162,.2)", borderRadius: 8 }
-            },
-              React.createElement("span", { style: { fontSize: 13 } }, "\u{1F916}"),
-              React.createElement("span", { style: { fontSize: 11 + fz, fontWeight: 700, color: "#764ba2" } }, "What should I study?")
-            );
-          })(),
-          // Rebuild plan button
-          React.createElement("button", {
-            onClick: function() {
-              dirtyRef.current = true;
-              setData(function(d) { return Object.assign({}, d, { dailyPlanSnapshot: null }); });
-              setCoachText(null); setCoachDate("");
-            },
-            style: { display: "flex", alignItems: "center", justifyContent: "center", gap: 4, width: "100%", padding: "6px 8px", marginTop: 6, background: "transparent", border: "1px dashed " + TC.cbr, borderRadius: 6, fontSize: 10 + fz, color: TC.dim, cursor: "pointer" }
-          }, "\u{1F504} Rebuild today's plan"),
-          plan.totalQs > 0 ? /*#__PURE__*/React.createElement("button", { onClick: startSmartSession, style: { ...S.btn, fontSize: 13 + fz, marginTop: 10 } }, "\u{1F680} Start Smart Session (" + plan.totalQs + " Qs)") : null
-          );
-        })()
-      );
-    }(),
-    // CONTEXTUAL ACTION CARDS
-    (function() {
-      var ctxCards = getContextualCards(data);
-      if (ctxCards.length === 0) return null;
-      return React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 } },
-        ctxCards.map(function(card, ci) {
-          return React.createElement("button", {
-            key: ci,
-            onClick: function() {
-              if (card.action === "card") { setShowConceptCard(card.tag); }
-              else if (card.action === "lesson") { setModuleTag(card.tag); setModuleStep(0); setModuleCheckSel(null); setModuleCheckDone(false); setScr("module"); }
-              else if (card.action === "spaced") { startGame("SPACED_REVIEW", []); }
-              else if (card.action === "questions") {
-                var pool = QS.filter(function(q) { return (q.tags||[]).indexOf(card.tag)>=0 && (!card.diff || (q.diff||2) >= card.diff); });
-                if (pool.length > 0) startGame("TAG_PRACTICE", [], card.tag);
-              }
-            },
-            style: { display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: "rgba(" + (card.color === "#38bdf8" ? "56,189,248" : card.color === "#f87171" ? "248,113,113" : card.color === "#667eea" ? "102,126,234" : "167,139,250") + ",.05)", border: "1px solid rgba(" + (card.color === "#38bdf8" ? "56,189,248" : card.color === "#f87171" ? "248,113,113" : card.color === "#667eea" ? "102,126,234" : "167,139,250") + ",.15)", borderRadius: 10, textAlign: "left", cursor: "pointer", width: "100%" }
-          },
-            React.createElement("span", { style: { fontSize: 16, flexShrink: 0 } }, card.icon),
-            React.createElement("span", { style: { fontSize: 11 + fz, color: TC.muted, flex: 1, lineHeight: 1.4 } }, card.text),
-            React.createElement("span", { style: { fontSize: 10, color: card.color, fontWeight: 700, flexShrink: 0 } }, "\u25B6")
-          );
-        })
-      );
-    })(),
-    /*#__PURE__*/React.createElement("div", {
-      style: {
-        ...TS.sb,
-        background: TC.sbg,
-        border: "1px solid " + TC.cbr
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: S.si
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        ...TS.sv,
-        color: fg
-      }
-    }, rank.b, " ", rank.name), /*#__PURE__*/React.createElement("span", {
-      style: {
-        ...TS.sl,
-        color: TC.dim
-      }
-    }, "Rank")), /*#__PURE__*/React.createElement("div", {
-      style: {
-        ...TS.dv,
-        background: TC.sbg
-      }
-    }), /*#__PURE__*/React.createElement("div", {
-      style: S.si
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        ...TS.sv,
-        color: fg
-      }
-    }, data.xp), /*#__PURE__*/React.createElement("span", {
-      style: {
-        ...TS.sl,
-        color: TC.dim
-      }
-    }, "XP")), /*#__PURE__*/React.createElement("div", {
-      style: {
-        ...TS.dv,
-        background: TC.sbg
-      }
-    }), /*#__PURE__*/React.createElement("div", {
-      style: S.si
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        ...TS.sv,
-        color: fg
-      }
-    }, acc, "%"), /*#__PURE__*/React.createElement("span", {
-      style: {
-        ...TS.sl,
-        color: TC.dim
-      }
-    }, "Accuracy")), /*#__PURE__*/React.createElement("div", {
-      style: {
-        ...TS.dv,
-        background: TC.sbg
-      }
-    }), /*#__PURE__*/React.createElement("div", {
-      style: S.si
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        ...TS.sv,
-        color: fg
-      }
-    }, data.totalAnswered), /*#__PURE__*/React.createElement("span", {
-      style: {
-        ...TS.sl,
-        color: TC.dim
-      }
-    }, "Answered"))), nr && /*#__PURE__*/React.createElement("div", {
-      style: {
-        marginBottom: 14,
-        textAlign: "center"
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        height: 6,
-        background: TC.sbg,
-        borderRadius: 3,
-        overflow: "hidden",
-        marginBottom: 4
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        height: "100%",
-        background: "linear-gradient(90deg,#667eea,#764ba2)",
-        borderRadius: 3,
-        width: Math.min((data.xp - rank.min) / (nr.min - rank.min) * 100, 100) + "%"
-      }
-    })), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 10,
-        color: TC.dim
-      }
-    }, nr.min - data.xp, " XP to ", nr.b, " ", nr.name)), dueC > 0 && /*#__PURE__*/React.createElement("button", {
-      onClick: function () {
-        startGame("SPACED_REVIEW", []);
-      },
-      style: {
-        width: "100%",
-        padding: 14,
-        marginBottom: 14,
-        background: "linear-gradient(135deg,rgba(102,126,234,.12),rgba(118,75,162,.12))",
-        border: "1.5px solid rgba(102,126,234,.3)",
-        borderRadius: 12,
-        textAlign: "center"
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 13,
-        fontWeight: 700,
-        color: "#667eea"
-      }
-    }, "\u{1F9E0}", " ", dueC, " due for review"), /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 10,
-        color: TC.muted,
-        marginTop: 2
-      }
-    }, "Spaced repetition")),
-    // Error Pattern Notification Card
-    function () {
-      var hpats = getErrorPatterns(data);
-      if (hpats.length === 0) return null;
-      var topPat = hpats[0];
-      return /*#__PURE__*/React.createElement("div", {
-        style: { width: "100%", padding: 12, marginBottom: 8, background: "rgba(248,113,113,.06)", border: "1px solid rgba(248,113,113,.18)", borderRadius: 12 }
-      },
-        /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 } },
-          /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: "#f87171" } }, "\u{1F50D} " + hpats.length + " pattern" + (hpats.length > 1 ? "s" : "") + " detected"),
-          /*#__PURE__*/React.createElement("button", {
-            onClick: function () { setScr("mistakes"); },
-            style: { fontSize: 10, color: "#667eea", textDecoration: "underline", background: "none", border: "none", padding: 0, cursor: "pointer" }
-          }, "View all")
         ),
-        /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: TC.muted, lineHeight: 1.5, marginBottom: topPat.moduleTag ? 8 : 0 } }, topPat.advice),
-        topPat.moduleTag && typeof MODULES !== "undefined" && MODULES[topPat.moduleTag] ? /*#__PURE__*/React.createElement("button", {
-          onClick: function () { setModuleTag(topPat.moduleTag); setModuleStep(0); setModuleCheckSel(null); setModuleCheckDone(false); setScr("module"); },
-          style: { fontSize: 11, fontWeight: 600, color: "#fff", padding: "8px 14px", borderRadius: 8, background: "linear-gradient(135deg,#667eea,#764ba2)", border: "none", cursor: "pointer" }
-        }, "\u{1F4DA} Review " + topPat.moduleTag) : null
-      );
-    }(),
-    /*#__PURE__*/React.createElement("button", {
-      onClick: function () {
-        setActiveTab("study"); setScr("study_hub");
-      },
-      style: {
-        width: "100%",
-        padding: 12,
-        marginBottom: 8,
-        background: "rgba(102,126,234,.06)",
-        border: "1px solid rgba(102,126,234,.15)",
-        borderRadius: 12,
-        textAlign: "center"
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 13,
-        fontWeight: 700,
-        color: "#667eea"
-      }
-    }, "\u{1F4D6}", " Study Cards"), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 10,
-        color: TC.muted,
-        marginLeft: 8
-      }
-    }, "30 cards + 15 interactive lessons")), /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        gap: 8,
-        marginBottom: 14
-      }
-    }, /*#__PURE__*/React.createElement("button", {
-      onClick: function () {
-        setScr("section_pick");
-      },
-      style: {
-        flex: 1,
-        padding: 12,
-        background: "rgba(255,150,50,.06)",
-        border: "1px solid rgba(255,150,50,.15)",
-        borderRadius: 12,
-        textAlign: "center"
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 12,
-        fontWeight: 700,
-        color: "#ff9933"
-      }
-    }, "\u{1F3AF}", " Section Sim")), /*#__PURE__*/React.createElement("button", {
-      onClick: function () {
-        setScr("reference");
-      },
-      style: {
-        flex: 1,
-        padding: 12,
-        background: "rgba(74,222,128,.06)",
-        border: "1px solid rgba(74,222,128,.15)",
-        borderRadius: 12,
-        textAlign: "center"
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 12,
-        fontWeight: 700,
-        color: "#4ade80"
-      }
-    }, "\u{1F4CB}", " Reference")), /*#__PURE__*/React.createElement("button", {
-      onClick: function () { setScr("mistakes"); },
-      style: {
-        flex: 1,
-        padding: 12,
-        background: "rgba(248,113,113,.06)",
-        border: "1px solid rgba(248,113,113,.15)",
-        borderRadius: 12,
-        textAlign: "center"
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 12,
-        fontWeight: 700,
-        color: "#f87171"
-      }
-    }, "\u{1F4D3}", " Mistakes", getMistakeLog(data).length > 0 ? " (" + getMistakeLog(data).length + ")" : ""))),
-    // === COLLAPSIBLE MODE SECTIONS ===
-    // --- TARGETED PRACTICE (collapsed by default) ---
-    /*#__PURE__*/React.createElement("button", {
-      onClick: function() { setHomeSections(function(p) { return Object.assign({}, p, { targeted: !p.targeted }); }); },
-      style: { width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", marginBottom: homeSections.targeted ? 6 : 10, background: TC.card, border: "1px solid " + TC.cbr, borderRadius: 10 }
-    },
-      /*#__PURE__*/React.createElement("span", { style: { fontSize: 12 + fz, fontWeight: 700, color: fg } }, "\u{1F3AF} Targeted Practice"),
-      /*#__PURE__*/React.createElement("span", { style: { fontSize: 10, color: TC.dim } }, homeSections.targeted ? "\u25B2" : "\u25BC " + [dueC > 0 ? dueC + " due" : null, hardC > 0 ? hardC + " hard" : null, newC > 0 ? newC + " new" : null].filter(Boolean).join(" \u2022 "))
-    ),
-    homeSections.targeted ? /*#__PURE__*/React.createElement("div", {
-      style: { display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }
-    }, [{
-      k: "SPACED_REVIEW", n: dueC, l: dueC ? dueC + " due" : "Caught up!"
-    }, {
-      k: "TAG_PRACTICE", n: 1, l: ALL_TAGS.length + " concept tags"
-    }, {
-      k: "FLAGGED", n: flagC, l: flagC ? flagC + " flagged" : "Flag Qs during play"
-    }, {
-      k: "BLIND_SPOTS", n: blindC, l: blindC ? blindC + " confident but wrong" : "Great calibration!"
-    }, {
-      k: "HARD_QS", n: hardC, l: hardC ? hardC + " below 70%" : "Play more"
-    }, {
-      k: "NEW_QS", n: newC, l: newC ? newC + " unseen" : "All seen!"
-    }, {
-      k: "WEAK_TOPICS", n: weakC.length, l: weakC.length ? weakC.map(function (c) { return CATS[c.key].icon + (c.pct || 0) + "%"; }).join(" ") : "Play more"
-    }, {
-      k: "INTERLEAVED", n: 1, l: "Weakest topics, mixed"
-    }, {
-      k: "CARS_MODE", n: carsC, l: carsC + " CARS Qs"
-    }, {
-      k: "CARS_SPEED", n: carsC, l: "Timed passage reading"
-    }, {
-      k: "POE_TRAINER", n: 1, l: "Elimination practice"
-    }, {
-      k: "REVIEW", n: missC, l: missC ? missC + " to review" : "None"
-    }].map(function (x) {
-      return /*#__PURE__*/React.createElement("button", {
-        key: x.k,
-        style: Object.assign({}, TS.mc, { background: TC.card, border: "1px solid " + TC.cbr, opacity: x.n ? 1 : .4 }),
-        onClick: function () {
-          if (!x.n) return;
-          if (x.k === "TAG_PRACTICE") setScr("select_tag"); else startGame(x.k, []);
-        }
-      }, /*#__PURE__*/React.createElement("span", { style: { fontSize: 18, width: 30, textAlign: "center" } }, MODES[x.k].icon),
-        /*#__PURE__*/React.createElement("div", null,
-          /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: fg, display: "block" } }, MODES[x.k].name),
-          /*#__PURE__*/React.createElement("span", { style: { fontSize: 10, color: x.n ? TC.muted : TC.dim } }, x.l)));
-    })) : null,
-    // --- CHALLENGES (collapsed by default) ---
-    // === SECTION SIMULATION CARD ===
-    React.createElement("div", { style: { padding: "14px 16px", marginBottom: 12, background: "rgba(255,150,50,.04)", border: "1px solid rgba(255,150,50,.15)", borderRadius: 14 } },
-      React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 } },
-        React.createElement("span", { style: { fontSize: 13 + fz, fontWeight: 800, color: fg } }, "\u{1F3AF} Section Simulation"),
-        React.createElement("span", { style: { fontSize: 9, color: TC.dim } }, "Timed \u2022 No feedback \u2022 Free nav")
-      ),
-      React.createElement("div", { style: { fontSize: 10, color: TC.muted, marginBottom: 10, lineHeight: 1.5 } }, "Full MCAT-style section practice. Passage-heavy, timed, no instant feedback \u2014 just like test day."),
-      React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } },
-        ["Bio/Biochem", "Chem/Phys", "Psych/Soc", "CARS"].map(function(sec) {
-          var secColors = { "Bio/Biochem": "#2a9d8f", "Chem/Phys": "#457b9d", "Psych/Soc": "#e76f51", "CARS": "#9b5de5" };
-          var secIcons = { "Bio/Biochem": "\u{1F9EC}", "Chem/Phys": "\u2697\uFE0F", "Psych/Soc": "\u{1F9E0}", "CARS": "\u{1F4D6}" };
-          var secCats = Object.keys(CATS).filter(function(k) { return CATS[k].sec === sec; });
-          var secPool = QS.filter(function(q) { return secCats.indexOf(q.cat) >= 0 && q.type !== "match" && q.type !== "order" && q.type !== "label"; });
-          var passCount = secPool.filter(function(q) { return q.pass; }).length;
-          var a = getSectionAccEMA(data, sec);
-          var p = a !== null ? predictScore(a) : null;
-          var c = a === null ? TC.dim : a >= 80 ? "#4ade80" : a >= 65 ? "#fbbf24" : "#f87171";
-          var simsDone = (data.simHistory || []).filter(function(s) { return s.section === sec; }).length;
-          return React.createElement("button", {
-            key: sec,
-            onClick: function() { startSectionSim(sec); },
-            style: { display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: TC.card, border: "1px solid " + TC.cbr, borderRadius: 10, borderLeft: "3px solid " + (secColors[sec] || "#667eea"), textAlign: "left", width: "100%" }
-          },
-            React.createElement("span", { style: { fontSize: 18, width: 28, textAlign: "center", flexShrink: 0 } }, secIcons[sec]),
-            React.createElement("div", { style: { flex: 1 } },
-              React.createElement("div", { style: { fontSize: 12 + fz, fontWeight: 700, color: fg } }, sec),
-              React.createElement("div", { style: { fontSize: 9, color: TC.dim } }, secPool.length + " Qs \u2022 " + passCount + " passage-based" + (simsDone > 0 ? " \u2022 " + simsDone + " sim" + (simsDone > 1 ? "s" : "") + " done" : ""))
+
+        // ════════════════════════════════════════════
+        // §2  HERO CARD — primary action
+        // ════════════════════════════════════════════
+        (function() {
+          // Daily challenge (if not done)
+          if (dc && dcQ && !dc.done) {
+            return React.createElement("button", { onClick: function() {
+              dirtyRef.current = true;
+              setData(function(d) { return Object.assign({}, d, { dailyChallengeDate: todayStr(), dailyChallengeId: dc.id }); });
+              startGame("MARATHON", [], (dcQ.tags||[])[0]);
+            }, style: { display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "16px 18px", marginBottom: 12, background: "linear-gradient(135deg, rgba(251,191,36,.08), rgba(245,158,11,.04))", border: "1.5px solid rgba(251,191,36,.25)", borderRadius: 16, textAlign: "left" } },
+              React.createElement("div", { style: { width: 44, height: 44, borderRadius: 12, background: "rgba(251,191,36,.12)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 } }, "\u{1F3C6}"),
+              React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                React.createElement("div", { style: { fontSize: 13 + fz, fontWeight: 800, color: "#fbbf24", marginBottom: 2 } }, "Daily Challenge"),
+                React.createElement("div", { style: { fontSize: 10 + fz, color: TC.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, dcQ.q.substring(0, 65)),
+                React.createElement("div", { style: { fontSize: 9, color: "rgba(251,191,36,.7)", fontWeight: 700, marginTop: 3 } }, "+50 XP bonus")
+              ),
+              React.createElement("span", { style: { fontSize: 18, color: "rgba(251,191,36,.5)", flexShrink: 0 } }, "\u25B6")
+            );
+          }
+          // Daily challenge done
+          if (dc && dc.done) {
+            return React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", marginBottom: 12, background: "rgba(74,222,128,.05)", border: "1px solid rgba(74,222,128,.18)", borderRadius: 14 } },
+              React.createElement("span", { style: { fontSize: 20 } }, "\u2705"),
+              React.createElement("div", { style: { flex: 1 } },
+                React.createElement("div", { style: { fontSize: 12 + fz, fontWeight: 700, color: "#4ade80" } }, "Daily Challenge Complete!"),
+                React.createElement("div", { style: { fontSize: 10, color: TC.dim } }, "+50 XP earned")
+              )
+            );
+          }
+          return null;
+        })(),
+
+        // ════════════════════════════════════════════
+        // §3  QUICK ACTIONS — horizontal row
+        // ════════════════════════════════════════════
+        React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 14, overflowX: "auto", scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch", paddingBottom: 2 } },
+          // Quick 5
+          React.createElement("button", { onClick: function() { startGame("QUICK_5", []); }, style: { flex: "0 0 auto", display: "flex", alignItems: "center", gap: 6, padding: "9px 14px", background: "linear-gradient(135deg, rgba(102,126,234,.1), rgba(118,75,162,.06))", border: "1px solid rgba(102,126,234,.2)", borderRadius: 10 } },
+            React.createElement("span", { style: { fontSize: 14 } }, "\u26A1"),
+            React.createElement("span", { style: { fontSize: 11 + fz, fontWeight: 700, color: "#667eea" } }, "Quick 5")
+          ),
+          // Spaced Review (if due)
+          dueC > 0 ? React.createElement("button", { onClick: function() { startGame("SPACED_REVIEW", []); }, style: { flex: "0 0 auto", display: "flex", alignItems: "center", gap: 6, padding: "9px 14px", background: "rgba(74,222,128,.06)", border: "1px solid rgba(74,222,128,.2)", borderRadius: 10 } },
+            React.createElement("span", { style: { fontSize: 14 } }, "\u{1F9E0}"),
+            React.createElement("span", { style: { fontSize: 11 + fz, fontWeight: 700, color: "#4ade80" } }, dueC + " Due")
+          ) : null,
+          // Smart Session (if plan has Qs)
+          plan.totalQs > 0 ? React.createElement("button", { onClick: startSmartSession, style: { flex: "0 0 auto", display: "flex", alignItems: "center", gap: 6, padding: "9px 14px", background: "rgba(118,75,162,.06)", border: "1px solid rgba(118,75,162,.2)", borderRadius: 10 } },
+            React.createElement("span", { style: { fontSize: 14 } }, "\u{1F680}"),
+            React.createElement("span", { style: { fontSize: 11 + fz, fontWeight: 700, color: "#a78bfa" } }, "Smart " + plan.totalQs + "Q")
+          ) : null,
+          // Surprise
+          React.createElement("button", { onClick: function() { var modes = Object.keys(MODES); var rk = modes[Math.floor(Math.random()*modes.length)]; if (MODES[rk].smart) startGame(rk, []); else startGame(rk, Object.keys(CATS)); }, style: { flex: "0 0 auto", display: "flex", alignItems: "center", gap: 6, padding: "9px 14px", background: "rgba(251,146,60,.06)", border: "1px solid rgba(251,146,60,.2)", borderRadius: 10 } },
+            React.createElement("span", { style: { fontSize: 14 } }, "\u{1F3B2}"),
+            React.createElement("span", { style: { fontSize: 11 + fz, fontWeight: 700, color: "#fb923c" } }, "Surprise")
+          )
+        ),
+
+        // ════════════════════════════════════════════
+        // §4  TODAY'S PROGRESS — compact stats row
+        // ════════════════════════════════════════════
+        React.createElement("div", { style: Object.assign({}, cardStyle, { display: "flex", alignItems: "center", gap: 12 }) },
+          // Weekly ring (small)
+          React.createElement(ProgressRing, { pct: weeklyPct, size: 48, stroke: 4, color: weeklyPct >= 100 ? "#4ade80" : "#667eea", trackColor: isDark ? "rgba(255,255,255,.06)" : "rgba(0,0,0,.06)" },
+            React.createElement("span", { style: { fontSize: 11, fontWeight: 800, color: weeklyPct >= 100 ? "#4ade80" : "#667eea" } }, weeklyPct + "%")
+          ),
+          // Stats
+          React.createElement("div", { style: { flex: 1, display: "flex", flexDirection: "column", gap: 4 } },
+            React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } },
+              React.createElement("span", { style: { fontSize: 12 + fz, fontWeight: 700, color: fg } }, "Today"),
+              React.createElement("span", { style: { fontSize: 10, color: TC.dim } }, weeklyQs + "/" + goal + " weekly")
             ),
-            React.createElement("div", { style: { textAlign: "right", flexShrink: 0 } },
-              React.createElement("div", { style: { fontSize: 14, fontWeight: 900, color: c } }, a !== null ? a + "%" : "--"),
-              p ? React.createElement("div", { style: { fontSize: 8, color: TC.dim } }, p.low + "-" + p.high) : null
+            React.createElement("div", { style: { display: "flex", gap: 12, fontSize: 11 + fz } },
+              React.createElement("span", { style: { color: TC.muted } }, "\u{1F4DD} " + totalQsToday + " Qs"),
+              React.createElement("span", { style: { color: TC.muted } }, "\u23F1 " + stToday + "m"),
+              acc > 0 ? React.createElement("span", { style: { color: acc >= 75 ? "#4ade80" : acc >= 55 ? "#fbbf24" : "#f87171" } }, "\u{1F3AF} " + acc + "%") : null
+            ),
+            // Mini progress bar for weekly
+            React.createElement("div", { style: { height: 3, background: isDark ? "rgba(255,255,255,.06)" : "rgba(0,0,0,.06)", borderRadius: 2, overflow: "hidden" } },
+              React.createElement("div", { style: { height: "100%", width: weeklyPct + "%", background: weeklyPct >= 100 ? "#4ade80" : "linear-gradient(90deg,#667eea,#764ba2)", borderRadius: 2, transition: "width .3s" } })
             )
+          )
+        ),
+
+        // ════════════════════════════════════════════
+        // §5  MCAT READINESS — the centerpiece
+        // ════════════════════════════════════════════
+        (function() {
+          if (data.totalAnswered < 5) {
+            // New user — show test date prompt + welcome
+            return React.createElement("div", { style: Object.assign({}, cardStyle, { textAlign: "center", padding: "20px 16px" }) },
+              React.createElement("div", { style: { fontSize: 32, marginBottom: 8 } }, "\u{1F9EC}"),
+              React.createElement("div", { style: { fontSize: 14 + fz, fontWeight: 800, color: fg, marginBottom: 4 } }, "Welcome to MCAT Quest"),
+              React.createElement("div", { style: { fontSize: 11 + fz, color: TC.muted, marginBottom: 12, lineHeight: 1.5 } }, "Answer 5+ questions to unlock your Readiness Score and personalized study plan."),
+              !testDate ? React.createElement("button", { onClick: function() { var nd = prompt("Set your MCAT date (YYYY-MM-DD):"); if (nd) { dirtyRef.current = true; setData(function(d) { return Object.assign({}, d, { testDate: nd }); }); } }, style: { padding: "10px 20px", background: "linear-gradient(135deg,#667eea,#764ba2)", borderRadius: 10, color: "#fff", fontSize: 12 + fz, fontWeight: 700, border: "none" } }, "\u{1F4C5} Set MCAT Date") : null
+            );
+          }
+
+          var r = 40, cx = 50, cy = 50, circ = 2 * Math.PI * r;
+          var offset = circ - (readiness.score / 100) * circ;
+          var sc = readiness.color;
+          var scRgb = sc === "#f87171" ? "248,113,113" : sc === "#fb923c" ? "251,146,60" : "74,222,128";
+
+          return React.createElement("div", { style: glowCard(sc, scRgb) },
+            // Header row: Readiness ring + info
+            React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 14, marginBottom: 14 } },
+              // SVG ring
+              React.createElement("div", { style: { width: 72, height: 72, flexShrink: 0, position: "relative" } },
+                React.createElement("svg", { viewBox: "0 0 100 100", style: { width: "100%", height: "100%", transform: "rotate(-90deg)" } },
+                  React.createElement("circle", { cx: cx, cy: cy, r: r, fill: "none", stroke: isDark ? "rgba(255,255,255,.06)" : "rgba(0,0,0,.06)", strokeWidth: 7 }),
+                  React.createElement("circle", { cx: cx, cy: cy, r: r, fill: "none", stroke: sc, strokeWidth: 7, strokeDasharray: circ, strokeDashoffset: offset, strokeLinecap: "round", style: { transition: "stroke-dashoffset .6s ease" } })
+                ),
+                React.createElement("div", { style: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column" } },
+                  React.createElement("span", { style: { fontSize: 22, fontWeight: 900, color: sc, lineHeight: 1 } }, readiness.score),
+                  React.createElement("span", { style: { fontSize: 7, color: TC.dim, fontWeight: 700, letterSpacing: 0.5 } }, "READY")
+                )
+              ),
+              // Info
+              React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                React.createElement("div", { style: { fontSize: 14 + fz, fontWeight: 800, color: fg, marginBottom: 2 } }, "MCAT Readiness"),
+                React.createElement("div", { style: { fontSize: 10 + fz, color: TC.muted, lineHeight: 1.5 } },
+                  readiness.potentialGain > 3
+                    ? readiness.weakest + " is pulling you down \u2014 " + readiness.potentialGain + "pts possible."
+                    : readiness.score >= 70 ? "Strong position! Keep reviewing weak spots." : "Build momentum with daily sessions."
+                ),
+                daysUntilTest !== null && daysUntilTest <= 60 ? React.createElement("div", { style: { fontSize: 9, color: daysUntilTest <= 30 ? "#e85d2f" : TC.dim, fontWeight: 600, marginTop: 3 } },
+                  daysUntilTest <= 7 ? "\u26A0\uFE0F Final week — focus on weak areas" : daysUntilTest <= 30 ? "\u{1F4A8} " + daysUntilTest + " days — stay consistent" : "\u{1F4C5} " + daysUntilTest + " days — good time to build"
+                ) : null
+              )
+            ),
+            // Section score mini-cards
+            React.createElement("div", { style: { display: "flex", gap: 6 } },
+              ["Bio/Biochem", "Chem/Phys", "Psych/Soc", "CARS"].map(function(sec) {
+                var a2 = getSectionAccEMA(data, sec);
+                var p2 = a2 !== null ? predictScore(a2) : null;
+                var c2 = a2 === null ? TC.dim : a2 >= 80 ? "#4ade80" : a2 >= 65 ? "#fbbf24" : "#f87171";
+                return React.createElement("div", { key: sec, style: { flex: 1, padding: "8px 4px", background: isDark ? "rgba(255,255,255,.03)" : "rgba(0,0,0,.02)", borderRadius: 8, textAlign: "center", borderTop: "2.5px solid " + (secColors[sec] || TC.dim) } },
+                  React.createElement("div", { style: { fontSize: 8, color: TC.dim, fontWeight: 700, letterSpacing: 0.5, marginBottom: 2 } }, secShort[sec]),
+                  React.createElement("div", { style: { fontSize: 15, fontWeight: 900, color: c2 } }, a2 !== null ? a2 + "%" : "--"),
+                  p2 ? React.createElement("div", { style: { fontSize: 8, color: TC.dim } }, p2.low + "-" + p2.high) : null
+                );
+              })
+            ),
+            // Total predicted score
+            (function() {
+              var tp = getTotalPredicted(data);
+              if (!tp) return null;
+              return React.createElement("div", { style: { display: "flex", justifyContent: "center", alignItems: "center", gap: 6, marginTop: 10, padding: "6px 0" } },
+                React.createElement("span", { style: { fontSize: 12 + fz, fontWeight: 800, color: "#667eea" } }, "Est. Total: " + tp.low + "\u2013" + tp.high),
+                React.createElement("span", { style: { fontSize: 9, color: TC.dim } }, "/ 528")
+              );
+            })()
           );
-        })
-      )
-    ),
-    // --- AI Tutor button ---
-    /*#__PURE__*/React.createElement("button", {
-      onClick: function() { launchTeach(null, null); },
-      style: { width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", marginBottom: 10, background: "linear-gradient(135deg, rgba(102,126,234,.08), rgba(118,75,162,.06))", border: "1.5px solid rgba(102,126,234,.25)", borderRadius: 12, textAlign: "left" }
-    },
-      /*#__PURE__*/React.createElement("span", { style: { fontSize: 22 } }, "\u{1F9D1}\u200D\u{1F3EB}"),
-      /*#__PURE__*/React.createElement("div", null,
-        /*#__PURE__*/React.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: "#667eea", display: "block" } }, "AI Tutor"),
-        /*#__PURE__*/React.createElement("span", { style: { fontSize: 10, color: TC.muted } }, "Ask anything about any MCAT topic"))
-    ),
-    // === INTERACTIVE STATS CARD ===
-    React.createElement("button", {
-      onClick: function() { setScr("stats"); },
-      style: { width: "100%", padding: "14px 16px", marginBottom: 14, background: TC.card, border: "1px solid " + TC.cbr, borderRadius: 14, textAlign: "left" }
-    },
-      React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 } },
-        React.createElement("span", { style: { fontSize: 13 + fz, fontWeight: 800, color: fg } }, "\u{1F4CA} Stats & Scores"),
-        React.createElement("span", { style: { fontSize: 10, color: TC.dim } }, "\u203A")
-      ),
-      // Section score predictions row
-      (function() {
-        var secs = ["Bio/Biochem", "Chem/Phys", "Psych/Soc", "CARS"];
-        var secColors = { "Bio/Biochem": "#2a9d8f", "Chem/Phys": "#457b9d", "Psych/Soc": "#e76f51", "CARS": "#9b5de5" };
-        var secShort = { "Bio/Biochem": "B/B", "Chem/Phys": "C/P", "Psych/Soc": "P/S", "CARS": "CARS" };
-        var tp = getTotalPredicted(data);
-        return React.createElement("div", null,
-          React.createElement("div", { style: { display: "flex", gap: 6, marginBottom: 8 } },
-            secs.map(function(sec) {
-              var a = getSectionAccEMA(data, sec);
-              var p = a !== null ? predictScore(a) : null;
-              var scoreStr = p ? p.low + "-" + p.high : "--";
-              var pctStr = a !== null ? a + "%" : "--";
-              var c = a === null ? TC.dim : a >= 80 ? "#4ade80" : a >= 65 ? "#fbbf24" : "#f87171";
-              return React.createElement("div", { key: sec, style: { flex: 1, padding: "8px 4px", background: isDark ? "rgba(255,255,255,.03)" : "rgba(0,0,0,.02)", borderRadius: 8, textAlign: "center", borderTop: "2px solid " + (secColors[sec] || "#667eea") } },
-                React.createElement("div", { style: { fontSize: 8, color: TC.dim, marginBottom: 2, fontWeight: 600, letterSpacing: 0.5 } }, secShort[sec]),
-                React.createElement("div", { style: { fontSize: 14, fontWeight: 900, color: c } }, pctStr),
-                React.createElement("div", { style: { fontSize: 8, color: TC.dim, marginTop: 1 } }, scoreStr)
+        })(),
+
+        // ════════════════════════════════════════════
+        // §6  TODAY'S PLAN — task list (if tasks exist)
+        // ════════════════════════════════════════════
+        totalTasks > 0 ? React.createElement("div", { style: Object.assign({}, cardStyle, { background: "linear-gradient(135deg, rgba(102,126,234,.04), rgba(74,222,128,.02))", border: "1px solid rgba(102,126,234,.15)" }) },
+          React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 } },
+            React.createElement("span", { style: { fontSize: 13 + fz, fontWeight: 800, color: fg } }, "\u{1F9E0} Today\u2019s Plan"),
+            React.createElement("span", { style: { fontSize: 10, fontWeight: 700, color: allDone ? "#4ade80" : "#667eea" } }, allDone ? "\u2705 Done!" : completedTasks + "/" + totalTasks)
+          ),
+          // Compact progress bar
+          React.createElement("div", { style: { height: 4, background: isDark ? "rgba(255,255,255,.06)" : "rgba(0,0,0,.06)", borderRadius: 2, overflow: "hidden", marginBottom: 10 } },
+            React.createElement("div", { style: { width: planPct + "%", height: "100%", borderRadius: 2, background: allDone ? "#4ade80" : "linear-gradient(90deg, #667eea, #764ba2)", transition: "width 0.4s ease" } })
+          ),
+          // Task list (compact)
+          React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4 } },
+            tasks.slice(0, 6).map(function(task, ti) {
+              var ts = taskStates[ti];
+              var isDoneTask = ts.complete;
+              var subtitle = task.type === "questions" ? ts.done + "/" + ts.total + " Qs" : task.type === "time" ? ts.done + "/" + ts.total + "m" : isDoneTask ? "Done" : "Start";
+              var onClick = null;
+              if (task.type === "questions") {
+                onClick = function() {
+                  var qPool = QS.filter(function(q) { return task.ids.indexOf(q.id) >= 0; });
+                  if (qPool.length === 0) return;
+                  var built = buildQSet(qPool, "MARATHON", data);
+                  setQs(built); setQI(0); setSel(null); setSR(false); setSScore(0); setSC(0); setST(0); setWrong([]);
+                  setGM("MARATHON"); setLives(3); setStreak(0); setConf(null); setAwaitConf(false);
+                  setMatchSel(null); setMatchDone([]); setMatchResults([]); setHintUsed(false);
+                  setEliminated([]); setRevealed(false); setPassOpen(true); setPaused(false);
+                  setQAnswered({}); setTL(null); setThinkDelay(0); setElaborativeDelay(0);
+                  setFreeRecallText(""); setFreeRecallRevealed(false);
+                  setAiExplain({loading:false, text:null, qId:null});
+                  setSessionRolling([]); setConsecutiveWrong(0); setRescueMode(false); setRescueTag(null); setDifficultyMode("normal");
+                  qStartRef.current = Date.now(); setScr("play");
+                };
+              } else if (task.type === "lesson") {
+                onClick = function() { setModuleTag(task.moduleTag); setModuleStep(0); setModuleCheckSel(null); setModuleCheckDone(false); setScr("module"); };
+              } else if (task.type === "card") {
+                onClick = function() {
+                  dirtyRef.current = true;
+                  setData(function(d) { var newSnap = Object.assign({}, d.dailyPlanSnapshot || {}); var cd2 = Object.assign({}, newSnap.cardsDone || {}); cd2[task.cardTag] = Date.now(); newSnap.cardsDone = cd2; return Object.assign({}, d, { dailyPlanSnapshot: newSnap }); });
+                  setShowConceptCard(task.cardTag);
+                };
+              }
+              return React.createElement("div", { key: ti, onClick: onClick, style: { display: "flex", alignItems: "center", gap: 8, padding: "5px 0", cursor: onClick ? "pointer" : "default", opacity: isDoneTask ? 0.6 : 1 } },
+                React.createElement("span", { style: { width: 20, height: 20, borderRadius: 6, background: isDoneTask ? "rgba(74,222,128,.15)" : "rgba(102,126,234,.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, flexShrink: 0, color: isDoneTask ? "#4ade80" : TC.dim } }, isDoneTask ? "\u2713" : task.icon),
+                React.createElement("span", { style: { flex: 1, fontSize: 11 + fz, color: isDoneTask ? TC.dim : fg, textDecoration: isDoneTask ? "line-through" : "none", textDecorationColor: "rgba(74,222,128,.3)" } }, task.label),
+                React.createElement("span", { style: { fontSize: 10, fontWeight: 600, color: isDoneTask ? "#4ade80" : TC.dim } }, subtitle)
               );
             })
           ),
-          // Total predicted + key stats row
-          React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } },
-            React.createElement("div", { style: { display: "flex", gap: 12 } },
-              React.createElement("span", { style: { fontSize: 10, color: TC.muted } }, "\u{1F525} ", data.bestStreak > 0 ? data.bestStreak + " best streak" : "No streak yet"),
-              React.createElement("span", { style: { fontSize: 10, color: TC.muted } }, "\u{1F4AA} ", data.totalAnswered, " answered")
+          // AI Coach + Rebuild row
+          React.createElement("div", { style: { display: "flex", gap: 6, marginTop: 10 } },
+            React.createElement("button", { onClick: function() {
+              if (!getApiKey()) { setCoachText("\u26A0\uFE0F Set your API key in Settings to use AI features."); setCoachDate(todayStr()); return; }
+              setCoachLoading(true);
+              var tc2 = getTagCounts(data);
+              var weakTags2 = Object.keys(tc2).filter(function(t) { return tc2[t].seen >= 3; }).map(function(t) { return { tag: t, pct: Math.round(tc2[t].correct / tc2[t].seen * 100) }; }).sort(function(a,b) { return a.pct - b.pct; }).slice(0, 5);
+              var weakStr2 = weakTags2.map(function(t) { return t.tag + " (" + t.pct + "%)"; }).join(", ") || "not enough data yet";
+              var userMsg = (daysUntilTest !== null ? "Days until MCAT: " + daysUntilTest + ". " : "") + "Streak: " + dayStreak + "d. Answered: " + (data.totalAnswered || 0) + ". Accuracy: " + acc + "%. Today: " + stToday + "min. Due: " + dueC + ". Weak: " + weakStr2 + ".";
+              var sysP = "You are an MCAT study coach. Give 2-3 sentences of warm, direct advice. Use **bold** for key actions. Reference specific weak areas. Under 60 words.";
+              callTeachAI([{role:"user", content: userMsg}], sysP).then(function(reply) { setCoachLoading(false); setCoachText(reply); setCoachDate(todayStr()); });
+            }, style: { flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 4, padding: "7px 10px", background: "rgba(118,75,162,.06)", border: "1px solid rgba(118,75,162,.18)", borderRadius: 8, fontSize: 10 + fz, fontWeight: 600, color: "#a78bfa" } },
+              coachLoading ? "\u{1F916} Thinking..." : "\u{1F916} AI Coach"
             ),
-            tp ? React.createElement("span", { style: { fontSize: 11, fontWeight: 800, color: "#667eea" } }, "Est: " + tp.low + "-" + tp.high) : React.createElement("span", { style: { fontSize: 10, color: TC.dim } }, "Need more data")
+            React.createElement("button", { onClick: function() { dirtyRef.current = true; setData(function(d) { return Object.assign({}, d, { dailyPlanSnapshot: null }); }); setCoachText(null); setCoachDate(""); }, style: { padding: "7px 10px", background: "transparent", border: "1px dashed " + TC.cbr, borderRadius: 8, fontSize: 10 + fz, color: TC.dim } }, "\u{1F504}")
+          ),
+          // Coach response (if cached)
+          coachText && coachDate === todayStr() ? React.createElement("div", { style: { padding: "10px 12px", background: "rgba(118,75,162,.04)", borderRadius: 8, marginTop: 8, fontSize: 11 + fz, color: TC.muted, lineHeight: 1.6 } },
+            React.createElement("div", { style: { whiteSpace: "pre-wrap" } }, renderMd(coachText))
+          ) : null
+        ) : null,
+
+        // ════════════════════════════════════════════
+        // §7  SMART INSIGHTS — max 3, actionable
+        // ════════════════════════════════════════════
+        insights.length > 0 ? React.createElement("div", { style: { marginBottom: 12 } },
+          insights.slice(0, 3).map(function(ins, ii) {
+            return React.createElement("div", { key: ii, style: { display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", marginBottom: 4, background: ins.type === "positive" ? "rgba(74,222,128,.04)" : ins.type === "warning" ? "rgba(248,113,113,.04)" : "rgba(102,126,234,.04)", border: "1px solid " + (ins.type === "positive" ? "rgba(74,222,128,.12)" : ins.type === "warning" ? "rgba(248,113,113,.12)" : "rgba(102,126,234,.12)"), borderRadius: 8 } },
+              React.createElement("span", { style: { fontSize: 13, flexShrink: 0 } }, ins.icon),
+              React.createElement("span", { style: { fontSize: 10 + fz, color: TC.muted, flex: 1, lineHeight: 1.4 } }, ins.text)
+            );
+          })
+        ) : null,
+
+        // ════════════════════════════════════════════
+        // §8  RANK & XP — compact footer bar
+        // ════════════════════════════════════════════
+        React.createElement("div", { style: Object.assign({}, cardStyle, { display: "flex", alignItems: "center", gap: 10, marginBottom: 8, padding: "10px 14px" }) },
+          React.createElement("span", { style: { fontSize: 20 } }, rank.b),
+          React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+            React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 } },
+              React.createElement("span", { style: { fontSize: 12 + fz, fontWeight: 700, color: fg } }, rank.name),
+              React.createElement("span", { style: { fontSize: 10, color: "#667eea", fontWeight: 600 } }, data.xp + " XP")
+            ),
+            nr ? React.createElement("div", null,
+              React.createElement("div", { style: { height: 3, background: isDark ? "rgba(255,255,255,.06)" : "rgba(0,0,0,.06)", borderRadius: 2, overflow: "hidden" } },
+                React.createElement("div", { style: { height: "100%", width: Math.min((data.xp - rank.min) / (nr.min - rank.min) * 100, 100) + "%", background: "linear-gradient(90deg,#667eea,#764ba2)", borderRadius: 2 } })
+              ),
+              React.createElement("div", { style: { fontSize: 9, color: TC.dim, marginTop: 2 } }, (nr.min - data.xp) + " XP to " + nr.b + " " + nr.name)
+            ) : null
           )
-        );
-      })()
-    ),
-    /*#__PURE__*/React.createElement("div", {
-      style: {
-        textAlign: "center",
-        marginTop: 12
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 9,
-        color: TC.dim
-      }
-    }, QS.length, " Qs ", "\u2022", " ", ALL_TAGS.length, " tags ", "\u2022", " ", newC, " unseen"))));
+        ),
+
+        // MCAT date (if not set and has some data)
+        !testDate && data.totalAnswered >= 5 ? React.createElement("button", { onClick: function() { var nd = prompt("Set your MCAT date (YYYY-MM-DD):"); if (nd) { dirtyRef.current = true; setData(function(d) { return Object.assign({}, d, { testDate: nd }); }); } }, style: { width: "100%", padding: "10px", marginBottom: 8, background: TC.card, border: "1px dashed " + TC.cbr, borderRadius: 10, fontSize: 11 + fz, color: TC.dim, textAlign: "center" } }, "\u{1F4C5} Set your MCAT test date") : null,
+
+        // ── Footer ──
+        React.createElement("div", { style: { textAlign: "center", marginTop: 8, paddingBottom: 8 } },
+          React.createElement("span", { style: { fontSize: 9, color: TC.dim } }, QS.length + " Qs \u2022 " + ALL_TAGS.length + " tags \u2022 v20.0.1")
+        )
+
+      ),
+      // Tab bar
+      React.createElement(TabBar, { activeTab: activeTab, setActiveTab: setActiveTab, setScr: setScr, isDark: isDark, fg: fg })
+    );
   }
+
 
   // === TAG SELECT ===
   if (scr === "select_tag") {
